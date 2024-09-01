@@ -4,7 +4,7 @@
 
 <div align="center"> 
 
-![SDBXgraf](https://github.com/user-attachments/assets/f4dfb406-bfb1-4c2f-9ed1-f754908635f6)
+![sdbx2ksnow2_logo](https://github.com/user-attachments/assets/a6847ed6-f68b-4244-8e8a-704025da32f0)
 ##
 
  ### [ [Darkshapes](https://github.com/darkshapes) ]
