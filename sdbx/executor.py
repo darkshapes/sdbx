@@ -1,6 +1,6 @@
 from typing import Any, Dict
 from collections import defaultdict
-from asyncio import Queue, Event, gather
+from asyncio import Queue, Event, create_task, gather
 
 import networkx as nx
 from networkx import MultiDiGraph
@@ -78,7 +78,7 @@ class Executor:
             if converged:
                 break
 
-    async def execute(self, graph: MultiDiGraph):
+    async def execute_graph(self, graph: MultiDiGraph):
         # Detect cycles in the graph
         cycles = self.detect_cycles(graph)
         
@@ -99,6 +99,9 @@ class Executor:
         await gather(*tasks)
         
         return self.results
+    
+    def execute(self, graph: MultiDiGraph):
+        self.running_task = create_task(self.execute_graph(graph))
     
     def halt(self):
         # Signal the executor to halt

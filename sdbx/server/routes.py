@@ -11,8 +11,11 @@ def register_routes(rtr: APIRouter):
     
     @rtr.post("/prompt")
     async def start_prompt(graph: Graph):
-        await config.executor.execute(node_link_graph(graph.dict()))
-        return
+        return config.executor.execute(node_link_graph(graph.dict()))
+    
+    @rtr.post("/kill")
+    async def kill_prompt():
+        return config.executor.halt()
     
     @rtr.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
