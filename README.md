@@ -1,13 +1,13 @@
 
 
-# [SDBX](https://github.com/darkshapes/sdbx) / Powerful ML / Long-Term Support / Extensive Functions
+# [SDBX](https://github.com/darkshapes/sdbx) / Powerful ML
 
 <div align="center"> 
 
-![SDBXgraf](https://github.com/user-attachments/assets/aa347fe8-9de0-4b33-af90-b3d5d99bc36c)
+![SDBXgraf](https://github.com/user-attachments/assets/f4dfb406-bfb1-4c2f-9ed1-f754908635f6)
 ##
 
- ### [ [AppMana](https://github.com/appmana/) | [Hidden Switch](https://github.com/hiddenswitch/) | [Darkshapes](https://github.com/darkshapes) ]
+ ### [ [Darkshapes](https://github.com/darkshapes) ]
 
 <hr>
 
