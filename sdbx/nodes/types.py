@@ -80,7 +80,7 @@ class Slider:
 
 @dataclass
 class Numerical(Slider):
-    randomizable: bool = False
+    randomizable: bool = False # seed generator
 
 @dataclass
 class Text:
