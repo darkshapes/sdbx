@@ -1,9 +1,8 @@
-from typing import Any, Callable, List, Optional, Tuple
-from dataclasses import dataclass, field
-from functools import partial
 from enum import Enum
-from typing import Annotated, Dict, Generic, Literal, get_type_hints, Union
 from inspect import signature
+from functools import partial, cache
+from dataclasses import dataclass, field
+from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -22,7 +21,7 @@ def node(fn=None, path=None, name=None):
         return partial(node, path=path, name=name)
 
     fn.info = NodeInfo(fn, path=path, name=name)
-    return fn
+    return cache(fn)
 
 
 ## Types ##
