@@ -30,7 +30,7 @@ def name_test(
 ) -> str:
     return string
 
-@node
+@node(name="LLM Print")
 def llm_print(
     string: A[str, Text()]
 ) -> None:
