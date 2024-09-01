@@ -30,7 +30,7 @@ def clip_vision_encode(
     clip_vision: CLIPVision,
     pixels: Image,
 ) -> CLIPVisionOutput:
-        return clip_vision.encode_image(image)
+    return clip_vision.encode_image(image)
 
 @node
 def style_model_apply(
@@ -38,12 +38,12 @@ def style_model_apply(
     style_model: StyleModel,
     clip_vision_output: CLIPVisionOutput
 ) -> Conditioning:
-        cond = style_model.get_cond(clip_vision_output).flatten(start_dim=0, end_dim=1).unsqueeze(dim=0)
-        c = []
-        for t in conditioning:
-            n = [torch.cat((t[0], cond), dim=1), t[1].copy()]
-            c.append(n)
-        return (c, )
+    cond = style_model.get_cond(clip_vision_output).flatten(start_dim=0, end_dim=1).unsqueeze(dim=0)
+    c = []
+    for t in conditioning:
+        n = [torch.cat((t[0], cond), dim=1), t[1].copy()]
+        c.append(n)
+    return (c, )
 
 @node
 def unclip_conditioning(
@@ -52,20 +52,20 @@ def unclip_conditioning(
     strength: A[float, Numerical(min=-10.0, max=10.0, step=0.01)] = 1.0,
     noise_augmentation: A[float, Slider(min=0.0, max=1.0, step=0.01)] = 0,
 ) -> Conditioning:
-        if strength == 0:
-            return conditioning
+    if strength == 0:
+        return conditioning
 
-        c = []
-        for t in conditioning:
-            o = t[1].copy()
-            x = {"clip_vision_output": clip_vision_output, "strength": strength, "noise_augmentation": noise_augmentation}
-            if "unclip_conditioning" in o:
-                o["unclip_conditioning"] = o["unclip_conditioning"][:] + [x]
-            else:
-                o["unclip_conditioning"] = [x]
-            n = [t[0], o]
-            c.append(n)
-        return c
+    c = []
+    for t in conditioning:
+        o = t[1].copy()
+        x = {"clip_vision_output": clip_vision_output, "strength": strength, "noise_augmentation": noise_augmentation}
+        if "unclip_conditioning" in o:
+            o["unclip_conditioning"] = o["unclip_conditioning"][:] + [x]
+        else:
+            o["unclip_conditioning"] = [x]
+        n = [t[0], o]
+        c.append(n)
+    return c
 
 
 @node

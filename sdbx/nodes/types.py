@@ -1,6 +1,6 @@
 from enum import Enum
 from inspect import signature
-from functools import partial, cache
+from functools import partial
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
 
@@ -21,7 +21,7 @@ def node(fn=None, path=None, name=None):
         return partial(node, path=path, name=name)
 
     fn.info = NodeInfo(fn, path=path, name=name)
-    return cache(fn)
+    return fn
 
 
 ## Types ##
