@@ -19,6 +19,9 @@ core = [
     "transformers",
     "accelerate",
 
+    # Other machine learning libraries
+    "llama-cpp-python",
+
     # Graph data structure
     "networkx",
 
