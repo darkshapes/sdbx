@@ -8,10 +8,10 @@ import tomllib
 import importlib
 import sysconfig
 import subprocess
-from functools import cached_property
-from importlib.metadata import distribution
-from inspect import getmembers, isfunction
 from typing import Callable, Dict, List
+from inspect import getmembers, isfunction
+from importlib.metadata import distribution
+from functools import cached_property, cache
 
 import virtualenv
 from dulwich import porcelain
@@ -88,4 +88,4 @@ class NodeManager:
 	
 	@cached_property
 	def registry(self) -> Dict[str, Callable]:
-		return { node.__name__: node for node in self.nodes }
+		return { node.__name__: cache(node) for node in self.nodes }
