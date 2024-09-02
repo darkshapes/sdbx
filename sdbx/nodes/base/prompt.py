@@ -1,28 +1,26 @@
 from sdbx.nodes.types import *
 from llama_cpp import Llama
 from transformers import AutoTokenizer, AutoModel
-from diffusers import encode_prompt
+import diffusers
 
 @node(name="LLM Prompt")
 def llm_prompt(
     llama: Llama,
-    streaming: bool = True,
-    top_k: A[int, Slider(min=0, max=100)] = 40,
-    top_p: A[float, Slider(min=0, max=1, step=0.01)] = 0.95,
-    repeat_penalty: A[float, Numerical(min=0.0, max=2.0, step=0.01)] = 1,
-    temperature: A[float, Numerical(min=0.0, max=2.0, step=0.01)] = 0.2,
-    max_tokens:  A[int, Numerical(min=0, max=2)] = 256,
-    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for revealing what you know, yet wise for revealing what you do not.",
+    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for revealing what you know, yet wiser for revealing what you do not.",
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
+    streaming: bool = True, #triggers generator in next node?
+    advanced_options: bool = False,
+        top_k: A[int, Dependent(on="advanced_options", when=True),Slider(min=0, max=100)] = 40,
+        top_p: A[float, Dependent(on="advanced_options", when=True), Slider(min=0, max=1, step=0.01)] = 0.95,
+        repeat_penalty: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01)] = 1,
+        temperature: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01)] = 0.2,
+        max_tokens:  A[int, Dependent(on="advanced_options", when=True),  Numerical(min=0, max=2)] = 256,
 ) -> str:
     print("⎆Adding Prompt:")
     return llama.create_chat_completion(
         messages=[
                 { "role": "system", "content": system_prompt },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
+                { "role": "user", "content": user_prompt }
             ],
         stream=streaming,
         repeat_penalty=repeat_penalty,
@@ -32,19 +30,19 @@ def llm_prompt(
         max_tokens=max_tokens,
     )
 
+@node
 def text_encode(
     checkpoint: Llama,
     encoder: Llama,
-    lora_scale: A[float],
+    # encoder_2: when input is attached, needs to make other _2 options show
+    lora_scale: float = 0.00,
     prompt : A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     negative_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     clip_skip: A[int, Slider(min=0, max=3)] = 0,
-    second_encoder: bool = False,
-    encoder_2: A[Llama, Dependent(on="second_encoder", when=True)] = None,
-    prompt_2: A[str, Dependent(on="second_encoder", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
-    negative_prompt_2: A[str, Dependent(on="second_encoder", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
-) -> embeddings:
+    prompt_2: A[str, Dependent(on="encoder_2", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
+    negative_prompt_2: A[str, Dependent(on="encoder_2", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
+) -> str: # placeholder for latent space embeddings
     print("⎆Encoding Prompt")
-    encode = encoder.encode_prompt(prompt)  # return for encode_prompt= prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+    encode = encoder.encode_prompt(prompt)  # returns embeds for 1)prompt, 2)negative, 3)pooled prompt, 4)negative pooled
     return encode
 

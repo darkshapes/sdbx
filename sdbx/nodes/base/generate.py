@@ -1,20 +1,24 @@
+from sdbx.nodes.types import *
+from sdbx.nodes.helpers import getSchedulers
 from torch import Generator, manual_seed
-from diffusers import StableDiffusionXLPipeline, enable_model_cpu_offload, pipe
+from diffusers import StableDiffusionXLPipeline
+from llama_cpp import Llama
+from diffusers import UNet2DConditionModel, AutoencoderKL, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, HeunDiscreteScheduler, DPMSolverMultistepScheduler
 
-@node(Name="Inference")
+@node(name="Inference")
 def inference(
     checkpoint: Llama,
-    embeds: Llama,
-    scheduler: None,
+    embeds: str,
     unet: Llama,
-) -> Image:
+    scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
+) -> str: # placeholder for latent space denoised tensor
     print("⎆Generating:")
     pipe = StableDiffusionXLPipeline(
             vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
-            scheduler=scheduler,
+            scheduler=scheduler+"Scheduler",
             force_zeros_for_empty_prompt=False)
     pipe = pipe.to("cuda")
     pipe.enable_model_cpu_offload()
@@ -27,8 +31,5 @@ def inference(
         num_images_per_prompt=1,
         generator= torch.Generator(pipe.device).manual_seed(66)).images[0]
     return image
-    
 
-if __name__ == '__main__':
-    import fire
-    fire.Fire(infer)
+    
