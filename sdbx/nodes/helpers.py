@@ -23,8 +23,12 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
         num.append(float(conv)) if secrets.choice([True, False]) else num.append(float(conv)*-1)
     return num
 
-def getDir(folder):
-   return sorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f))])
+def getDirFiles(folder, filtering=None):
+   return sorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (f.startswith(filtering) or f.endswith(filtering))])
+
+def getDirFilesCount(folder, filtering=None):
+    counts = [getDirFiles(folder, filtering)]
+    return format(len(counts))
 
 import re
 
