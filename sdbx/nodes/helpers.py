@@ -2,6 +2,8 @@ from random import random
 import numpy as np
 from numpy.random import SeedSequence, Generator, Philox, BitGenerator
 import secrets as secrets
+import os
+from sdbx import config
 
 def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
@@ -20,6 +22,9 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
             conv = '{0:.6f}'.format((float(hardRandom()))/0xE8D4A51000)
         num.append(float(conv)) if secrets.choice([True, False]) else num.append(float(conv)*-1)
     return num
+
+def getDir(folder):
+   return sorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f))])
 
 import re
 
