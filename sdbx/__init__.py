@@ -10,4 +10,7 @@ except PackageNotFoundError:
 from .config import config
 from .server import create_app
 
+if "dev" in __version__:
+    config.development = True
+
 app = create_app()
