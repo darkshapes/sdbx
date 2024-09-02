@@ -34,7 +34,7 @@ def name_test(
 def llm_print(
     response: A[str, Text()]
 ) -> None:
-    print("printing response")
+    print("Printing Resposnse")
     for chunk in response:
         delta = chunk['choices'][0]['delta']
         if 'role' in delta:
