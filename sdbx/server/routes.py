@@ -11,7 +11,8 @@ def register_routes(rtr: APIRouter):
     
     @rtr.post("/prompt")
     async def start_prompt(graph: Graph):
-        return config.executor.execute(node_link_graph(graph.dict()))
+        task = config.executor.execute(node_link_graph(graph.dict()))
+        return {"status": "started", "task_id": id(task)}
     
     @rtr.post("/kill")
     async def kill_prompt():

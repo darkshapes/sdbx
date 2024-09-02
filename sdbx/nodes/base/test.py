@@ -32,15 +32,12 @@ def name_test(
 
 @node(name="LLM Print")
 def llm_print(
-    string: A[str, Text()]
+    response: A[str, Text()]
 ) -> None:
+    print("printing response")
     for chunk in response:
         delta = chunk['choices'][0]['delta']
         if 'role' in delta:
-            stream = print(delta['role'], end=': ')
-            print(stream)
-            return stream
+            print(delta['role'], end=': ')
         elif 'content' in delta:
-            stream = delta['content'], end=''
-            print(stream)
-            return stream
+            print(delta['content'], end='')

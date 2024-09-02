@@ -1,5 +1,8 @@
+from sdbx import config
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import softRandom
+
+import os
 
 from llama_cpp import Llama
 
@@ -10,8 +13,9 @@ def llm_loader(
     repeat_penalty: A[float, Numerical(min=0, max=2, step=0.01)] = 1,
     temperature: A[float, Numerical(min=0, max=2, step=0.01)] = 0.2
 ) -> Llama:
+    print("loading llama")
     return Llama(
-        model_path="/Users/Shared/ouerve/recent/darkshapes/models/llms/codeninja-1.0-openchat-7b.Q5_K_M.gguf",
+        model_path=os.path.join(config.get_path("models.llms"), "codeninja-1.0-openchat-7b.Q5_K_M.gguf"),
         # n_gpu_layers=-1, # Uncomment to use GPU acceleration
         n_threads=threads,   # The number of CPU threads to use, tailor to your system and the resulting performance
         seed=softRandom(), # Uncomment to set a specific seed

@@ -9,7 +9,8 @@ def llm_prompt(
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "Return python code to access a webcam with as few dependencies as possible.",
     streaming: bool = True
 ) -> str:
-    return llm.create_chat_completion(
+    print("creating chat completion")
+    return llama.create_chat_completion(
         messages=[
                 { "role": "system", "content": system_prompt },
                 {

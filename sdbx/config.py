@@ -16,30 +16,6 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-model_directories = [
-    "checkpoints",
-    "classifiers",
-    "clip",
-    "clip_vision",
-    # "configs",
-    "controlnet",
-    "diffusers",
-    "embeddings",
-    "gligen",
-    "hypernetworks",
-    "huggingface",
-    "hf_cache",
-    "loras",
-    "llms",
-    "photomaker",
-    "style_models",
-    "t2i_adapter",
-    "unet",
-    "upscale_models",
-    "vae",
-    "vae_approx"
-]
-
 config_default_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config/default")
 
 def get_config_location():
@@ -186,9 +162,6 @@ class Config(BaseSettings):
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
         
-        # for subdir in model_directories:
-        #     os.makedirs(os.path.join(path, "models", subdir), exist_ok=True)
-        
         shutil.copytree(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config/default"), self.path, dirs_exist_ok=True)
 
     def rewrite(self, key, value):
@@ -212,6 +185,30 @@ class Config(BaseSettings):
         #     "models": os.path.join(self.path, self.location.models),
         #     "workflows": os.path.join(self.path, self.location.workflows)
         # }
+
+        model_directories = [
+            "checkpoints",
+            "classifiers",
+            "clip",
+            "clip_vision",
+            # "configs",
+            "controlnet",
+            "diffusers",
+            "embeddings",
+            "gligen",
+            "hypernetworks",
+            "huggingface",
+            "hf_cache",
+            "loras",
+            "llms",
+            "photomaker",
+            "style_models",
+            "t2i_adapter",
+            "unet",
+            "upscale_models",
+            "vae",
+            "vae_approx"
+        ]
 
         root = {
             n: os.path.join(self.path, p) for n, p in dict(self.location).items()
