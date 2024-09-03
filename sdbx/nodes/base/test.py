@@ -30,6 +30,15 @@ def name_test(
 ) -> str:
     return string
 
+@node
+def basic_generator(
+    n: A[int, Numerical(min=1, max=20)] = 10
+) -> I[int]:
+    basic_generator.steps = n
+    
+    for i in range(n):
+        yield i
+
 @node(name="LLM Print")
 def llm_print(
     response: A[str, Text()]

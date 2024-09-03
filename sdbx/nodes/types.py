@@ -29,6 +29,9 @@ def node(fn=None, path=None, name=None):
 # Annotations
 from typing import Annotated as A                   # A
 
+# Iterators
+from collections.abc import Iterator as I
+
 # Primitives
 # bool                                              # bool
 # int                                               # int

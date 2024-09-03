@@ -1,5 +1,8 @@
+import contextvars
+
 from typing import Any, Dict
 from collections import defaultdict
+from contextlib import contextmanager
 from asyncio import Queue, Event, create_task, gather
 
 import networkx as nx
@@ -8,19 +11,39 @@ from networkx import MultiDiGraph
 from sdbx import config
 from sdbx.server.types import Edge, Node
 
+current_context = contextvars.ContextVar('current_context')
+
+class TaskContext:
+    def __init__(self):
+        self.queue = Queue()
+        self.results = defaultdict(list)
+        self.halt_event = Event()
+        self.result_event = Event()
+        self.running_task = None
+
+    @contextmanager
+    def use(self):
+        token = current_context.set(self)
+        try:
+            yield self
+        finally:
+            current_context.reset(token)
+
+    @staticmethod
+    def get_current():
+        return current_context.get()
+
 class Executor:
     def __init__(self, node_manager):
         self.node_manager = node_manager
-        self.queue = Queue()
-        self.results = defaultdict(list) # Store the results of each node execution
-        self.halt_event = Event() # Event to signal halt
-        self.result_event = Event() # Event to signal result updates
-        self.running_task = None  # Task handle for the running executor
+        self.tasks = {}
     
     async def execute_node(self, node: Node, inputs: Dict[str, Any]):
         return self.node_manager.registry[node['fname']](**inputs, **node['widget_inputs'])
     
     async def process_node(self, graph, node):
+        context = TaskContext.get_current()
+
         # Get data of all input edges
         in_edge_data = [Edge(
             source=e[0],
@@ -28,21 +51,21 @@ class Executor:
         ) for e in graph.in_edges(node) for v in graph.get_edge_data(*e).values()]
 
         # Gather inputs from predecessors
-        inputs = { v.target_handle: self.results[v.source][v.source_handle] for v in in_edge_data }
+        inputs = { v.target_handle: context.results[v.source][v.source_handle] for v in in_edge_data }
         
         # Execute the node with the collected inputs
         output = await self.execute_node(graph.nodes[node], inputs)
         
         # Store the result
-        self.results[node].append(output)
+        context.results[node].append(output)
 
         # Notify that results have been updated
-        self.result_event.set()
+        context.result_event.set()
         
         # Enqueue successors if they have received all their inputs
         for successor in graph.successors(node):
-            if len(self.results[node]) == len(list(graph.predecessors(successor))):
-                await self.queue.put(successor)
+            if len(context.results[node]) == len(list(graph.predecessors(successor))):
+                await context.queue.put(successor)
     
     def detect_cycles(self, graph):
         # Detect strongly connected components (SCCs)
@@ -54,59 +77,65 @@ class Executor:
         return cycles
     
     async def handle_cycle(self, graph, cycle):
+        context = TaskContext.get_current()
+
         # Process the cycle as a strongly connected component (SCC)
         subgraph = graph.subgraph(cycle)
         
         # Initialize node outputs
         for node in cycle:
-            if node not in self.results:
+            if node not in context.results:
                 await self.execute_node(graph.nodes[node], [])
         
         # Iterate to propagate the feedback until halted
-        while not self.halt_event.is_set():
+        while not context.halt_event.is_set():
             converged = True
             for node in cycle:
-                inputs = [self.results[pred][-1] for pred in subgraph.predecessors(node)]
+                inputs = [context.results[pred][-1] for pred in subgraph.predecessors(node)]
                 output = await self.execute_node(graph.nodes[node], inputs)
                 
-                if not self.results[node] or output != self.results[node][-1]:
+                if not context.results[node] or output != context.results[node][-1]:
                     converged = False
                 
-                self.results[node].append(output)
+                context.results[node].append(output)
             
             # If convergence is achieved or no change in results, break the loop
             if converged:
                 break
 
     async def execute_graph(self, graph: MultiDiGraph):
+        context = TaskContext.get_current()
+
         # Detect cycles in the graph
         cycles = self.detect_cycles(graph)
         
-        # Start handling cycles
-        tasks = [self.handle_cycle(graph, cycle) for cycle in cycles]
+        # Setup cycle coroutines
+        ct = [self.handle_cycle(graph, cycle) for cycle in cycles]
         
         # Initialize the queue with nodes that have no predecessors (input terminal nodes)
         for node in graph.nodes:
             if graph.in_degree(node) == 0:
-                await self.queue.put(node)
+                await context.queue.put(node)
         
         # Process nodes in topological order (acyclic parts)
-        while not self.queue.empty() and not self.halt_event.is_set():
-            node = await self.queue.get()
+        while not context.queue.empty() and not context.halt_event.is_set():
+            node = await context.queue.get()
             await self.process_node(graph, node)
         
-        # Wait for cycle handling tasks to complete
-        await gather(*tasks)
+        # Wait for cycle handling coroutines to complete
+        await gather(*ct)
         
-        return self.results
+        return context.results
     
-    def execute(self, graph: MultiDiGraph):
-        self.running_task = create_task(self.execute_graph(graph))
+    def execute(self, graph: MultiDiGraph, task_id: str):
+        context = TaskContext()
+        self.tasks[task_id] = context
+        with context.use():
+            context.running_task = create_task(self.execute_graph(graph))
     
-    def halt(self):
-        # Signal the executor to halt
-        self.halt_event.set()
-        
-        # Optionally, cancel the running task if needed
-        if self.running_task:
-            self.running_task.cancel()
+    def halt(self, task_id: str):
+        context = self.tasks.get(task_id)
+        if context:
+            context.halt_event.set()
+            if context.running_task:
+                context.running_task.cancel()
