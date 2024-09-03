@@ -1,35 +1,54 @@
 from sdbx.nodes.types import *
-from sdbx.nodes.helpers import getSchedulers
+from sdbx.nodes.helpers import getSchedulers, softRandom
 from torch import Generator, manual_seed
-from diffusers import StableDiffusionXLPipeline
+from diffusers import (
+    DiffusionPipeline, UNet2DConditionModel, AutoencoderKL,
+    EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMScheduler,
+    UniPCMultistepScheduler, HeunDiscreteScheduler, DPMSolverMultistepScheduler,
+    LMSDiscreteScheduler, DEISMultistepScheduler )
 from llama_cpp import Llama
-from diffusers import UNet2DConditionModel, AutoencoderKL, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, HeunDiscreteScheduler, DPMSolverMultistepScheduler
 
-@node(name="Inference")
-def inference(
+@node(name="Diffusion")
+def diffusion(
     checkpoint: Llama,
     embeds: str,
     unet: Llama,
+    height: int = 1024,
+    width: int = 1024,
+    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFFF, randomizable=True)] = softRandom,
+    steps: A[int, Numerical(min=0, max=1000, step=1)] = 10,
+    guidance: A[float, Slider(min=0.0, max=20.0, step=0.01)] = 5.0,
     scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
+    algorithm_type: A[Literal["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver",], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
+    use_karras_sigmas: A[bool, Dependent(on="scheduler", when=["LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"],)] = True,
+    solver_order: A[int, Dependent(on="scheduler", when="DPMSolverMultistepScheduler"), Slider(min=1, max=3, step=1)] = 2,
+    v_pred: A[bool, Dependent(on="scheduler", when="DDIMScheduler")] = False, 
+    timestep_spacing: A[Literal["trailing",], Dependent(on="scheduler", when="DDIMScheduler")] = "trailing",
 ) -> str: # placeholder for latent space denoised tensor
-    print("⎆Generating:")
-    pipe = StableDiffusionXLPipeline(
-            vae=vae,
-            text_encoder=text_encoder,
-            tokenizer=tokenizer,
-            unet=unet,
-            scheduler=scheduler+"Scheduler",
-            force_zeros_for_empty_prompt=False)
+    print("Generating")
+    pipe = checkpoint
+    pipe = DiffusionPipeline.from_pretrained(use_safetensors=True)
+    class_object = getattr(schedulerdict, scheduler)
+    pipe.scheduler = class_object.from_config( {
+        "config": pipe.scheduler.config,
+        "use_karras_sigmas": True if dpm_karras_sigmas==True or lms_karras_sigmas==True else False,
+        "rescale_betas_zero_snr": True if v_pred==True else False,
+        "force_zeros_for_empty_prompt": False if v_pred==True else False,
+        "solver_order": solver_order if scheduler=="DPMSolverMultistepScheduler" else None,
+        "prediction_type": "v_prediction" if v_pred==True else "epsilon",
+        "timestep_spacing": "trailing" if timestep_spacing=="trailing" else None,
+    })
     pipe = pipe.to("cuda")
     pipe.enable_model_cpu_offload()
+
     image = pipe(
-        prompt=prompt,
-        height=1024,
-        width=1024,
-        num_inference_steps=50,
-        guidance_scale=5.0,
-        num_images_per_prompt=1,
-        generator= torch.Generator(pipe.device).manual_seed(66)).images[0]
+            prompt=prompt,
+            height=height,
+            width=width,
+            num_inference_steps=steps,
+            guidance_scale=guidance,
+            num_images_per_prompt=n_batch,
+            generator= torch.Generator(pipe.device).manual_seed(softRandom())).images[0]
     return image
 
     

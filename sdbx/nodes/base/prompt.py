@@ -16,7 +16,7 @@ def llm_prompt(
         temperature: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01)] = 0.2,
         max_tokens:  A[int, Dependent(on="advanced_options", when=True),  Numerical(min=0, max=2)] = 256,
 ) -> str:
-    print("⎆Adding Prompt:")
+    print("Encoding Prompt")
     return llama.create_chat_completion(
         messages=[
                 { "role": "system", "content": system_prompt },
@@ -42,7 +42,7 @@ def text_encode(
     prompt_2: A[str, Dependent(on="encoder_2", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
     negative_prompt_2: A[str, Dependent(on="encoder_2", when=True), Text(multiline=True, dynamic_prompts=True)] = None,
 ) -> str: # placeholder for latent space embeddings
-    print("⎆Encoding Prompt")
+    print("Encoding Prompt")
     encode = encoder.encode_prompt(prompt)  # returns embeds for 1)prompt, 2)negative, 3)pooled prompt, 4)negative pooled
     return encode
 

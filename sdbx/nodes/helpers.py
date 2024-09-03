@@ -1,4 +1,5 @@
 from random import random
+from natsort import natsorted
 import numpy as np
 from numpy.random import SeedSequence, Generator, Philox, BitGenerator
 import secrets as secrets
@@ -24,7 +25,7 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
     return num
 
 def getDirFiles(folder, filtering=""):
-   return sorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (f.startswith(filtering) or f.endswith(filtering))])
+   return natsorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (f.startswith(filtering) or f.endswith(filtering))])
 
 def getDirFilesCount(folder, filtering=""):
     counts = [getDirFiles(folder, filtering)]
@@ -37,15 +38,14 @@ def getSchedulers(filtering=""):
         "EulerAncestralDiscreteScheduler",
         "HeunDiscreteScheduler",
         "UniPCMultistepScheduler",
-        "DDIMScheduler",
+        "DDIMScheduler", # rescale_betas_zero_snr=True, timestep_spacing="trailing"
         "DPMSolverMultistepScheduler", # dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
         "LMSDiscreteScheduler",  #use_karras_sigmas=True
-        "LMSDiscreteScheduler",
         "DEISMultistepScheduler",
         "AysSchedules"
     ]
 
-    schedulers = sorted([s for s in schedulerdict if (s.startswith(filtering) or s.endswith(filtering))])
+    schedulers = natsorted([s for s in schedulerdict if (s.startswith(filtering) or s.endswith(filtering))])
     return schedulers
 
 

@@ -25,13 +25,12 @@ def gguf_loader(
         verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
         batch: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=512, step=1), ] = 1,  
 ) -> Llama:
-    print("⎆loading:GGUF")
-    # debug print(os.path.join(config.get_path("models.llms"), checkpoint))
+    print("loading:GGUF")
     return Llama(
         model_path=os.path.join(config.get_path("models.llms"), checkpoint),
+        seed=softRandom() if one_time_seed == False else hardRandom(),
         n_gpu_layers=gpu_layers if cpu_only == False else 0,
         n_threads=threads,
-        seed=softRandom() if one_time_seed == False else hardRandom(),
         n_ctx=max_context,
         n_batch=batch,
         flash_attn=flash_attention,
@@ -42,5 +41,5 @@ def gguf_loader(
 def safetensors_loader(
     checkpoint: Literal[*getDirFiles("models.checkpoints")] = Literal[*getDirFiles("models.checkpoints")],
 ) -> Llama:
-    print("⎆loading:Safetensors")
+    print("loading:Safetensors")
     return os.path.join(config.get_path("models.checkpoints"), checkpoint)
