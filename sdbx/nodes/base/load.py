@@ -14,7 +14,7 @@ from llama_cpp import Llama
 
 @node(name="GGUF Loader")
 def gguf_loader(
-    checkpoint: Literal[*getDirFiles("models.llms")] = Literal[*getDirFiles("models.llms")],
+    checkpoint: Literal[*getDirFiles("models.llms", ".gguf")] = Literal[*getDirFiles("models.llms", ".gguf")],
     cpu_only: bool = True,
         gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
     advanced_options: bool = False,
@@ -39,7 +39,7 @@ def gguf_loader(
 
 @node(name="Safetensors Loader")
 def safetensors_loader(
-    checkpoint: Literal[*getDirFiles("models.checkpoints")] = Literal[*getDirFiles("models.checkpoints")],
+    checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = Literal[*getDirFiles("models.checkpoints", ".safetensors")],
 ) -> Llama:
     print("loading:Safetensors")
     return os.path.join(config.get_path("models.checkpoints"), checkpoint)

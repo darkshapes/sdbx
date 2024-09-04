@@ -1,5 +1,5 @@
 from sdbx.nodes.types import *
-from sdbx.nodes.helpers import getSchedulers, softRandom
+from sdbx.nodes.helpers import getSchedulers, getSolvers, softRandom
 from torch import Generator, manual_seed
 from diffusers import (
     DiffusionPipeline, UNet2DConditionModel, AutoencoderKL,
@@ -19,8 +19,8 @@ def diffusion(
     steps: A[int, Numerical(min=0, max=1000, step=1)] = 10,
     guidance: A[float, Slider(min=0.0, max=20.0, step=0.01)] = 5.0,
     scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
-    algorithm_type: A[Literal["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver",], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
-    use_karras_sigmas: A[bool, Dependent(on="scheduler", when=["LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"],)] = True,
+    algorithm_type: A[Literal[*getSolvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
+    use_karras_sigmas: A[bool, Dependent(on="scheduler", when=("LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"),)] = True,
     solver_order: A[int, Dependent(on="scheduler", when="DPMSolverMultistepScheduler"), Slider(min=1, max=3, step=1)] = 2,
     v_pred: A[bool, Dependent(on="scheduler", when="DDIMScheduler")] = False, 
     timestep_spacing: A[Literal["trailing",], Dependent(on="scheduler", when="DDIMScheduler")] = "trailing",
@@ -28,15 +28,16 @@ def diffusion(
     print("Generating")
     pipe = checkpoint
     pipe = DiffusionPipeline.from_pretrained(use_safetensors=True)
-    class_object = getattr(schedulerdict, scheduler)
-    pipe.scheduler = class_object.from_config( {
+    pipe.scheduler = getattr(schedulerdict, scheduler).from_config( {
         "config": pipe.scheduler.config,
-        "use_karras_sigmas": True if dpm_karras_sigmas==True or lms_karras_sigmas==True else False,
-        "rescale_betas_zero_snr": True if v_pred==True else False,
-        "force_zeros_for_empty_prompt": False if v_pred==True else False,
-        "solver_order": solver_order if scheduler=="DPMSolverMultistepScheduler" else None,
-        "prediction_type": "v_prediction" if v_pred==True else "epsilon",
-        "timestep_spacing": "trailing" if timestep_spacing=="trailing" else None,
+        "use_karras_sigmas": True if dpm_karras_sigmas==True or lms_karras_sigmas==True else False, 
+        "rescale_betas_zero_snr": True if v_pred==True else False, #vprediction
+        "force_zeros_for_empty_prompt": False if v_pred==True else False, #vprediction
+        "solver_order": solver_order if scheduler=="DPMSolverMultistepScheduler" else None, #dpm options
+        "prediction_type": "v_prediction" if v_pred==True else "epsilon", #vprediction
+        "timestep_spacing": "trailing" if timestep_spacing=="trailing" else None, #pcm
+        # "clip_sample": False, #pcm
+        # "set_alpha_to_one": False #pcm
     })
     pipe = pipe.to("cuda")
     pipe.enable_model_cpu_offload()

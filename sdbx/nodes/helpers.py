@@ -25,7 +25,7 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
     return num
 
 def getDirFiles(folder, filtering=""):
-   return natsorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (f.startswith(filtering) or f.endswith(filtering))])
+   return natsorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (filtering in f)])
 
 def getDirFilesCount(folder, filtering=""):
     counts = [getDirFiles(folder, filtering)]
@@ -45,9 +45,20 @@ def getSchedulers(filtering=""):
         "AysSchedules"
     ]
 
-    schedulers = natsorted([s for s in schedulerdict if (s.startswith(filtering) or s.endswith(filtering))])
+    schedulers = natsorted([s for s in schedulerdict if (filtering in s)])
     return schedulers
 
+
+def getSolvers(filtering=""):
+
+    solverdict = [
+        "dpmsolver++",
+        "sde-dpmsolver++",
+        "sde-dpmsolver",
+        "dpmsolver"
+    ]
+    solvers = natsorted([s for s in solverdict if (filtering in s)])
+    return solvers
 
 import re
 
