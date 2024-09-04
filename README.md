@@ -8,6 +8,7 @@
 ##
 
  ### [ [Darkshapes](https://github.com/darkshapes) ]
+[ [Discord](https://discord.gg/RYaJw9mPPe) | [HuggingFace](https://huggingface.co/darkshapes) | [Maxtretikov](https://github.com/Maxtretikov/) | [EXDYSA](https://github.com/exdysa/) ]
 
 <hr>
 
