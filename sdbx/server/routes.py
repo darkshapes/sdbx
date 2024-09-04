@@ -1,11 +1,12 @@
 import uuid
-from asyncio import create_task
+import logging
+from asyncio import create_task, wait, FIRST_COMPLETED
 
 from networkx import node_link_graph
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse
 
-from sdbx import config
+from sdbx import config, logger
 from sdbx.server.types import Graph
 
 def register_routes(rtr: APIRouter):
@@ -36,15 +37,37 @@ def register_routes(rtr: APIRouter):
             return
 
         async def notifier():
-            while True:
-                # Wait for a new result to be available for this specific task
-                await task_context.result_event.wait()
-                
-                # Send the latest results of the task to the websocket
-                await websocket.send_json({"task_id": tid, "results": dict(task_context.results)})
-                
-                # Clear the event to wait for the next result
-                task_context.result_event.clear()
+            try:
+                while True:
+                    # Wait for either result_event or error_event
+                    done, _ = await wait(
+                        [
+                            create_task(task_context.result_event.wait()), 
+                            create_task(task_context.error_event.wait()),
+                            create_task(task_context.completion_event.wait())
+                        ],
+                        return_when=FIRST_COMPLETED
+                    )
+                    
+                    if task_context.error_event.is_set():
+                        raise task_context.task_error
+                    elif task_context.completion_event.is_set():
+                        await websocket.send_json({"task_id": tid, "completion": True})
+                        await websocket.close()
+                        return
+                    elif task_context.result_event.is_set():
+                        # Send the latest results of the task to the websocket
+                        await websocket.send_json({"task_id": tid, "results": dict(task_context.results)})
+
+                        # Inform that results are finished processing
+                        task_context.process_event.set() # All events are cleared by the executor
+            except Exception as e:
+                # If error occurred, send error message and close the WebSocket
+                logger.exception(e)
+                logger.error("sending websocket error")
+                await websocket.send_json({"task_id": tid, "error": task_context.task_error})
+                await websocket.close()
+                return
 
         ntask = create_task(notifier())
 

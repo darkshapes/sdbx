@@ -1,7 +1,7 @@
 from enum import Enum
-from inspect import signature
 from functools import partial
 from dataclasses import dataclass, field
+from inspect import signature, isgeneratorfunction
 from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
 
 # from torch import Tensor
@@ -14,13 +14,14 @@ from sdbx.nodes.helpers import rename_class
 
 
 ## Path decorator ##
-def node(fn=None, path=None, name=None):
+def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     from sdbx.nodes.info import NodeInfo  # Avoid circular import
 
     if fn is None:
-        return partial(node, path=path, name=name)
-
-    fn.info = NodeInfo(fn, path=path, name=name)
+        return partial(node, **kwargs)
+    
+    fn.generator = isgeneratorfunction(fn)
+    fn.info = NodeInfo(fn, **kwargs)
     return fn
 
 

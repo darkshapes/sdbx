@@ -2,15 +2,16 @@ import typing
 import inspect
 import logging
 
-from collections import OrderedDict
-from dataclasses import asdict
 from pathlib import Path
+from dataclasses import asdict
+from collections import OrderedDict
+from collections.abc import Iterator
 
 from sdbx.nodes.helpers import format_name
 from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
 
 class NodeInfo:
-    def __init__(self, fn, path=None, name=None):
+    def __init__(self, fn, path=None, name=None, display=False):
         self.fname = getattr(fn, '__name__')
 
         if path:
@@ -18,6 +19,8 @@ class NodeInfo:
 
         self.name = name or format_name(self.fname)
         self.path = path or Path(inspect.getfile(fn)).stem
+
+        self.display = display
 
         self.inputs = {
             "required": OrderedDict(),
@@ -27,6 +30,9 @@ class NodeInfo:
 
         annotations = inspect.get_annotations(fn)
         signature = inspect.signature(fn)
+
+        self.generator = inspect.isgeneratorfunction(fn)
+        self.steps = getattr(fn, "steps", None)
 
         try:
             for key, param in signature.parameters.items():
@@ -41,7 +47,14 @@ class NodeInfo:
             # Handling the return annotation separately
             if 'return' in annotations:
                 return_annotation = annotations['return']
-                if typing.get_origin(return_annotation) == tuple:
+
+                if self.generator:
+                    assert typing.get_origin(return_annotation) is Iterator, "Generator node must return I[yield type] type"
+                    iterator_args = typing.get_args(return_annotation)
+                    assert len(iterator_args) > 0, "Generator return type requires a type in the I[yield type] brackets"
+                    return_annotation = iterator_args[0] if len(iterator_args) == 1 else Tuple[iterator_args]
+
+                if typing.get_origin(return_annotation) is tuple:
                     for v in typing.get_args(return_annotation):
                         self.put('return', v)
                 else:
@@ -125,4 +138,6 @@ class NodeInfo:
             "fname": self.fname, 
             "inputs": self.inputs,
             "outputs": self.outputs,
+            "display": self.display,
+            **({"steps": self.steps} if self.steps is not None else {})
         }

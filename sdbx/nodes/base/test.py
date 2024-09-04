@@ -31,12 +31,20 @@ def name_test(
     return string
 
 @node
+def multi_io_test(
+    string: A[str, Text()] = None,
+    number: A[int, Numerical(min=0, max=10)] = None
+) -> Tuple[str, int]:
+    return string, number
+
+@node
 def basic_generator(
     n: A[int, Numerical(min=1, max=20)] = 10
 ) -> I[int]:
     basic_generator.steps = n
     
     for i in range(n):
+        print(i)
         yield i
 
 @node(name="LLM Print")
