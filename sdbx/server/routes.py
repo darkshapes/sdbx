@@ -79,4 +79,7 @@ def register_routes(rtr: APIRouter):
             # Cleanup when the WebSocket is disconnected
             ntask.cancel()
         finally:
-            await websocket.close()
+            try:
+                await websocket.close()
+            except Exception:
+                pass

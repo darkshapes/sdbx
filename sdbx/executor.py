@@ -152,7 +152,7 @@ class Executor:
             # Wait for cycle handling coroutines to complete
             await gather(*ct)
 
-            self.completion_event.set() # Completed execution successfully
+            context.completion_event.set() # Completed execution successfully
             
             return context.results
         except Exception as e:
