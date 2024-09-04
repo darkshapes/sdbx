@@ -2,8 +2,7 @@ import inspect
 import logging
 import contextvars
 
-import asyncio
-
+from itertools import tee
 from typing import Any, Dict
 from functools import partial
 from collections import defaultdict
@@ -56,20 +55,22 @@ class Executor:
         nf = self.node_manager.registry[fname] # Node function
         lf = partial(nf, **inputs, **widget_inputs) # Loaded function
 
-        def ng(): # Ensure that the node function is a generator
-            if nf.generator:
-                yield from lf()
-            else:
-                yield lf()
-
-        for out in ng(): # If the node function wasn't already a generator, this will only run once
-            context.results[node_id] = out if isinstance(out, tuple) else (out,) # Ensure the output is iterable if isn't already
+        async def send_result(result):
+            context.results[node_id] = result if isinstance(result, tuple) else (result,) # Ensure the output is iterable if isn't already
             context.result_event.set()
 
             await context.process_event.wait()
             context.process_event.clear()
 
             context.result_event.clear()
+
+        g = lf()
+
+        if nf.generator:
+            for result in g:
+                await send_result(result)
+        else:
+            await send_result(g)
     
     async def process_node(self, graph, node):
         context = TaskContext.get_current()
@@ -143,7 +144,7 @@ class Executor:
             for node in graph.nodes:
                 if graph.in_degree(node) == 0:
                     await context.queue.put(node)
-            
+
             # Process nodes in topological order (acyclic parts)
             while not context.queue.empty() and not context.halt_event.is_set():
                 node = await context.queue.get()

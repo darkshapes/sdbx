@@ -1,3 +1,25 @@
+from functools import cache as function_cache, wraps
+
+def generator_cache(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Check if the cached data exists and inputs are identical
+        if wrapper.cache and wrapper.cache_args == (args, kwargs):
+            return iter(wrapper.cache)
+        
+        # Otherwise, run the generator and cache the result
+        gen = func(*args, **kwargs)
+        wrapper.cache = list(gen)
+        wrapper.cache_args = (args, kwargs)
+        return iter(wrapper.cache)
+
+    # Initialize cache and arguments
+    wrapper.cache = None
+    wrapper.cache_args = None
+    return wrapper
+
+cache = lambda node: generator_cache(node) if node.generator else function_cache(node)
+
 from random import random
 import numpy as np
 from numpy.random import SeedSequence, Generator, Philox, BitGenerator
