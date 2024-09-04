@@ -74,3 +74,4 @@ def rename_class(base, name):
 
 def format_name(name):
     return ' '.join(word[0].upper() + word[1:] if word else '' for word in re.split(r'_', name))
+
