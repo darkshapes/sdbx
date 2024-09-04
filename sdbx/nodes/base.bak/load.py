@@ -257,7 +257,7 @@ def load_latent(
 
 @node
 def load_image(
-    image: Literal[*natsorted([f for f in os.listdir(config.get_path("input")) if os.path.isfile(os.path.join(config.get_path("input"), f))])] = None,
+    image: Literal[*sorted([f for f in os.listdir(config.get_path("input")) if os.path.isfile(os.path.join(config.get_path("input"), f))])] = None,
     image_upload: bool = True,
 ) -> Tuple[Image, Mask]:
     image_path = folder_paths.get_annotated_filepath(image)

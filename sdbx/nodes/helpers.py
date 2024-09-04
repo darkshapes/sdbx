@@ -1,6 +1,6 @@
 from random import random
-from natsort import natsorted
 import numpy as np
+from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox, BitGenerator
 import secrets as secrets
 import os

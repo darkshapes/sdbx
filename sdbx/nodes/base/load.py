@@ -4,17 +4,15 @@ from sdbx.nodes.helpers import softRandom, hardRandom
 from sdbx.config import get_config_location
 from sdbx.nodes.helpers import getDirFiles
 import torch
-# from PIL import Image
-# from kolors.pipelines.pipeline_stable_diffusion_xl_chatglm_256 import StableDiffusionXLPipeline
-# from kolors.models.modeling_chatglm import ChatGLMModel
-# from kolors.models.tokenization_chatglm import ChatGLMTokenizer
 
+import transformers
+import diffusers
 import os
 from llama_cpp import Llama
 
 @node(name="GGUF Loader")
 def gguf_loader(
-    checkpoint: Literal[*getDirFiles("models.llms", ".gguf")] = Literal[*getDirFiles("models.llms", ".gguf")],
+    checkpoint: Literal[*getDirFiles("models.llms", ".gguf")] = getDirFiles("models.llms", ".gguf")[0],
     cpu_only: bool = True,
         gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
     advanced_options: bool = False,
@@ -37,9 +35,14 @@ def gguf_loader(
         verbose=verbose
     )
 
-@node(name="Safetensors Loader")
+@node(name="SDXL Loader")
 def safetensors_loader(
-    checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = Literal[*getDirFiles("models.checkpoints", ".safetensors")],
-) -> Llama:
-    print("loading:Safetensors")
-    return os.path.join(config.get_path("models.checkpoints"), checkpoint)
+    checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = getDirFiles("models.checkpoints", ".safetensors")[0],
+) -> Any:
+    checkpoint = "" + os.path.join(config.get_path("models.checkpoints"), checkpoint)
+    print(f"loading:Safetensors '/Users/Shared/ouerve/recent/darkshapes/models/checkpoints/ponyFaetality_v11.safetensors'" )
+    return {"pipe" : AutoPipelineForText2Image.from_single_file(
+        '/Users/Shared/ouerve/recent/darkshapes/models/checkpoints/ponyFaetality_v11.safetensors',
+        torch_dtype=torch.float16,
+        variant="fp16",
+    ) }

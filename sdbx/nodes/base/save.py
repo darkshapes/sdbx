@@ -1,5 +1,7 @@
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import getDirFiles, getDirFilesCount
+from PIL import Image, ImageOps, ImageSequence, ImageFile
+
 
 @node
 def prints_number(
