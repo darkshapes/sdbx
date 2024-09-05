@@ -6,6 +6,7 @@ from sdbx.nodes.helpers import softRandom
 from time import perf_counter
 import config
 
+model = "ponyFaetality_v11"
 seed = int(softRandom())
 filename_prefix = "Shadowbox-"
 print(seed)
@@ -42,19 +43,18 @@ print('Image time:', images_totals)
 images_average = round(sum(generation['total_time'] for generation in queue) / len(queue), 1)
 print('Average image time:', images_average)
 
-#max_memory = round(torch.cuda.device.max_memory_allocated(device='cpu') / 1000000000, 2)
-#print('Max. memory used:', max_memory, 'GB')
-
+max_memory = round(torch.cuda.device.max_memory_allocated(device='cpu') / 1000000000, 2)
+print('Max. memory used:', max_memory, 'GB')
 
 # Load the model on the graphics card
 pipe = AutoPipelineForText2Image.from_pretrained(
- 'stabilityai/stable-diffusion-xl-base-1.0',
-  use_safetensors=True,
-  #torch_dtype=torch.float16,
-  #variant='fp16',
+    "" + config.get_path("models.checkpoints") + model,
+    use_safetensors=True,
+    torch_dtype=torch.float16,
+    #variant='fp16',
 )
 # Create a generator
-generator = torch.Generator(device='cpu')
+generator = torch.Generator(device='cuda')
 
 # Start a loop to process prompts one by one
 for i, generation in enumerate(queue, start=1):

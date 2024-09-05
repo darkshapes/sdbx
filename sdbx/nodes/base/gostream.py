@@ -16,7 +16,7 @@ pipe = StableDiffusionPipeline.from_pretrained(
 # You recommend to use cfg_type="none" when text2image
 stream = StreamDiffusion(
     pipe,
-    t_index_list=[0, 16, 32, 45],
+    t_index_list=[32, 45],
     torch_dtype=torch.float16,
 )
 
