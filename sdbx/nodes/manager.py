@@ -8,13 +8,15 @@ import tomllib
 import importlib
 import sysconfig
 import subprocess
+from functools import cached_property
 from typing import Callable, Dict, List
 from inspect import getmembers, isfunction
 from importlib.metadata import distribution
-from functools import cached_property, cache
 
 import virtualenv
 from dulwich import porcelain
+
+from sdbx.nodes.helpers import cache
 
 class NodeManager:
 	def __init__(self, path, nodes_path, env_name=".node_env"):

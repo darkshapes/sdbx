@@ -1,10 +1,32 @@
+from functools import cache as function_cache, wraps
+from sdbx.config import config
+from natsort import natsorted
+import os
+
+def generator_cache(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Check if the cached data exists and inputs are identical
+        if wrapper.cache and wrapper.cache_args == (args, kwargs):
+            return iter(wrapper.cache)
+        
+        # Otherwise, run the generator and cache the result
+        gen = func(*args, **kwargs)
+        wrapper.cache = list(gen)
+        wrapper.cache_args = (args, kwargs)
+        return iter(wrapper.cache)
+
+    # Initialize cache and arguments
+    wrapper.cache = None
+    wrapper.cache_args = None
+    return wrapper
+
+cache = lambda node: generator_cache(node) if node.generator else function_cache(node)
+
 from random import random
 import numpy as np
-from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox, BitGenerator
 import secrets as secrets
-import os
-from sdbx import config
 
 def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
@@ -74,4 +96,3 @@ def rename_class(base, name):
 
 def format_name(name):
     return ' '.join(word[0].upper() + word[1:] if word else '' for word in re.split(r'_', name))
-

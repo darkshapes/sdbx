@@ -46,3 +46,5 @@ def safetensors_loader(
         torch_dtype=torch.float16,
         variant="fp16",
     ) }
+
+    

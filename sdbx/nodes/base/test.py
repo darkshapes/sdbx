@@ -29,7 +29,7 @@ def name_test(
     string: A[str, Text()] = None
 ) -> str:
     return string
-"""
+
 @node
 def basic_generator(
     n: A[int, Numerical(min=1, max=20)] = 10
@@ -38,4 +38,3 @@ def basic_generator(
     
     for i in range(n):
         yield i
-"""
