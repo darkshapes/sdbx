@@ -1,4 +1,5 @@
 from sdbx.nodes.types import *
+from sdbx.nodes.helpers import softRandom, getGPUs
 
 from torch import torch
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
@@ -33,20 +34,22 @@ def llm_prompt(
 
 @node(name="Diffusion Prompt")
 def diffusion_prompt(
-    pipe: Safetensors or Llama,
-    text_encoder: Safetensors or Llama = checkpoint,
-    text_encoder_2: Safetensors or Llama = checkpoint,
-    prompt: A[Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
+    pipe: torch.Tensor or Llama,
+    text_encoder: torch.Tensor or Llama = None,
+    text_encoder_2: torch.Tensor or Llama = None,
+    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
     seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1,randomizable=True)]= int(softRandom()),
-) -> torch.Tensor:
+    device: Literal[*getGPUs()] = getGPUs()[0],
+) -> Tuple[torch.Tensor, dict]:
     if debug==True: print("token encode init")
     if queue not in globals(): queue = []
     queue.extend([{
         "prompt": prompt,
         "seed": seed
     }])
+    if text_encoder is None: text_encoder = pipe
     tokenizer = text_encoder
-    tokenizer_2 = text_encoder_2
+    if text_encoder_2 is not None: tokenizer_2 = text_encoder_2
 
     if debug==True: print("encode prompt")
 
@@ -95,4 +98,4 @@ def diffusion_prompt(
     
     del tokenizer, text_encoder, tokenizer_2, text_encoder_2
     cacheBin()
-    return vectors
+    return vectors, queue

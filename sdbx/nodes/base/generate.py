@@ -1,5 +1,6 @@
+from sdbx.nodes.types import *
 from sdbx.config import config
-from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin
+from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin, getSchedulers, getSolvers
 
 from time import perf_counter
 import os
@@ -12,10 +13,10 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 
 @node(name="Diffusion")
 def diffusion(
-    pipe: torch.Tensor or Llama,
-    vectors: dict or torch.Tensor,
-    device: Literal[*getGPUs()] = getGPUs([0]),
-    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFFF, randomizable=True)] = softRandom,
+    pipe: torch.Tensor,
+    vectors: torch.Tensor,
+    queue: dict,
+    device: Literal[*getGPUs()] = getGPUs()[0],
     inference_steps: A[int, Numerical(min=0, max=500, step=1)] = 25,
     cfg_scale: A[float,Slider(min=0.000, max=20.000, step=0.001, round=0.001)] = 5.00,
     height: int = 1024,
@@ -85,7 +86,8 @@ def diffusion(
 
 @node(name="Autoencode Reverse")
 def autoencode(
-    pipe: torch.Tensor or Llama,
+    pipe: torch.Tensor,
+    latent: torch.Tensor,
 ) -> Any:
     with torch.no_grad():
         for i, generation in enumerate(queue, start=1):

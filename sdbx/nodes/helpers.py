@@ -78,8 +78,8 @@ def seedPlanter(seed, deterministic=True):
         return torch.cuda.manual_seed(seed), torch.cuda.manual_seed_all(seed)
     elif torch.backends.mps.is_available():
         return torch.mps.manual_seed(seed)
-    elif torch.xpu.is_available():
-        return torch.xpu.manual_seed(seed)
+    # elif torch.xpu.is_available():
+    #    return torch.xpu.manual_seed(seed)
 
 def getGPUs(filtering=""):
     if torch.cuda.is_available(): 
@@ -88,8 +88,8 @@ def getGPUs(filtering=""):
     elif torch.backends.mps.is_available():
         for i in range(torch.mps.device_count()):
             devices = [torch.device(f"mps:{i}")]
-    elif torch.xpu.is_available():
-            devices = [torch.xpu.get_device_properties(i).name]
+    #elif torch.xpu.is_available():
+    #        devices = [torch.xpu.get_device_properties(i).name]
     else: devices = "cpu"
     return natsorted(filtering in [devices] if filtering in [devices] is not None else [devices])
 

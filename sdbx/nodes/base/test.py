@@ -47,15 +47,3 @@ def basic_generator(
     for i in range(n):
         yield i
         time.sleep(1)
-
-@node(name="LLM Print")
-def llm_print(
-    response: A[str, Text()]
-) -> None:
-    print("printing response")
-    for chunk in response:
-        delta = chunk['choices'][0]['delta']
-        if 'role' in delta:
-            print(delta['role'], end=': ')
-        elif 'content' in delta:
-            print(delta['content'], end='')

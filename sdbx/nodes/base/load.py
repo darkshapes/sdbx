@@ -4,6 +4,7 @@ from sdbx.nodes.helpers import softRandom, hardRandom, getGPUs
 from sdbx.config import config
 from sdbx.nodes.helpers import getDirFiles
 from diffusers import AutoPipelineForText2Image
+import torch
 
 import os
 from llama_cpp import Llama
@@ -40,11 +41,11 @@ def safetensors_loader(
     checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = getDirFiles("models.checkpoints", ".safetensors")[0],
     model_type: Literal["diffusion", "autoencoder" ,"super_resolution", "token_encoder"] = "diffusion",
     safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
-    device: Literal[*getGPUs()] = getGPUs([0]),
-    precision: [int, Slider(min=16, max=32, step=16), Dependent(on="device", when=(not "cpu"))] = 16, 
-    bfloat: A[bool, Dependent(on="precision", when="16")] = false,
-) -> [*torch.Tensor]:
-    print(f"loading:Safetensors: {checkpoint}" )
+    device: Literal[*getGPUs()] = getGPUs()[0],
+    # precision: [int, Slider(min=16, max=32, step=16), Dependent(on="getGPUs()", when=f"{not 'cpu'}")] = 16, 
+    bfloat: A[bool, Dependent(on="precision", when="16")] = False,
+) -> torch.Tensor:
+    print("loading:Safetensors:" + checkpoint)
     if model_type == "token_encoder":
         if debug==True: print("init tokenizer & text encoder")
         tokenizer = CLIPTokenizer.from_pretrained(
@@ -58,7 +59,11 @@ def safetensors_loader(
             torch_dtype=torch.float16,
             variant='fp16',
         ).to(device)
-        vectors = [tokenizer, text_encoder]
+
+        vectors = [{
+            "tokenizer": tokenizer, 
+            "text_encoder": text_encoder 
+            }]
         return vectors
 
     elif model_type == "diffusion":
@@ -70,7 +75,7 @@ def safetensors_loader(
                 'tokenizer_2':None,
                 'text_encoder_2':None,
             } 
-        if precision is not 32:
+        if precision != 32:
             pipe_args.extend({
                 'torch_btype': 'torch.float16' if bfloat == False else 'torch.bfloat16',
                 'variant': 'fp16' if bfloat == False else 'bf16',
@@ -91,9 +96,6 @@ def safetensors_loader(
         torch_dtype=torch.float16,
         ).to(device)
         return autoencoder
-    
-    else: return
-
 
 
 

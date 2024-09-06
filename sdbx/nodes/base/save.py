@@ -20,12 +20,12 @@ def llm_print(
 @node(name="Save / Preview Image")
 def save_preview_img(
     image: Any,
-    file_prefix: A[Text(multiline=False)]= "Shadowbox-",
+    file_prefix: A[str, Text(multiline=False)]= "Shadowbox-",
     compress_level: A[int, Slider(min=0,max=4, step=1)]= 4,
-) -> None:
+) -> I[Any]:
         image = pipe.image_processor.postprocess(image, output_type='pil')[0]
         # Save the image
-        if debug==True: print("save")
         counter = format(len(os.listdir(config.get_path("output")))) #file count
         image.save(f'{file_prefix + counter}.png')
-
+        print("Complete.")
+        yield image
