@@ -15,6 +15,7 @@ from networkx import MultiDiGraph
 
 from sdbx import config, logger
 from sdbx.server.types import Edge, Node
+from sdbx.server.helpers import serialize
 
 current_context = contextvars.ContextVar('current_context')
 
@@ -57,10 +58,7 @@ class Executor:
         lf = partial(nf, **inputs, **widget_inputs) # Loaded function
 
         async def send_result(result):
-            try:
-                json.dumps(result)
-            except (TypeError, OverflowError):
-                result = str(result)
+            result = serialize(result)
 
             context.results[node_id] = result if isinstance(result, tuple) else (result,) # Ensure the output is iterable if isn't already
             context.result_event.set()

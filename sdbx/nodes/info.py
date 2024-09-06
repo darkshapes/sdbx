@@ -7,7 +7,7 @@ from dataclasses import asdict
 from collections import OrderedDict
 from collections.abc import Iterator
 
-from sdbx.nodes.helpers import format_name
+from sdbx.nodes.helpers import format_name, serialize
 from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
 
 class NodeInfo:
@@ -85,7 +85,7 @@ class NodeInfo:
 
         # Handle default values
         if default is not inspect.Parameter.empty:
-            info["default"] = default
+            info["default"] = serialize(default)
             necessity = "optional"
 
         # Parse annotations
@@ -122,7 +122,7 @@ class NodeInfo:
                 # raise Exception(f"{key} of type Literal has no values.")
                 logging.warning(f"{key} of type Literal has no values.")
 
-            info["choices"] = choices
+            info["choices"] = [serialize(c) for c in choices]
         
         if not vtype:
             info["type"] = value.__name__.capitalize()

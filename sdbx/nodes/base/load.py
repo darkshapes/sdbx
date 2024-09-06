@@ -13,7 +13,7 @@ debug = True # eeeee
 
 @node(name="GGUF Loader")
 def gguf_loader(
-    checkpoint: Literal[*getDirFiles("models.llms", ".gguf")] = getDirFiles("models.llms", ".gguf")[0],
+    checkpoint: Literal[*getDirFiles("models.llms", ".gguf")] = next(iter(getDirFiles("models.llms", ".gguf")), None),
     cpu_only: bool = True,
         gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
     advanced_options: bool = False,
@@ -38,10 +38,10 @@ def gguf_loader(
 
 @node(name="Safetensors Loader")
 def safetensors_loader(
-    checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = getDirFiles("models.checkpoints", ".safetensors")[0],
+    checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = next(iter(getDirFiles("models.checkpoints", ".safetensors")), None),
     model_type: Literal["diffusion", "autoencoder" ,"super_resolution", "token_encoder"] = "diffusion",
     safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
-    device: Literal[*getGPUs()] = getGPUs()[0],
+    device: Literal[*getGPUs()] = next(iter(getGPUs()), None),
     # precision: [int, Slider(min=16, max=32, step=16), Dependent(on="getGPUs()", when=f"{not 'cpu'}")] = 16, 
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
 ) -> torch.Tensor:
