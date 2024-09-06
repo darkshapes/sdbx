@@ -37,6 +37,9 @@ core = [
     # Data validation
     "pydantic",
     "pydantic_settings",
+
+    # Accessibility
+    "natsort",
 ]
 dev = [
     # Testing frameworks and tools
