@@ -1,16 +1,6 @@
+from PIL import Image
+
 from sdbx.nodes.types import *
-
-@node
-def prints_number(
-    number: int
-):
-    print("prints_number prints:", number)
-
-@node
-def prints_string(
-    string: str
-):
-    print("prints_string prints:", string)
 
 @node
 def outputs_number(
@@ -20,22 +10,33 @@ def outputs_number(
 
 @node
 def outputs_string(
-    string: A[str, Text()] = None
+    string: str = None
 ) -> str:
     return string
 
-@node(path="name test", name="name test node")
+@node(display=True)
+def displays_number(
+    number: int
+):
+    print("prints_number prints:", number)
+
+@node(display=True)
+def displays_string(
+    string: str
+):
+    print("prints_string prints:", string)
+
+@node(display=True)
+def displays_test_image(
+    color: str = "red"
+) -> Image:
+    return Image.new('RGB', (512, 512), color=color)
+
+@node(path="test", name="Name Test Node")
 def name_test(
     string: A[str, Text()] = None
 ) -> str:
     return string
-
-@node
-def multi_io_test(
-    string: A[str, Text()] = None,
-    number: A[int, Numerical(min=0, max=10)] = None
-) -> Tuple[str, int]:
-    return string, number
 
 @node(display=True)
 def basic_generator(

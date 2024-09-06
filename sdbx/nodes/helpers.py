@@ -1,11 +1,14 @@
-import os
 import gc
+import io
+import os
 import re
 import json
+import base64
 
 import secrets as secrets
 from functools import cache as function_cache, wraps
 
+from PIL import Image
 from torch import torch
 from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox
@@ -14,6 +17,11 @@ from sdbx.config import config
 
 ### DATA FORMATTING
 def serialize(data):
+    if isinstance(data, Image.Image):
+        buffered = io.BytesIO()
+        data.save(buffered, format="PNG")
+        return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
+
     try:
         return json.dumps(data)
     except (TypeError, OverflowError, ValueError):
@@ -100,7 +108,7 @@ def getGPUs(filtering=""):
         for i in range(torch.cuda.device_count()):
             devices = [torch.cuda.get_device_properties(i).name]
     elif torch.backends.mps.is_available():
-        devices = "mps" # TODO: use api here in case apple ever makes more than one mps device
+        devices = "mps" # TODO: use api here in case apple ever makes more than one mps device      
         # for i in range(torch.mps.device_count()):
             # devices = [torch.device(f"mps:{i}").name]
     #elif torch.xpu.is_available():

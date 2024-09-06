@@ -14,8 +14,8 @@ import networkx as nx
 from networkx import MultiDiGraph
 
 from sdbx import config, logger
+from sdbx.nodes.helpers import serialize
 from sdbx.server.types import Edge, Node
-from sdbx.server.helpers import serialize
 
 current_context = contextvars.ContextVar('current_context')
 

@@ -11,7 +11,7 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 # import accelerate
 
 
-@node(name="Diffusion")
+@node
 def diffusion(
     pipe: torch.Tensor,
     vectors: torch.Tensor,

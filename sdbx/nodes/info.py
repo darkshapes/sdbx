@@ -7,6 +7,7 @@ from dataclasses import asdict
 from collections import OrderedDict
 from collections.abc import Iterator
 
+from sdbx import logger
 from sdbx.nodes.helpers import format_name, serialize
 from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
 
@@ -61,6 +62,7 @@ class NodeInfo:
                     self.put('return', return_annotation)
 
         except Exception as e:
+            logger.exception(e)
             raise Exception(f"Error parsing node {self.name}: {e}")
 
     def put(self, key, value, default=inspect.Parameter.empty):
