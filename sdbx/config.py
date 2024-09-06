@@ -132,7 +132,7 @@ class Config(BaseSettings):
     organization: OrganizationConfig = Field(default_factory=OrganizationConfig)
 
     development: bool = False
-    
+
     def __init__(self, path: str):
         if not isinstance(path, str):
             raise TypeError("Config path must be a string")

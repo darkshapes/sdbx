@@ -3,10 +3,7 @@ from sdbx.nodes.types import *
 from sdbx.nodes.helpers import softRandom, hardRandom
 from sdbx.config import get_config_location
 from sdbx.nodes.helpers import getDirFiles
-import torch
 
-import transformers
-import diffusers
 import os
 from llama_cpp import Llama
 
@@ -34,7 +31,7 @@ def gguf_loader(
         flash_attn=flash_attention,
         verbose=verbose
     )
-
+    
 @node(name="SDXL Loader")
 def safetensors_loader(
     checkpoint: Literal[*getDirFiles("models.checkpoints", ".safetensors")] = getDirFiles("models.checkpoints", ".safetensors")[0],

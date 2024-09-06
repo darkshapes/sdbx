@@ -1,7 +1,7 @@
 from sdbx.nodes.types import *
+
 from llama_cpp import Llama
-from transformers import AutoTokenizer, AutoModel
-import diffusers
+
 
 @node(name="LLM Prompt")
 def llm_prompt(
@@ -29,19 +29,3 @@ def llm_prompt(
         top_p=top_p,
         max_tokens=max_tokens,
     )
-
-@node(name="Kolors Diffusion Prompt")
-def kolors_diffusion_prompt(
-    checkpoint: Any,
-    encoder: Llama,
-    encoder_2: Any = None, # when input is attached, needs to make other _2 options show
-    lora_scale: float = 0.00,
-    prompt : A[str, Text(multiline=True, dynamic_prompts=True)] = "",
-    negative_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
-    clip_skip: A[int, Slider(min=0, max=3)] = 0,
-    prompt_2: A[str, Dependent(on="encoder_2", when=(not None)), Text(multiline=True, dynamic_prompts=True)] = None,
-    negative_prompt_2: A[str, Dependent(on="encoder_2", when=(not None)), Text(multiline=True, dynamic_prompts=True)] = None,
-) -> Any: # placeholder for latent space embeddings
-    print("Encoding Prompt")
-    embedding = encoder.diffusion_prompt(prompt)  # returns embeds for 1)prompt, 2)negative, 3)pooled prompt, 4)negative pooled
-    return embedding
