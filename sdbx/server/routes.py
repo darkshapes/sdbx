@@ -17,13 +17,21 @@ def register_routes(rtr: APIRouter):
     @rtr.post("/prompt")
     async def start_prompt(graph: Graph):
         tid = str(uuid.uuid4())
-        task = config.executor.execute(node_link_graph(graph.dict()), tid)
-        return PlainTextResponse(tid)
+        try:
+            task = config.executor.execute(node_link_graph(graph.dict()), tid)
+            return {"task_id": tid}
+        except Exception as e:
+            logger.exception(e)
+            return {"error": str(e)}
     
     @rtr.post("/kill/{tid}")
     async def kill_prompt(tid: str):
-        config.executor.halt(tid)
-        return PlainTextResponse(tid)
+        try:
+            config.executor.halt(tid)
+            return {"task_id": tid}
+        except Exception as e:
+            logger.exception(e)
+            return {"error": str(e)}
     
     @rtr.websocket("/ws/{tid}")
     async def websocket_endpoint(websocket: WebSocket, tid: str):
@@ -52,10 +60,11 @@ def register_routes(rtr: APIRouter):
                     if task_context.error_event.is_set():
                         raise task_context.task_error
                     elif task_context.completion_event.is_set():
-                        await websocket.send_json({"task_id": tid, "completion": True})
+                        await websocket.send_json({"task_id": tid, "results": dict(task_context.results), "completed": True})
                         await websocket.close()
                         return
                     elif task_context.result_event.is_set():
+                        print("sending results")
                         # Send the latest results of the task to the websocket
                         await websocket.send_json({"task_id": tid, "results": dict(task_context.results)})
 

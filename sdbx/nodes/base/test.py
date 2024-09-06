@@ -37,15 +37,16 @@ def multi_io_test(
 ) -> Tuple[str, int]:
     return string, number
 
-@node
+@node(display=True)
 def basic_generator(
     n: A[int, Numerical(min=1, max=20)] = 10
 ) -> I[int]:
+    import time
     basic_generator.steps = n
     
     for i in range(n):
-        print(i)
         yield i
+        time.sleep(1)
 
 @node(name="LLM Print")
 def llm_print(

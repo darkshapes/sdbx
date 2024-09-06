@@ -3,15 +3,20 @@ from functools import cache as function_cache, wraps
 def generator_cache(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        # Check if the cached data exists and inputs are identical
+        # If the cache exists and matches the arguments, return an iterator over the cached results
         if wrapper.cache and wrapper.cache_args == (args, kwargs):
             return iter(wrapper.cache)
-        
-        # Otherwise, run the generator and cache the result
-        gen = func(*args, **kwargs)
-        wrapper.cache = list(gen)
+
+        # If no cache exists, or arguments differ, create a new generator
+        wrapper.cache = []
         wrapper.cache_args = (args, kwargs)
-        return iter(wrapper.cache)
+        
+        def generator_with_cache():
+            for result in func(*args, **kwargs):
+                wrapper.cache.append(result)  # Cache the result as it's generated
+                yield result  # Yield the result to the caller
+
+        return generator_with_cache()
 
     # Initialize cache and arguments
     wrapper.cache = None
