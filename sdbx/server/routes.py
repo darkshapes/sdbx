@@ -1,3 +1,4 @@
+import json
 import uuid
 import logging
 from asyncio import create_task, wait, FIRST_COMPLETED
@@ -8,6 +9,7 @@ from fastapi.responses import PlainTextResponse
 
 from sdbx import config, logger
 from sdbx.server.types import Graph
+from sdbx.server.serialize import WebEncoder
 
 def register_routes(rtr: APIRouter):
     @rtr.get("/nodes")
@@ -43,6 +45,11 @@ def register_routes(rtr: APIRouter):
             await websocket.send_json({"error": "Invalid task ID"})
             await websocket.close()
             return
+        
+        websocket.send_serialized = lambda data: websocket.send({
+            "type": "websocket.send", 
+            "text": json.dumps(data, separators=(",", ":"), ensure_ascii=False, cls=WebEncoder)
+        })
 
         async def notifier():
             try:
@@ -60,13 +67,13 @@ def register_routes(rtr: APIRouter):
                     if task_context.error_event.is_set():
                         raise task_context.task_error
                     elif task_context.completion_event.is_set():
-                        await websocket.send_json({"task_id": tid, "results": dict(task_context.results), "completed": True})
+                        await websocket.send_serialized({"task_id": tid, "results": dict(task_context.results), "completed": True})
                         await websocket.close()
                         return
                     elif task_context.result_event.is_set():
                         print("sending results")
                         # Send the latest results of the task to the websocket
-                        await websocket.send_json({"task_id": tid, "results": dict(task_context.results)})
+                        await websocket.send_serialized({"task_id": tid, "results": dict(task_context.results)})
 
                         # Inform that results are finished processing
                         task_context.process_event.set() # All events are cleared by the executor

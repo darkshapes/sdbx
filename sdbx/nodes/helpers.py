@@ -8,24 +8,11 @@ import base64
 import secrets as secrets
 from functools import cache as function_cache, wraps
 
-from PIL import Image
 from torch import torch
 from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox
 
 from sdbx.config import config
-
-### DATA FORMATTING
-def serialize(data):
-    if isinstance(data, Image.Image):
-        buffered = io.BytesIO()
-        data.save(buffered, format="PNG")
-        return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
-
-    try:
-        return json.dumps(data)
-    except (TypeError, OverflowError, ValueError):
-        return str(data)
 
 ### CACHING ###
 
