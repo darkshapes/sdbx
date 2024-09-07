@@ -71,28 +71,28 @@ def format_name(name):
 
 ### RANDOM ROUTINES
 
-def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
+def soft_random(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
     rndmc = Generator(Philox(SeedSequence(int(entropy,16))))
     return rndmc.integers(0, size) 
 
-def hardRandom(hardness=5): # returns a non-prng random number use secrets
+def hard_random(hardness=5): # returns a non-prng random number use secrets
     return int(secrets.token_hex(hardness),16) # make hex secret be int
 
-def tensorRandom(device,seed=None):
+def tensor_random(seed=None):
     return torch.random.seed() if seed is None else torch.random.manual_seed(seed)
 
-def tensorify(hard, size=4): # creates an array of default size 4x1 using either softRandom or hardRandom
+def tensorify(hard, size=4): # creates an array of default size 4x1 using either soft_random or hard_random
     num = []
     for s in range(size): # make array, convert float, negate it randomly
         if hard==False: # divide 10^10, truncate float
-            conv = '{0:.6f}'.format((float(softRandom()))/0x2540BE400)
+            conv = '{0:.6f}'.format((float(soft_random()))/0x2540BE400)
         else:  # divide 10^12, truncate float
-            conv = '{0:.6f}'.format((float(hardRandom()))/0xE8D4A51000)
+            conv = '{0:.6f}'.format((float(hard_random()))/0xE8D4A51000)
         num.append(float(conv)) if secrets.choice([True, False]) else num.append(float(conv)*-1)
     return num
 
-def seedPlanter(seed, deterministic=True):
+def seed_planter(seed, deterministic=True):
     torch.manual_seed(seed)
     if torch.cuda.is_available(): 
         if deterministic == True:
@@ -103,40 +103,21 @@ def seedPlanter(seed, deterministic=True):
     # elif torch.xpu.is_available():
     #    return torch.xpu.manual_seed(seed)
 
-def getGPUs(filtering=""):
-    if torch.cuda.is_available(): 
-        for i in range(torch.cuda.device_count()):
-            devices = [torch.cuda.get_device_properties(i).name]
-    elif torch.backends.mps.is_available():
-        devices = "mps" # TODO: use api here in case apple ever makes more than one mps device      
-        # for i in range(torch.mps.device_count()):
-            # devices = [torch.device(f"mps:{i}").name]
-    #elif torch.xpu.is_available():
-    #        devices = [torch.xpu.get_device_properties(i).name]
-    else: devices = "cpu"
-    return natsorted(filtering in [devices] if filtering in [devices] is not None else [devices])
 
-def cacheBin():
+def cache_bin():
     gc.collect()
     if torch.cuda.is_available(): return torch.cuda.empty_cache()
     elif torch.backends.mps.is_available(): return torch.mps.empty_cache()
     elif torch.xpu.is_available(): return torch.xpu.empty_cache()
 
-def getDirFiles(folder, filtering=""):
+def get_dir_files(folder, filtering=""):
    return natsorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (filtering in f)])
 
-def getDirFilesCount(folder, filtering=""):
-    counts = [getDirFiles(folder, filtering)]
+def get_dir_file_count(folder, filtering=""):
+    counts = [get_dir_files(folder, filtering)]
     return format(len(counts))
 
-def switch_case(switch):
-    def switcher(func):
-        def case(case):
-            return switch[case](case) if case in switch else None
-        return case 
-    return switcher
-
-def getSchedulers(filtering=""):
+def get_schedulers(filtering=""):
 
     schedulerdict = [
         "EulerDiscreteScheduler",
@@ -153,7 +134,7 @@ def getSchedulers(filtering=""):
     schedulers = natsorted([s for s in schedulerdict if (filtering in s)])
     return schedulers
 
-def getSolvers(filtering=""):
+def get_solvers(filtering=""):
 
     solverdict = [
         "dpmsolver++",

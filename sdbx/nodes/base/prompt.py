@@ -1,7 +1,7 @@
 from sdbx.nodes.types import *
-from sdbx.nodes.helpers import softRandom, getGPUs
+from sdbx.nodes.helpers import soft_random, get_gpus
 
-from torch import torch
+import torch
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 from llama_cpp import Llama
 
@@ -38,8 +38,8 @@ def diffusion_prompt(
     text_encoder: torch.Tensor or Llama = None,
     text_encoder_2: torch.Tensor or Llama = None,
     prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
-    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1,randomizable=True)]= int(softRandom()),
-    device: Literal[*getGPUs()] = getGPUs()[0],
+    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1,randomizable=True)]= int(soft_random()),
+    device: Literal[*get_gpus()] = get_gpus()[0],
 ) -> Tuple[torch.Tensor, dict]:
     if debug==True: print("token encode init")
     if queue not in globals(): queue = []

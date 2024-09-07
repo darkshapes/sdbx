@@ -1,6 +1,6 @@
 from sdbx.nodes.types import *
 from sdbx.config import config
-from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin, getSchedulers, getSolvers
+from sdbx.nodes.helpers import soft_random, seed_planter, get_gpus, cache_bin, get_schedulers, get_solvers
 
 from time import perf_counter
 import os
@@ -16,13 +16,13 @@ def diffusion(
     pipe: torch.Tensor,
     vectors: torch.Tensor,
     queue: dict,
-    device: Literal[*getGPUs()] = getGPUs()[0],
+    device: Literal[*get_gpus()] = get_gpus()[0],
     inference_steps: A[int, Numerical(min=0, max=500, step=1)] = 25,
     cfg_scale: A[float,Slider(min=0.000, max=20.000, step=0.001, round=0.001)] = 5.00,
     height: int = 1024,
     width: int = 1024,
-    scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
-    algorithm_type: A[Literal[*getSolvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
+    scheduler: Literal[*get_schedulers()] = "EulerDiscreteScheduler",
+    algorithm_type: A[Literal[*get_solvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
     use_karras_sigmas: A[bool, Dependent(on="scheduler", when=("LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"),)] = True,
     solver_order: A[int, Dependent(on="scheduler", when="DPMSolverMultistepScheduler"), Slider(min=1, max=3, step=1)] = 2,
     v_pred: A[bool, Dependent(on="scheduler", when="DDIMScheduler")] = False, 
@@ -65,7 +65,7 @@ def diffusion(
         image_start = perf_counter()
         # Assign the seed to the generator
         print(generation['seed'])
-        seedPlanter(generation['seed'])
+        seed_planter(generation['seed'])
         generator.manual_seed(generation['seed'])
 
         generation['latents'] = pipe(
@@ -81,7 +81,7 @@ def diffusion(
             callback_on_step_end_tensor_inputs=['prompt_embeds', 'add_text_embeds', 'add_time_ids'],
         ).images
     del pipe.unet
-    cacheBin()
+    cache_bin()
     return generation
 
 @node(name="Autoencode Reverse")
