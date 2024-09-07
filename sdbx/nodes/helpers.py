@@ -14,6 +14,7 @@ from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox
 
 from sdbx.config import config
+from llama_cpp import Llama
 
 ### DATA FORMATTING
 def serialize(data):
@@ -21,7 +22,7 @@ def serialize(data):
         buffered = io.BytesIO()
         data.save(buffered, format="PNG")
         return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
-
+    
     try:
         return json.dumps(data)
     except (TypeError, OverflowError, ValueError):
@@ -77,7 +78,7 @@ def format_name(name):
 
 ### SEED ROUTINES
 
-def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
+def soft_random(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
     rndmc = Generator(Philox(SeedSequence(int(entropy,16))))
     return rndmc.integers(0, size) 
