@@ -1,28 +1,24 @@
 from sdbx.nodes.types import *
-from sdbx.config import config
-from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin, getSchedulers, getSolvers
+from sdbx.nodes.helpers import seed_planter, get_gpus, cache_bin, get_schedulers, get_solvers
 
 from time import perf_counter
-import os
 
-from torch import torch
-from diffusers import AutoPipelineForText2Image, AutoencoderKL
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
+import torch
 # import accelerate
 
 
 @node
 def diffusion(
     pipe: torch.Tensor,
-    vectors: torch.Tensor,
+    generation: torch.Tensor,
     queue: dict,
-    device: Literal[*getGPUs()] = getGPUs()[0],
+    device: Literal[*get_gpus()] = get_gpus()[0], # type: ignore
     inference_steps: A[int, Numerical(min=0, max=500, step=1)] = 25,
     cfg_scale: A[float,Slider(min=0.000, max=20.000, step=0.001, round=0.001)] = 5.00,
     height: int = 1024,
     width: int = 1024,
-    scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
-    algorithm_type: A[Literal[*getSolvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
+    scheduler: Literal[*get_schedulers()] = "EulerDiscreteScheduler", # type: ignore
+    algorithm_type: A[Literal[*get_solvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++", # type: ignore
     use_karras_sigmas: A[bool, Dependent(on="scheduler", when=("LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"),)] = True,
     solver_order: A[int, Dependent(on="scheduler", when="DPMSolverMultistepScheduler"), Slider(min=1, max=3, step=1)] = 2,
     v_pred: A[bool, Dependent(on="scheduler", when="DDIMScheduler")] = False, 
@@ -30,9 +26,9 @@ def diffusion(
 ) -> torch.Tensor:
     debug = True
     low_memory = False
-    pipe.scheduler = getattr(schedulerdict, scheduler).from_config( {
+    pipe.scheduler = getattr(get_schedulers(), scheduler).from_config( {
         "config": pipe.scheduler.config,
-        "use_karras_sigmas": True if dpm_karras_sigmas==True or lms_karras_sigmas==True else False, 
+        "use_karras_sigmas": True if use_karras_sigmas==True else False, 
         "rescale_betas_zero_snr": True if v_pred==True else False, #vprediction
         "force_zeros_for_empty_prompt": False if v_pred==True else False, #vprediction
         "solver_order": solver_order if scheduler=="DPMSolverMultistepScheduler" else None, #dpm options
@@ -43,8 +39,8 @@ def diffusion(
     })
     pipe = pipe.to(device)
 
-    if debug==True: print("lower overhead, select generator")
-    if device=="cpu": pipe.enable_model_cpu_offload()
+    print("lower overhead, select generator")
+    if device!="cpu": pipe.enable_model_cpu_offload()
     if low_memory==True: pipe.enable_sequential_cpu_offload()
 
     def dynamic_cfg(pipe, step_index, timestep, callback_kwargs):
@@ -62,10 +58,10 @@ def diffusion(
 
     for i, generation in enumerate(queue, start=1):
     # We start the counter
-        image_start = perf_counter()
+        generation.image_start = perf_counter()
         # Assign the seed to the generator
         print(generation['seed'])
-        seedPlanter(generation['seed'])
+        seed_planter(generation['seed'])
         generator.manual_seed(generation['seed'])
 
         generation['latents'] = pipe(
@@ -81,17 +77,18 @@ def diffusion(
             callback_on_step_end_tensor_inputs=['prompt_embeds', 'add_text_embeds', 'add_time_ids'],
         ).images
     del pipe.unet
-    cacheBin()
+    cache_bin()
     return generation
 
 @node(name="Autoencode Reverse")
 def autoencode(
     pipe: torch.Tensor,
     latent: torch.Tensor,
+    queue: Any,
 ) -> Any:
     with torch.no_grad():
         for i, generation in enumerate(queue, start=1):
-            generation['total_time'] = perf_counter() - image_start
+            generation['total_time'] = perf_counter() - generation.image_start
             generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
 
         image = pipe.vae.decode(

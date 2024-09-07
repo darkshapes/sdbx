@@ -1,13 +1,12 @@
 from sdbx.nodes.types import *
-from sdbx.nodes.helpers import softRandom, getGPUs
+from sdbx.nodes.helpers import soft_random, get_gpus, cache_bin
 
-from torch import torch
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
+import torch
 from llama_cpp import Llama
 
 @node(name="LLM Prompt")
 def llm_prompt(
-    llama: Llama,
+    llama: torch.Tensor,
     system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for revealing what you know, yet wiser for revealing what you do not.",
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     streaming: bool = True, #triggers generator in next node? 
@@ -17,7 +16,7 @@ def llm_prompt(
         repeat_penalty: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01, round=0.01)] = 1,
         temperature: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01, round=0.01)] = 0.2,
         max_tokens:  A[int, Dependent(on="advanced_options", when=True),  Numerical(min=0, max=2)] = 256,
-) -> str:
+) -> Any:
     print("Encoding Prompt")
     return llama.create_chat_completion(
         messages=[
@@ -25,23 +24,24 @@ def llm_prompt(
                 { "role": "user", "content": user_prompt }
             ],
         stream=streaming,
-        repeat_penalty=repeat_penalty,
-        temperature=temperature,
-        top_k=top_k,
-        top_p=top_p,
-        max_tokens=max_tokens,
+        #repeat_penalty=repeat_penalty,
+        #temperature=temperature,
+        #top_k=top_k,
+        #top_p=top_p,
+        #max_tokens=max_tokens,
     )
+    return llama
 
 @node(name="Diffusion Prompt")
 def diffusion_prompt(
-    pipe: torch.Tensor or Llama,
-    text_encoder: torch.Tensor or Llama = None,
-    text_encoder_2: torch.Tensor or Llama = None,
+    pipe: torch.Tensor,
+    text_encoder: torch.Tensor,
+    text_encoder_2: Any,
     prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
-    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1,randomizable=True)]= int(softRandom()),
-    device: Literal[*getGPUs()] = getGPUs()[0],
+    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1,randomizable=True)]= int(soft_random()),
+    device: Literal[*get_gpus()] = get_gpus()[0], # type: ignore
 ) -> Tuple[torch.Tensor, dict]:
-    if debug==True: print("token encode init")
+    print("token encode init")
     if queue not in globals(): queue = []
     queue.extend([{
         "prompt": prompt,
@@ -51,18 +51,18 @@ def diffusion_prompt(
     tokenizer = text_encoder
     if text_encoder_2 is not None: tokenizer_2 = text_encoder_2
 
-    if debug==True: print("encode prompt")
+    print("encode prompt")
 
     def encode_prompt(prompts, tokenizers, text_encoders):
         embeddings_list = []
 
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
-            prompt,
-            max_length=tokenizer.model_max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt',
+                prompt,
+                max_length=tokenizer.model_max_length,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt',
             )
 
             prompt_embeds = text_encoder(cond_input.input_ids.to(device), output_hidden_states=True)
@@ -86,16 +86,16 @@ def diffusion_prompt(
         pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
         negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
 
-    return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+        return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
     with torch.no_grad():
-        for vectors in queue:
-            vectors['embeddings'] = encode_prompt(
-            [vectors['prompt'], vectors['prompt']],
+        for generation in queue:
+            generation['embeddings'] = encode_prompt(
+            [generation['prompt'], generation['prompt']],
             [tokenizer, tokenizer_2],
             [text_encoder, text_encoder_2],
             )
     
     del tokenizer, text_encoder, tokenizer_2, text_encoder_2
-    cacheBin()
-    return vectors, queue
+    cache_bin()
+    return generation, queue
