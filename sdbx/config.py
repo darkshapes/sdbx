@@ -177,7 +177,8 @@ class Config(BaseSettings):
         return self._path_dict[name]
     
     def get_path_contents(self, name, extension=""):
-        return glob.glob(f"**.{extension}", root_dir=self.get_path(name), recursive=True)
+        p = self.get_path(name)
+        return [os.path.join(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
 
     @cached_property
     def _path_dict(self):
