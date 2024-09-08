@@ -68,7 +68,7 @@ def example_node(
     # Slider(min=, max=, step=), accepts float and int,
 
     circle : A[float, Numerical(min=0.5, max=4.0, step=0.01)] = 3.14,
-    label: str = "roundy roundy thing", # same as A[str, Text(multiline=False, dynamic_prompts=False)]
+    label: str = "roundy roundy thing", # same as A[str, Text(multiline=False, dynamic_prompts=False)] or A[str, Text()]
     textbox: A[str, Text(multiline=True, dynamic_prompts=True)] = "write here",
     proof: bool = True,
     mask_area: Literal("default", "mask bounds") = "default", # multiple choice

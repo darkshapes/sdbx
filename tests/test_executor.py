@@ -1,1 +1,1 @@
-from sdbx.tests import nodes # Using test nodes to test executor
+from . import nodes # Using test nodes to test executor

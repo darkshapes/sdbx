@@ -1,1 +1,1 @@
-from sdbx.tests import nodes
+print("base node tests go here")
