@@ -10,7 +10,7 @@ from sdbx.nodes.manager import NodeManager
 @pytest.fixture
 def mock_config_path(tmp_path):
     """Fixture to create a temporary path for config."""
-    return tmp_path / "config.toml"
+    return os.path.join(tmp_path, "config.toml")
 
 @pytest.fixture
 def mock_config_instance(mock_config_path):
