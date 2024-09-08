@@ -1,10 +1,13 @@
 import os
 import enum
+import glob
 import shutil
 import logging
+import tomllib
 import argparse
 import platform
 
+from pathlib import Path
 from typing import Tuple, Type, Union, Literal
 from functools import total_ordering, cached_property
 
@@ -16,7 +19,7 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-config_default_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config/default")
+config_source_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config")
 
 def get_config_location():
     filename = "config.toml"
@@ -137,7 +140,7 @@ class Config(BaseSettings):
         if not isinstance(path, str):
             raise TypeError("Config path must be a string")
 
-        Config.path = path if os.path.exists(path) else config_default_location
+        Config.path = path if os.path.exists(path) else os.path.join(config_source_location, "user")
         super().__init__()
         Config.path = os.path.dirname(path)
         
@@ -164,65 +167,51 @@ class Config(BaseSettings):
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
         
-        shutil.copytree(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config/default"), self.path, dirs_exist_ok=True)
+        shutil.copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
 
     def rewrite(self, key, value):
         # rewrites the config.toml key to value
         pass
-
+    
     def get_path(self, name):
         return self._path_dict[name]
-
-    @cached_property
-    def extensions_path(self):
-        return os.path.join(self.path, "extensions.toml")
+    
+    def get_path_contents(self, name, extension=""):
+        return glob.glob(f"**.{extension}", root_dir=self.get_path(name), recursive=True)
 
     @cached_property
     def _path_dict(self):
-        # root = {
-        #     "clients": os.path.join(self.path, self.location.clients),
-        #     "nodes": os.path.join(self.path, self.location.nodes),
-        #     "input": os.path.join(self.path, self.location.input),
-        #     "output": os.path.join(self.path, self.location.output),
-        #     "models": os.path.join(self.path, self.location.models),
-        #     "workflows": os.path.join(self.path, self.location.workflows)
-        # }
-
-        model_directories = [
-            "checkpoints",
-            "classifiers",
-            "clip",
-            "clip_vision",
-            # "configs",
-            "controlnet",
-            "diffusers",
-            "embeddings",
-            "gligen",
-            "hypernetworks",
-            "huggingface",
-            "hf_cache",
-            "loras",
-            "llms",
-            "photomaker",
-            "style_models",
-            "t2i_adapter",
-            "unet",
-            "upscale_models",
-            "vae",
-            "vae_approx"
-        ]
-
         root = {
-            n: os.path.join(self.path, p) for n, p in dict(self.location).items()
+            n: os.path.join(self.path, p) for n, p in dict(self.location).items() # see self.location for details
         }
 
         for n, p in dict(self.location).items():
             if ".." in p:
                 raise Exception("Cannot set location outside of config path.")
 
-        models = {f"models.{name}": os.path.join(root["models"], name) for name in model_directories}
+        models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
 
         return {**root, **models}
+    
+    def get_default(self, name, prop):
+        return self._defaults_dict[name][prop]
+    
+    @cached_property
+    def _defaults_dict(self):
+        d = {}
+
+        for filename in glob.glob("*.toml", root_dir=config_source_location):
+            filepath = Path(os.path.join(config_source_location, filename))
+            with open(filepath, "rb") as f:
+                fd = tomllib.load(f)
+            name = filepath.stem
+            d[name] = fd
+        
+        return d
+    
+    @cached_property
+    def extensions_path(self):
+        return os.path.join(self.path, "extensions.toml")
 
     @cached_property
     def node_manager(self):

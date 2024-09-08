@@ -1,0 +1,18 @@
+schedulers = [
+    "EulerDiscreteScheduler",
+    "EulerAncestralDiscreteScheduler",
+    "HeunDiscreteScheduler",
+    "UniPCMultistepScheduler",
+    "DDIMScheduler",                    # rescale_betas_zero_snr=True, timestep_spacing="trailing"
+    "DPMSolverMultistepScheduler",      # dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
+    "LMSDiscreteScheduler",             # use_karras_sigmas=True
+    "DEISMultistepScheduler",
+    "AysSchedules"
+]
+
+solvers = [
+    "dpmsolver++",
+    "sde-dpmsolver++",
+    "sde-dpmsolver",
+    "dpmsolver"
+]

@@ -1,6 +1,5 @@
 import typing
 import inspect
-import logging
 
 from pathlib import Path
 from dataclasses import asdict
@@ -8,10 +7,11 @@ from collections import OrderedDict
 from collections.abc import Iterator
 
 from sdbx import logger
-from sdbx.nodes.helpers import format_name
+from sdbx.nodes.helpers import format_name, timing
 from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
 
 class NodeInfo:
+    @timing(logger.debug)
     def __init__(self, fn, path=None, name=None, display=False):
         self.fname = getattr(fn, '__name__')
 
@@ -70,7 +70,7 @@ class NodeInfo:
             if key == 'return':
                 self.terminal = True
                 return
-            raise Exception(f"{key} cannot be typed as None.")
+            raise Exception(f"Argument {key} cannot be typed as None.")
 
         info = {}
         necessity = "required"
@@ -122,7 +122,7 @@ class NodeInfo:
             choices = typing.get_args(value)
             if len(choices) == 0:
                 # raise Exception(f"{key} of type Literal has no values.")
-                logging.warning(f"{key} of type Literal has no values.")
+                logger.warning(f"Literal-typed argument '{key}' in node '{self.name}' has no values. This will show as an empty list of choices to the client.")
 
             info["choices"] = choices
         

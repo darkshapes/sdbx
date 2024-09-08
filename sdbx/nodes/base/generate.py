@@ -1,6 +1,6 @@
 from sdbx.nodes.types import *
 from sdbx.config import config
-from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin, getSchedulers, getSolvers
+from sdbx.nodes.helpers import softRandom, seedPlanter, getGPUs, cacheBin
 
 from time import perf_counter
 import os
@@ -21,9 +21,9 @@ def diffusion(
     cfg_scale: A[float,Slider(min=0.000, max=20.000, step=0.001, round=0.001)] = 5.00,
     height: int = 1024,
     width: int = 1024,
-    scheduler: Literal[*getSchedulers()] = "EulerDiscreteScheduler",
-    algorithm_type: A[Literal[*getSolvers()], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
-    use_karras_sigmas: A[bool, Dependent(on="scheduler", when=("LMSDiscreteScheduler" or "DPMSolverMultistepScheduler"),)] = True,
+    scheduler: Literal[*config.default_algorithms["schedulers"]] = "EulerDiscreteScheduler",
+    algorithm_type: A[Literal[*config.default_algorithms["solvers"]], Dependent(on="scheduler", when="DPMSolverMultistepScheduler")] = "dpmsolver++",
+    use_karras_sigmas: A[bool, Dependent(on="scheduler", when=("LMSDiscreteScheduler", "DPMSolverMultistepScheduler"))] = True,
     solver_order: A[int, Dependent(on="scheduler", when="DPMSolverMultistepScheduler"), Slider(min=1, max=3, step=1)] = 2,
     v_pred: A[bool, Dependent(on="scheduler", when="DDIMScheduler")] = False, 
     timestep_spacing: A[Literal["trailing","linspace","leading"], Dependent(on="scheduler", when="DDIMScheduler")] = "trailing",    

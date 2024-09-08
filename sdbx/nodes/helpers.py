@@ -8,10 +8,6 @@ import base64
 import secrets as secrets
 from functools import cache as function_cache, wraps
 
-from torch import torch
-from natsort import natsorted
-from numpy.random import SeedSequence, Generator, Philox
-
 from sdbx.config import config
 
 ### CACHING ###
@@ -56,7 +52,31 @@ def rename_class(base, name):
 def format_name(name):
     return ' '.join(word[0].upper() + word[1:] if word else '' for word in re.split(r'_', name))
 
-### RANDOM ROUTINES
+### NODE INFO TIMING ###
+
+from functools import wraps
+from time import time
+
+def timing(callback):
+    def decorator(f):
+        @wraps(f)
+        def wrap(instance, *args, **kwargs):
+            ts = time()
+            result = f(instance, *args, **kwargs)
+            te = time()
+            elapsed_time = te - ts
+            # Use the class attribute 'name' for timing log
+            print(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+            callback(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+            return result
+        return wrap
+    return decorator
+
+### RANDOM ROUTINES ###
+
+from torch import torch
+from natsort import natsorted
+from numpy.random import SeedSequence, Generator, Philox
 
 def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
@@ -90,6 +110,10 @@ def seedPlanter(seed, deterministic=True):
     # elif torch.xpu.is_available():
     #    return torch.xpu.manual_seed(seed)
 
+### SERVER INFORMATION ROUTINES ###
+
+### TODO: this stuff should all go in config.py or related somewhere, maybe device.py?
+
 def getGPUs(filtering=""):
     if torch.cuda.is_available(): 
         for i in range(torch.cuda.device_count()):
@@ -108,45 +132,3 @@ def cacheBin():
     if torch.cuda.is_available(): return torch.cuda.empty_cache()
     elif torch.backends.mps.is_available(): return torch.mps.empty_cache()
     elif torch.xpu.is_available(): return torch.xpu.empty_cache()
-
-def getDirFiles(folder, filtering=""):
-   return natsorted([f for f in os.listdir(config.get_path(folder)) if os.path.isfile(os.path.join(config.get_path(folder), f)) & (filtering in f)])
-
-def getDirFilesCount(folder, filtering=""):
-    counts = [getDirFiles(folder, filtering)]
-    return format(len(counts))
-
-def switch_case(switch):
-    def switcher(func):
-        def case(case):
-            return switch[case](case) if case in switch else None
-        return case 
-    return switcher
-
-def getSchedulers(filtering=""):
-
-    schedulerdict = [
-        "EulerDiscreteScheduler",
-        "EulerAncestralDiscreteScheduler",
-        "HeunDiscreteScheduler",
-        "UniPCMultistepScheduler",
-        "DDIMScheduler", # rescale_betas_zero_snr=True, timestep_spacing="trailing"
-        "DPMSolverMultistepScheduler", # dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
-        "LMSDiscreteScheduler",  #use_karras_sigmas=True
-        "DEISMultistepScheduler",
-        "AysSchedules"
-    ]
-
-    schedulers = natsorted([s for s in schedulerdict if (filtering in s)])
-    return schedulers
-
-def getSolvers(filtering=""):
-
-    solverdict = [
-        "dpmsolver++",
-        "sde-dpmsolver++",
-        "sde-dpmsolver",
-        "dpmsolver"
-    ]
-    solvers = natsorted([s for s in solverdict if (filtering in s)])
-    return solvers
