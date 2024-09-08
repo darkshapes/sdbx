@@ -1,22 +1,25 @@
+
 import gc
 import os
 import platform
-import json
 from time import perf_counter
+import datetime
+import time
 
 from diffusers import AutoPipelineForText2Image, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, FromOriginalModelMixin
 from diffusers.schedulers import AysSchedules
 from sdbx.config import config
-from sdbx.nodes.helpers import seed_planter, soft_random, model_list, pcm_list,ti_list, get_schedulers, get_dir_files
+from sdbx.nodes.helpers import seed_planter, soft_random, get_schedulers
 import torch
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
-# import accelerate
+
+def tc(): print(str(datetime.timedelta(seconds=time.process_time())), end="")
 
 ### GLOBAL AUTOCONFIGURE
-print("determining device type...") #debug
+print(f"{tc()} determining device type...") #debug
 clear_cache = True #[compatability] lower ram by clearing cache, slows batch ops, determined by ram calculation
 linux = True if platform.system().lower() == 'linux' else False
-if linux:torch.cuda.memory._record_memory_history() # diagnostic mem use measurement
+if linux:torch.cuda.memory._record_memory_history() # [diagnostic] mem use measurement
 compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
 queue = []    
 if torch.cuda.is_available(): device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
@@ -24,20 +27,19 @@ else:  # https://pytorch.org/docs/master/notes/mps.html
    device = "mps" if (torch.backends.mps.is_available() & torch.backends.mps.is_built()) else "cpu"
 
 ### USER OPTIONS  : TOKEN ENCODER
-#queue.extend([{
-# "prompt": "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
-#  "seed": int(soft_random()),
-#}])
-queue.extend([{
-  "prompt": "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
-  "seed": int(soft_random()),
-}])
+prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
+seed = int(soft_random())
 
 ### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
 token_encoder = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
 
 ### TOKEN ENCODER SYSTEM
-print(f"encoding prompt with device: {device}...") #debug
+queue.extend([{
+  "prompt": prompt,
+  "seed": seed,
+}])
+
+print(f"{tc()} encoding prompt with device: {device}...") #debug
 def encode_prompt(prompts, tokenizers, text_encoders):
     embeddings_list = []
     for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
@@ -114,23 +116,19 @@ if clear_cache:
     if device == "mps": torch.mps.empty_cache()
 
 ### USER OPTIONS  : INFERENCE
-model_find = get_dir_files("models.checkpoints","stabilityai/stable-diffusion-xl-base-1.0")
-lora_find = "8step"
-align_your_steps=False #locks steps to 10, disable for smaller or larger
-inference_steps=8 # lower to increase speed or match lcm/pcm
-guidance_scale=5, # default for sdxl-architecture. raise for sd-architecture, drop to 0 (off) to increase speed with turbo, etc
-try:
-    scheduler = get_schedulers("EulerAncestral")[0]
-except:
-    scheduler = "EulerDiscreteScheduler"
-#get_schedulers()
-# lora2 = None,
+model = next(iter(m for m in os.listdir(config.get_path("models.checkpoints")) if "adfdfd" in m and m.endswith(".safetensors")), "stabilityai/stable-diffusion-xl-base-1.0")
+lora = next(iter(m for m in os.listdir(config.get_path("models.loras")) if "adfdfd" in m and m.endswith(".safetensors")), "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors") #lora needs to be explicitly declared
+scheduler =  next(iter(m for m in get_schedulers("EulerAncestral")), "EulerDiscreteScheduler")
+inference_steps=8 # only appears if Lora isnt a PCM/LCM and scheduler isnt "AysScheduler". lower to increase speed
+guidance_scale=5, # default for sdxl-architecture. raise for sd-architecture, drop to 0 (off) to increase speed with turbo, etc. auto mode?
+# lora2 = next(iter(m for m in os.listdir(config.get_path("models.loras")) if "adfdfd" in m and m.endswith(".safetensors")), "a default lora.safetensors")
 # text_inversion = next((w for w in get_dir_files("models.embeddings"," ")),"None")
 
-### AUTOCONFIG OPTIONS  : INFERENCE
+### AUTOCONFIG OPTIONS : INFERENCE
 sequential_offload = True #[universal] lower vram use (and speed on pascal apparently!!)
 precision='16' # [universal], less memory for trivial quality decrease
-dynamic_guidance = True # [universal]half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
+dynamic_guidance = True # [universal] half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
+model_ays = "StableDiffusionXLTimesteps" #[compataibility] for alignyoursteps to match model type
 cpu_offload = False  #[compatability] lower vram use by pushing to cpu
 bf16=False # [compatability] certain types of models need this, it influences determinism as well
 timestep_spacing="trailing" #[compatability] DDIM, PCM "trailing"
@@ -140,11 +138,7 @@ rescale_betas_zero_snr=True #[compatability] DDIM True
 disk_offload = False #[compatability] last resort, but things work
 
 ### INFERENCE SYSTEM
-try: model = model_find[0]
-except: model = "stabilityai/stable-diffusion-xl-base-1.0"
-lora = config.get_path("models.loras") # lora load has to be to folder, then point to file in it
-weight_name = next((w for w in get_dir_files("models.loras", lora_find)),"pcm_sdxl_normalcfg_8step_converted_fp16.safetensors") #see above
-
+lora_path = config.get_path("models.loras")
 pipe_args = {
     "use_safetensors": True,
     "tokenizer":None,
@@ -159,14 +153,14 @@ elif precision=='16':
     pipe_args["variant"]="fp16"
     pipe_args["torch_dtype"]=torch.bfloat16 if bf16 else torch.float16
 
-print (f"precision set for: {precision}, bfloat: {bf16}, using {pipe_args["torch_dtype"]}") #debug
+print(f"{tc()} precision set for: {precision}, bfloat: {bf16}, using {pipe_args["torch_dtype"]}") #debug
 
-print(f"load model {model}...") #debug
+print(f"{tc()} load model {model}...") #debug
 pipe = AutoPipelineForText2Image.from_pretrained(
     model,**pipe_args,                        
 ).to(device)
 
-print(f"set scheduler, lora = {os.path.join(lora, weight_name)}")  # lora2
+print(f"{tc()} set scheduler, lora = {os.path.join(lora_path, lora)}")  # lora2
 scheduler_args = {
    
 }
@@ -180,21 +174,21 @@ if scheduler=="DDIMScheduler":
 # if scheduler=="DPMMultiStepScheduler":
     # scheduler_args["algorithm_type"]=
 
-pipe.load_lora_weights(lora, weight_name=weight_name)
+pipe.load_lora_weights(lora_path, weight_name=lora)
 # if lora2: pipe.load_lora_weights(lora2, weight_name=weight_name)
 # load lora into u-net only : pipeline.unet.load_attn_procs("jbilcke-hf/sdxl-cinematic-1", weight_name="pytorch_lora_weights.safetensors")
 
 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_args)
 # if text_inversion: pipe.load_textual_inversion(text_inversion)
 
-print(f"set offload {cpu_offload} and sequential as {sequential_offload} for {device} device") #debug 
+print(f"{tc()} set offload {cpu_offload} and sequential as {sequential_offload} for {device} device") #debug 
 if device=="cuda":
     if sequential_offload: pipe.enable_sequential_cpu_offload()
     if cpu_offload: pipe.enable_model_cpu_offload() 
 
 gen_args = {}
 if dynamic_guidance:
-    print("set dynamic cfg") #debug
+    print(f"{tc()} set dynamic cfg") #debug
     def dynamic_cfg(pipe, step_index, timestep, callback_key):
         if step_index == int(pipe.num_timesteps * 0.5):
             callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
@@ -206,22 +200,22 @@ if dynamic_guidance:
     gen_args["callback_on_step_end"]=dynamic_cfg
     gen_args["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
 
-if align_your_steps:
-    timesteps = AysSchedules["StableDiffusionXLTimesteps"] # should be autodetected
+if scheduler == "AysSchedules":
+    timesteps = AysSchedules[model_ays] # should be autodetected
     gen_args["timesteps"]=timesteps
 
-print("set generator") #debug
+print(f"{tc()} set generator") #debug
 generator = torch.Generator(device=device)
 
-print("begin queue loop...") #debug
+print(f"{tc()} begin queue loop...") #debug
 
 if compile_unet: pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
 for i, generation in enumerate(queue, start=1):
     image_start = perf_counter()                        #start the metric stopwatch
-    print(f"planting seed {generation['seed']}...") #debug
+    print(f"{tc()} planting seed {generation['seed']}...") #debug
     seed_planter(generation['seed'])
     generator.manual_seed(generation['seed'])
-    print(f"inference device: {device}....") #debug
+    print(f"{tc()} inference device: {device}....") #debug
 
     generation['latents'] = pipe(
         prompt_embeds=generation['embeddings'][0],
@@ -234,7 +228,7 @@ for i, generation in enumerate(queue, start=1):
         **gen_args,
     ).images 
 
-print("empty cache...") #debug
+print(f"{tc()} empty cache...") #debug
 if clear_cache:
     pipe.unload_lora_weights()
     del pipe.unet
@@ -246,27 +240,29 @@ if clear_cache:
 ### USER OPTIONS  : VAE/SAVE/PREVIEW
 vae_find = "flat"
 file_prefix = "Shadowbox-"
-compress_level = 9 # optional png compression
+compress_level = 4 # optional png compression
 
 ### AUTOCONFIG OPTIONS  : VAE
 # pipe.upcast_vae()
 vae_tile = True #[compatability] tile vae input to lower memory
 vae_slice = False #[compatability] serialize vae to lower memory
+vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors" #[compatability] this should be detected by model type
+vae_config_file ="ssdxlvae.json" #[compatability] this too
 
 ### VAE SYSTEM
-vae_path = os.path.normpath(os.path.join("c:",os.sep,"users","public","models","vae")) # config.get_path("models.vae")
-autoencoder = os.path.join(vae_path,next((w for w in get_dir_files("models.vae", vae_find)),))
-symlnk = os.path.join(vae_path,"temp_symlnk","model.safetensors")
+vae_path = config.get_path("models.vae")
+autoencoder = os.path.join(vae_path,next((w for w in os.listdir(path=vae_path) if "flat" in w), vae_default)) #autoencoder wants full path and filename
 
-if autoencoder is None: autoencoder = "madebyollin/sdxl-vae-fp16-fix.safetensors"
-else:
-    if os.path.isfile(symlnk): os.remove(symlnk)
-    os.symlink(autoencoder,symlnk)
+vae_config_path = os.path.join(config.get_path("models"),"metadata")
+symlnk = os.path.join(vae_config_path,"config.json") #autoencoder also wants specific filenames
+if os.path.isfile(symlnk): os.remove(symlnk)
+os.symlink(os.path.join(vae_config_path,vae_config_file),symlnk) #note: no 'i' in 'symlnk'
 
 
-print("decoding...") #debug
-pipe.vae = AutoencoderKL.from_single_file(autoencoder).to("cuda")
+print(f"{tc()} decoding using {autoencoder}...") #debug
+vae = AutoencoderKL.from_single_file(autoencoder, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
 #vae = FromOriginalModelMixin.from_single_file(autoencoder, config=vae_config).to(device)
+pipe.vae=vae
 pipe.upcast_vae()
 
 with torch.no_grad():
@@ -280,10 +276,9 @@ with torch.no_grad():
             return_dict=False,
         )[0]
 
-        print("error here?")
         image = pipe.image_processor.postprocess(image, output_type='pil')[0]
 
-        print("saving") #debug     
+        print(f"{tc()} saving") #debug     
         counter += 1
         filename = f"{file_prefix}-{counter}-batch-{i}.png"
 

@@ -38,8 +38,7 @@ core = [
     "pydantic",
     "pydantic_settings",
 
-    # Accessibility
-    "natsort",
+    "peft",
 ]
 dev = [
     # Testing frameworks and tools
