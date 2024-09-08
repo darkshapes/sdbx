@@ -78,34 +78,34 @@ from torch import torch
 from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox
 
-def softRandom(size=0x2540BE3FF): # returns a deterministic random number using Philox
+def soft_random(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
     rndmc = Generator(Philox(SeedSequence(int(entropy,16))))
     return rndmc.integers(0, size) 
 
-def hardRandom(hardness=5): # returns a non-prng random number use secrets
+def hard_random(hardness=5): # returns a non-prng random number use secrets
     return int(secrets.token_hex(hardness),16) # make hex secret be int
 
-def tensorRandom(device,seed=None):
+def tensor_random(seed=None):
     return torch.random.seed() if seed is None else torch.random.manual_seed(seed)
 
 def tensorify(hard, size=4): # creates an array of default size 4x1 using either softRandom or hardRandom
     num = []
     for s in range(size): # make array, convert float, negate it randomly
         if hard==False: # divide 10^10, truncate float
-            conv = '{0:.6f}'.format((float(softRandom()))/0x2540BE400)
+            conv = '{0:.6f}'.format((float(soft_random()))/0x2540BE400)
         else:  # divide 10^12, truncate float
-            conv = '{0:.6f}'.format((float(hardRandom()))/0xE8D4A51000)
+            conv = '{0:.6f}'.format((float(hard_random()))/0xE8D4A51000)
         num.append(float(conv)) if secrets.choice([True, False]) else num.append(float(conv)*-1)
     return num
 
-def seedPlanter(seed, deterministic=True):
+def seed_planter(seed, deterministic=True):
     torch.manual_seed(seed)
-    if torch.cuda.is_available(): 
+    if torch.cuda.is_available()==True:
         if deterministic == True:
             return {'torch.backends.cudnn.deterministic': 'True','torch.backends.cudnn.benchmark': 'False'}
         return torch.cuda.manual_seed(seed), torch.cuda.manual_seed_all(seed)
-    elif torch.backends.mps.is_available():
+    elif torch.backends.mps.is_available()==True:
         return torch.mps.manual_seed(seed)
     # elif torch.xpu.is_available():
     #    return torch.xpu.manual_seed(seed)
@@ -114,20 +114,10 @@ def seedPlanter(seed, deterministic=True):
 
 ### TODO: this stuff should all go in config.py or related somewhere, maybe device.py?
 
-def getGPUs(filtering=""):
-    if torch.cuda.is_available(): 
-        for i in range(torch.cuda.device_count()):
-            devices = [torch.cuda.get_device_properties(i).name]
-    elif torch.backends.mps.is_available():
-        devices = "mps" # TODO: use api here in case apple ever makes more than one mps device      
-        # for i in range(torch.mps.device_count()):
-            # devices = [torch.device(f"mps:{i}").name]
-    #elif torch.xpu.is_available():
-    #        devices = [torch.xpu.get_device_properties(i).name]
-    else: devices = "cpu"
-    return natsorted(filtering in [devices] if filtering in [devices] is not None else [devices])
+def get_gpus():
+    return ["cpu", "cuda", "mps", "xpu"]
 
-def cacheBin():
+def cache_bin():
     gc.collect()
     if torch.cuda.is_available(): return torch.cuda.empty_cache()
     elif torch.backends.mps.is_available(): return torch.mps.empty_cache()

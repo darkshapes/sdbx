@@ -18,6 +18,7 @@ core = [
     "diffusers",
     "transformers",
     "accelerate",
+    "peft",
 
     # Other machine learning libraries
     "llama-cpp-python",
@@ -37,9 +38,6 @@ core = [
     # Data validation
     "pydantic",
     "pydantic_settings",
-
-    # Accessibility
-    "natsort",
 ]
 dev = [
     # Testing frameworks and tools
