@@ -8,7 +8,7 @@ except PackageNotFoundError:
 import logging
 logger = logging.getLogger('uvicorn.error')
 
-from .config import config
+from .config import config, source
 if "dev" in __version__: config.development = True
 
 from .server import create_app

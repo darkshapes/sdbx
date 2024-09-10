@@ -11,13 +11,18 @@ from sdbx import config, logger
 from sdbx.server.types import Graph
 from sdbx.server.serialize import WebEncoder
 
-def register_routes(rtr: APIRouter):
+def register_update_signal(rtr: APIRouter):
+    @rtr.websocket("/ws/update")
+    async def update_signal_websocket(websocket: WebSocket):
+        await websocket.accept()
+
+def register_node_routes(rtr: APIRouter):
     @rtr.get("/nodes")
-    async def list_nodes():
+    def list_nodes():
         return config.node_manager.node_info
     
     @rtr.post("/prompt")
-    async def start_prompt(graph: Graph):
+    def start_prompt(graph: Graph):
         tid = str(uuid.uuid4())
         try:
             task = config.executor.execute(node_link_graph(graph.dict()), tid)
@@ -27,7 +32,7 @@ def register_routes(rtr: APIRouter):
             return {"error": str(e)}
     
     @rtr.post("/kill/{tid}")
-    async def kill_prompt(tid: str):
+    def kill_prompt(tid: str):
         try:
             config.executor.halt(tid)
             return {"task_id": tid}
@@ -35,8 +40,8 @@ def register_routes(rtr: APIRouter):
             logger.exception(e)
             return {"error": str(e)}
     
-    @rtr.websocket("/ws/{tid}")
-    async def websocket_endpoint(websocket: WebSocket, tid: str):
+    @rtr.websocket("/ws/task/{tid}")
+    async def task_subscribe_websocket(websocket: WebSocket, tid: str):
         await websocket.accept()
 
         task_context = config.executor.tasks.get(tid)
@@ -55,7 +60,7 @@ def register_routes(rtr: APIRouter):
             try:
                 while True:
                     # Wait for either result_event or error_event
-                    done, _ = await wait(
+                    await wait(
                         [
                             create_task(task_context.result_event.wait()), 
                             create_task(task_context.error_event.wait()),
@@ -99,3 +104,27 @@ def register_routes(rtr: APIRouter):
                 await websocket.close()
             except Exception:
                 pass
+    
+    @rtr.post("/tune/{node_id}")
+    def tune_node(node_id: str, graph: Graph):
+        try:
+            g = node_link_graph(graph.dict())
+            node_fn = config.node_manager.registry[g.nodes[node_id]['fname']]
+            params = node_fn.tuner.collect_tuned_parameters(config.node_manager, g, node_id)
+            return {"tuned_parameters": params}
+        except Exception as e:
+            logger.exception(e)
+            return {"error": str(e)}
+
+def register_flow_routes(rtr: APIRouter):
+    @rtr.get("/flows")
+    def list_flows():
+        return config.get_path_tree("flows")
+    
+    @rtr.get("/flows/{item}")
+    def fetch_flow_item():
+        return json.load(os.path.join(config.get_path("flows"), item))
+
+def register_routes(rtr: APIRouter):
+    register_node_routes(rtr)
+    register_flow_routes(rtr)

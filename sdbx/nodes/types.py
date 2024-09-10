@@ -13,7 +13,7 @@ from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, L
 from sdbx.nodes.helpers import rename_class
 
 
-## Path decorator ##
+## Node decorator ##
 def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     """
     Decorator for nodes. All functions using this decorator will be automatically read by the node manager.
@@ -27,13 +27,17 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
         display : bool
             Whether to display the output in the node.
     """
-    from sdbx.nodes.info import NodeInfo  # Avoid circular import
-
     if fn is None:
         return partial(node, **kwargs)
     
     fn.generator = isgeneratorfunction(fn)
+
+    from sdbx.nodes.info import NodeInfo  # Avoid circular import
     fn.info = NodeInfo(fn, **kwargs)
+
+    # from sdbx.nodes.tuner import NodeTuner
+    # fn.tuner = NodeTuner(fn)
+
     return fn
 
 
@@ -112,7 +116,3 @@ class Dependent:
 class Validator:
     condition: Callable[[Any], bool]
     error_message: str
-
-
-## Constants ##
-MAX_RESOLUTION = 16384

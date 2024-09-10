@@ -4,40 +4,27 @@ disable = false                  # [default false] Toggle extensions. false | "c
 [location]                      # Paths for loading and saving = "c:\foo\bar" | "/user/username/foo/bar"
 clients = "clients"             # [default "clients"]
 nodes = "nodes"                 # [default "nodes"]
+flows = "flows"                 # [default "flows"]
 input = "input"                 # [default "input"]
 output = "output"               # [default "output"]
 models = "models"               # [default "models]
-workflows = "workflows"         # [default "workflows"]
 
 [web]                           # http://listen:port and related settings. IPv4 format addresses.
 listen = "127.0.0.1"            # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0" 
-port = 8188                   	# [default 8188] Chooses the listen port. 
-
+port = 8188                   	# [default 8188] Chooses the listen port.
+reload = true                   # [default true] Reload the server on changes to source or user config directory.
+reload-include = [              # [default .toml, .json, models/] Glob for which file changes to reload the server to.
+    "*.toml",
+    "*.json",
+    "models/**/*",
+]
 external-address = "localhost"  # [default "localhost"] URL for external API, such as for image paths.
-
-enable-cors-header = false      # [default false] Enable Cross-Origin Resource Sharing = false | '*' | string.
 max-upload-size = 100           # [default 100] Maximum file import size
-max-queue-size = 65536          # [default 65536] Queue size is limited to this number
-
-auto-launch = true              # [default true] Opens Shadowbox in the default browser.
-
+auto-launch = true              # [default true] Opens Shadowbox in the default browser on launch.
 known-models = true             # [default true] Toggle whether known (downloadable) models are shown in the UI.
-
 preview-mode = "auto"           # [default auto] Show image while generating. "none" | "auto" | "latent2rgb" | "taesd"
 
-[computational]                 # CUDA, CPU, Directml and attention settings
-gpu-only = false                # [default false] use GPU exclusively
-cuda-device = 0                 # [default 0] cuda id for this instance. refer to nvidia-smi command
-cuda-malloc = true              # [default true] Toggles cudaMallocAsync (default for torch 2 and up)
-
-cpu-only = false                # [default false] use CPU exclusively (slow)
-cpu-vae = true                  # [default true] use CPU for VAE
-
-directml = false                # [default false] Toggles torch-directml (macOS or CPU). Can also be set to device id.
-ipex-optimize = true            # [default false] Toggles ipex.optimize when loading models with Intel GPUs.
-xformers = true                 # [default true] Toggles xformers. Overrides "split" or "quad" cross-attention.
-cross-attention = "torch"       # [default "torch"] Cross attention optimization = "split" | "quad" | "torch"
-upcast-attention = true         # [default true] Attention upcasting = true | false | "force"
+[computational]                 # Settings that directly affect inference computation
 deterministic = false           # [default false] Use slower deterministic algorithms. Determinism not guaranteed
 
 [memory]                        # RAM management

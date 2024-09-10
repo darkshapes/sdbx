@@ -8,7 +8,7 @@ import argparse
 import platform
 
 from pathlib import Path
-from typing import Tuple, Type, Union, Literal
+from typing import Tuple, Type, Union, Literal, List
 from functools import total_ordering, cached_property
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -19,7 +19,8 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-config_source_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../config")
+source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+config_source_location = os.path.join(source, "config")
 
 def get_config_location():
     filename = "config.toml"
@@ -29,7 +30,6 @@ def get_config_location():
         'darwin': os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Shadowbox', filename),
         'linux': os.path.join(os.path.expanduser('~'), '.config', 'shadowbox', filename),
     }[platform.system().lower()]
-
 
 class LatentPreviewMethod(str, enum.Enum):
     NONE = "none"
@@ -52,12 +52,28 @@ class VRAM(str, enum.Enum):
 
 class Precision(str, enum.Enum):
     MIXED = "mixed"
+    FP64 = "float64"
     FP32 = "float32"
     FP16 = "float16"
     BF16 = "bfloat16"
     FP8E4M3FN = "float8_e4m3fn"
     FP8E5M2 = "float8_e5m2"
 
+# class TensorType:
+#     DTYPE_T = Literal["FP64", "FP32", "FP16", "BF16", "I64", "I32", "I16", "I8", "U8", "BOOL"]
+
+# class TensorData:
+#     dtype: DTYPE_T
+#     shape: List[int]
+#     data_offsets: Tuple[int, int]
+#     parameter_count: int = field(init=False)
+
+#     def __post_init__(self) -> None:
+#         # Taken from https://stackoverflow.com/a/13840436
+#         try:
+#             self.parameter_count = functools.reduce(operator.mul, self.shape)
+#         except TypeError:
+#             self.parameter_count = 1  # scalar value has no shape
 
 class ConfigModel(BaseModel):
     model_config = ConfigDict(
@@ -71,32 +87,23 @@ class ExtensionsConfig(ConfigModel):
 class LocationConfig(ConfigModel):
     clients: str = "clients"
     nodes: str = "nodes"
+    flows: str = "flows"
     input: str = "input"
     output: str = "output"
     models: str = "models"
-    workflows: str = "workflows"
 
 class WebConfig(ConfigModel):
     listen: str = "127.0.0.1"
     port: int = 8188
+    reload: bool = True
+    reload_include: List[str] = ["*.toml", "*.json", "models/**/*"]
     external_address: str = "localhost"
-    enable_cors_header: Union[bool, str] = False
     max_upload_size: int = 100
     auto_launch: bool = True
     known_models: bool = True
     preview_mode: LatentPreviewMethod = LatentPreviewMethod.AUTO
 
 class ComputationalConfig(ConfigModel):
-    gpu_only: bool = False
-    cuda_device: int = 0
-    cuda_malloc: bool = True
-    cpu_only: bool = False
-    cpu_vae: bool = True
-    directml: Union[bool, int] = False
-    ipex_optimize: bool = False
-    xformers: bool = True
-    cross_attention: Literal['split', 'quad', 'torch'] = "torch"
-    upcast_attention: Union[bool, Literal['force']] = True
     deterministic: bool = False
 
 class MemoryConfig(ConfigModel):
@@ -176,9 +183,18 @@ class Config(BaseSettings):
     def get_path(self, name):
         return self._path_dict[name]
     
-    def get_path_contents(self, name, extension=""):
-        p = self.get_path(name)
+    def get_path_contents(self, name, extension="", path_name=True):
+        p = self.get_path(name) if path_name else name
         return [os.path.join(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
+    
+    def get_path_tree(self, name, path_name=True):
+        p = self.get_path(name) if path_name else name
+        with os.scandir(p) as it:
+            for entry in it:
+                if entry.is_file():  # If it's a file, add its name and modified time
+                    tree[entry.name] = datetime.fromtimestamp(entry.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                elif entry.is_dir():  # If it's a directory, recurse
+                    tree[entry.name] = self.get_path_tree(os.path.join(p, entry.name), path_name=False)
 
     @cached_property
     def _path_dict(self):

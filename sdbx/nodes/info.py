@@ -32,7 +32,7 @@ class NodeInfo:
         annotations = inspect.get_annotations(fn)
         signature = inspect.signature(fn)
 
-        self.generator = inspect.isgeneratorfunction(fn)
+        self.generator = fn.generator
         self.steps = getattr(fn, "steps", None)
 
         try:

@@ -29,6 +29,7 @@ core = [
     # Server libraries
     "fastapi",
     "uvicorn",
+    "watchfiles",
     "websockets",
 
     # Environment management
