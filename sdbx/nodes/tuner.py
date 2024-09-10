@@ -1,6 +1,11 @@
 import inspect
 import logging
 import json
+import struct
+from pathlib import Path
+from typing import Optional, Dict, Any
+import torch
+import os
 
 from functools import cache
 from typing import Callable, Dict
@@ -17,32 +22,6 @@ class NodeTuner:
     @cache
     def get_tuned_parameters(self, widget_inputs):
 
-        
-        if self.name is "safetensors_loader": 
-        data_offsets: Tuple[int, int]
-        parameter_count: int = field(init=False)
-
-        def __post_init__(self) -> None:  #  https://stackoverflow.com/a/13840436
-        try:
-            self.parameter_count = functools.reduce(operator.mul, self.shape)
-        except TypeError:
-            self.parameter_count = 1  # scalar value has no shape
-
-
-        metadata: dict[str, str]
-        tensors: dict[str, TensorData]
-        parameter_count: dict[DTYPE_T, int] = field(init=False)
-
-        def __post_init__(self) -> None:
-            parameter_count: dict[DTYPE_T, int] = defaultdict(int)
-            for tensor in self.tensors.values():
-                parameter_count[tensor.dtype] += tensor.parameter_count
-            self.parameter_count = dict(parameter_count)
-    
-        parse_safetensors_file_metadata(
-            "HuggingFaceH4/zephyr-7b-beta", "model-00003-of-00008.safetensors")
-
-
         #if no metadata os.path.getsize(file_path)
 
         # if self.name is "load gguf" use this routine to pull metadata
@@ -56,6 +35,7 @@ class NodeTuner:
         
         # if there is no metadata
         # fall back to filename and guess
+        
         # if no filename
         # pick a generic config.json from models.metadata and cross ur fingers
 
@@ -110,60 +90,47 @@ class NodeTuner:
             tuned_parameters |= p_tuned_parameters
         
         return tuned
+    
 # @dataclass
-@dataclass
-class SafetensorsMetadata: # https://huggingface.co/docs/safetensors/index#format.
+class ReadMeta:
+    # pass a file to this class like so : ReadMeta.data(file)
+    def data(file: Path,):
+        dict_ref = {
+                    '__metadata__': '',
+                    'dtype': '',
+                    'ds_config': '',
+                    'modelspec.title':'',
+                    'modelspec.architecture':'',
+                    'modelspec.author':'',
+                    }
+            
+        def _search_dict(meta):
+            for key, value in dict_ref.items():
+                if meta.get(key, 'not_found') != 'not_found':
+                    if dict_ref[key] == '':
+                       dict_ref[key] = meta.get(key)
 
-    metadata: Dict[str, str] # The metadata contained in the file
-    tensors: Dict[TENSOR_NAME_T, TensorInfo] # tensors map. Keys are tensor names and values are information about the corresponding tensor, as a parameter_count (`Dict[str, int]`):
-    parameter_count: Dict[DTYPE_T, int] = field(init=False) # parameter num per datatype map. data types:  parameters,
-            of that data type.
+            return meta
+        
+        def _parse_safetensors_metadata(file: Path):
+            with open(file, 'rb') as f:
+                header = struct.unpack('<Q', f.read(8))[0]
+                return json.loads(f.read(header).decode('utf-8'), object_hook=_search_dict)
 
-    def get_data(self, model) -> #not sure what type this returns:
-        info = self._api.get_safetensors_metadata(model)    hmmm
-    _api: "HfApi" = field(repr=False, compare=False)
+        if not os.path.exists(file):
+            raise RuntimeError(f"Not found: {file}")
 
-    def __post_init__(self) -> None:
-        parameter_count: Dict[DTYPE_T, int] = defaultdict(int)
-        for tensor in self.tensors.values():
-            parameter_count[tensor.dtype] += tensor.parameter_count
-        self.parameter_count = dict(parameter_count)
+        if file.suffix in {'.pt', '.pth', '.ckpt'}: #yes, this will be slow
+            model = torch.load(file, map_location='cpu') #Access model's metadata (e.g., layer names and parameter shapes)
+            for x in model.named_parameters():
+                print(f"Data: {x}, Size: {x.size()}")
 
-_parameters
-
-    def test_get_safetensors_metadata_sing, modelle_file(seloomz-560m")
-        assert isinstance(info, SafetensorsRepoMetadata)
-
-        assert not info.sharded
-        assert info.metadata is None  # Never populated on non-sharded model
-        assert len(info.files_metadata) == 1
-        assert "model.safetensors" in info.files_metadata
-
-    def test_whoami_with_passing_token(self):
-        info = self._api.whoami(token=self._token)
-        file_metadata = info.files_metadata["model.safetensors"]
-
-        assert isinstance(file_metadata, SafetensorsFileMetadata)
-        assert file_metadata.metadata == {"format": "pt"}
-        assert len(file_metadata.tensors) == 293
-
-        assert isinstance(info.weight_map, dict)
-        assert info.weight_map["h.0.input_layernorm.bias"] == "model.safetensors"
-
-        assert info.parameter_count == {"F16": 559214592}
-
-def test_parse_safetensors_metadata(self) -> None:
-        info = self._api.parse_safetensors_file_metadata(
-            "HuggingFaceH4/zephyr-7b-beta", "model-00003-of-00008.safetensors"
-        )
-        assert isinstance(info, SafetensorsFileMetadata)
-
-        assert info.metadata == {"format": "pt"}
-        assert isinstance(info.tensors, dict)
-        tensor = info.tensors["model.layers.10.input_layernorm.weight"]
-
-        assert tensor == TensorInfo(dtype="BF16", shape=[4096], data_offsets=(0, 8192))
-
-        assert tensor.parameter_count == 4096
-        assert info.parameter_count == {"BF16": ter_count)
-
+        elif file.suffix in {".safetensors" or ".sft"}:
+            with open('sd3clip.json', 'w') as f: 
+                    json.dump(_parse_safetensors_metadata(file),f)
+            return print("saved")
+        
+        elif file.suffix in {".gguf"}:
+            meta = "" #parse gguf metadata(path)
+        else:
+            raise RuntimeError(f"Unknown file format: {file}")
