@@ -1,0 +1,130 @@
+# 
+
+[sources]
+# maybe something about what hf/ca/gh/omd/gdrive are here
+
+[controlnet_hf]
+openpose = ["thibaud/controlnet-openpose-sdxl-1.0", "OpenPoseXL2.safetensors"]
+
+[clip_hf]
+t5xxl16 = ["stabilityai/stable-diffusion-3-medium", "text_encoders/t5xxl_fp16.safetensors", "t5xxl_fp16.safetensors"]
+t5xxl8 = ["stabilityai/stable-diffusion-3-medium", "text_encoders/t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp8_e4m3fn.safetensors"]
+clipg = ["stabilityai/stable-diffusion-3-medium", "text_encoders/clip_g.safetensors", "clip_g.safetensors"]
+clipl = ["stabilityai/stable-diffusion-3-medium", "text_encoders/clip_l.safetensors", "clip_l.safetensors"]
+
+[diffusion_hf]
+xlbase = ["stabilityai/stable-diffusion-xl-base-1.0", "sd_xl_base_1.0.safetensors"]
+xlrefine = ["stabilityai/stable-diffusion-xl-refiner-1.0", "sd_xl_refiner_1.0.safetensors"]
+turbo16 = ["stabilityai/sdxl-turbo", "sd_xl_turbo_1.0_fp16.safetensors"]
+turbo32 = ["stabilityai/sdxl-turbo", "sd_xl_turbo_1.0.safetensors"]
+cascadec = ["stabilityai/stable-cascade", "sdbx_checkpoints/stable_cascade_stage_c.safetensors"]
+cascadeb = ["stabilityai/stable-cascade", "sdbx_checkpoints/stable_cascade_stage_b.safetensors"]
+cascadea = ["stabilityai/stable-cascade", "sdbx_checkpoints/stage_a.safetensors"]
+sd15ema = ["runwayml/stable-diffusion-v1-5", "v1-5-pruned-emaonly.safetensors"]
+sd15 = ["runwayml/stable-diffusion-v1-5", "v1-5-pruned.safetensors"]
+sd21 = ["stabilityai/stable-diffusion-2-1/", "v2-1_768-ema-pruned.safetensors"]
+cosxl = ["stabilityai/cosxl", "cosxl.safetensors"]
+cosxl_edit = ["stabilityai/cosxl", "cosxl_edit.safetensors"]
+sd3med = ["stabilityai/stable-diffusion-3-medium", "sd3_medium.safetensors"]
+sd3medclip = ["stabilityai/stable-diffusion-3-medium", "sd3_medium_incl_clips.safetensors"]
+sd3medclipfp8 = ["stabilityai/stable-diffusion-3-medium", "sd3_medium_incl_clips_t5xxlfp8.safetensors"]
+sdzero123= ["stabilityai/stable-zero123", "stable_zero123.ckpt"] # unfortunate ckpt.
+
+[gligen_hf]
+sd14 = ["comfyanonymous/GLIGEN_pruned_safetensors", "gligen_sd14_textbox_pruned.safetensors"]
+sd14fp16 = ["comfyanonymous/GLIGEN_pruned_safetensors", "gligen_sd14_textbox_pruned_fp16.safetensors"]
+
+[clip_vision_hf]
+clipvisionh = ["lllyasviel/misc", "clip_vision_vit_h.safetensors"]
+clipvisiong = ["comfyanonymous/clip_vision_g", "clip_vision_g.safetensors"]
+
+[lora_hf]
+hypersdxl = ["ByteDance/Hyper-SD", "Hyper-SDXL-12steps-CFG-lora.safetensors"]
+cannyxl = ["lllyasviel/misc/", "sai_xl_canny_256lora.safetensors"]
+hypersd15 = ["ByteDance/Hyper-SD", "Hyper-SD15-12steps-CFG-lora.safetensors"]
+cnetopose256 = ["thibaud/controlnet-openpose-sdxl-1.0", "control-lora-openposeXL2-rank256.safetensors"]
+cnetip2p = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11e_sd15_ip2p_fp16.safetensors"]
+cnetshuff = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11e_sd15_shuffle_fp16.safetensors"]
+cnettile = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11f1e_sd15_tile_fp16.safetensors"]
+cnetdepth = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11f1p_sd15_depth_fp16.safetensors"]
+cnetcanny = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_canny_fp16.safetensors"]
+cnetinpaint = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_inpaint_fp16.safetensors"]
+cnetline = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_lineart_fp16.safetensors"]
+cnetmlsd = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_mlsd_fp16.safetensors"]
+cnetnormbae = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_normalbae_fp16.safetensors"]
+cnetopose = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_openpose_fp16.safetensors"]
+cnetscribble = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_scribble_fp16.safetensors"]
+cnetseg = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_seg_fp16.safetensors"]
+cnetsoft = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15_softedge_fp16.safetensors"]
+cnetanime = ["comfyanonymous/ControlNet-v1-1_fp16_safetensors", "control_lora_rank128_v11p_sd15s2_lineart_anime_fp16.safetensors"]
+xlcanny128 = ["lllyasviel/sd_control_collection", "sai_xl_canny_128lora.safetensors"]
+xlcanny256 = ["lllyasviel/sd_control_collection", "sai_xl_canny_256lora.safetensors"]
+xldepth128 = ["lllyasviel/sd_control_collection", "sai_xl_depth_128lora.safetensors"]
+xldepth256 = ["lllyasviel/sd_control_collection", "sai_xl_depth_256lora.safetensors"]
+xlrecolor128 = ["lllyasviel/sd_control_collection", "sai_xl_recolor_128lora.safetensors"]
+xlrecolor256 = ["lllyasviel/sd_control_collection", "sai_xl_recolor_256lora.safetensors"]
+xlsketch128 = ["lllyasviel/sd_control_collection", "sai_xl_sketch_128lora.safetensors"]
+xlsketch256 = ["lllyasviel/sd_control_collection", "sai_xl_sketch_256lora.safetensors"]
+
+[diffcontrolnet_hf]
+canny = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_canny_fp16.safetensors"]
+depth = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_depth_fp16.safetensors"]
+hed = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_hed_fp16.safetensors"]
+mlsd = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_mlsd_fp16.safetensors"]
+normal = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_normal_fp16.safetensors"]
+openpose = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_openpose_fp16.safetensors"]
+scribble = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_scribble_fp16.safetensors"]
+seg = ["kohya-ss/ControlNet-diff-modules", "diff_control_sd15_seg_fp16.safetensors"]
+
+[unclip_hf]
+cascadec = ["stabilityai/stable-cascade", "sdbx_checkpoints/stable_cascade_stage_c.safetensors"]
+sd21h = ["stabilityai/stable-diffusion-2-1-unclip", "sd21-unclip-h.ckpt"]
+sd21l = ["stabilityai/stable-diffusion-2-1-unclip", "sd21-unclip-l.ckpt"]
+
+[upscale_ca]
+# model_id=211577, model_version_id=238349, filename="
+# 164821?type=Model&format=PickleTensor
+
+[upscale_gh]
+esrganx4plus = ["https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth","RealESRGAN_x4plus.pth"]
+esrganx4plus6banime = ["https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth","RealESRGAN_x4plus_anime_6B.pth"]
+swinirx4 = ["https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth","003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth"]
+codeformer = ["https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth","codeformer.pth"]
+swinir = ["https://github.com/Bubblemint864/AI-Models/releases/download/2x_Bubble_AnimeScale_SwinIR_Small_v1/2x_Bubble_AnimeScale_SwinIR_Small_v1.pth","2x_Bubble_AnimeScale_SwinIR_Small_v1.pth"]
+fbcnncolor = ["https://github.com/jiaxi-jiang/FBCNN/releases/download/v1.0/fbcnn_color.pth","fbcnn_color.pth"]
+fbcnngray = ["https://github.com/jiaxi-jiang/FBCNN/releases/download/v1.0/fbcnn_gray.pth","fbcnn_gray.pth"]
+
+[upscale_gdrive]
+datx2 = ["https://drive.google.com/drive/folders/1yV9LMhr2tYM_eHEIVY4Jw9X3bWGgorbD?usp=drive_link", "DAT_2_x2.pth"]
+datx4 = ["https://drive.google.com/uc?export=download&confirm=1&id=1sfB15jklXRjGiZZWgYXZAYc2Ut4TuKOz", "DAT_2_x4.pth"]
+redhatganx4 = ["https://drive.usercontent.google.com/open?id=1Ma12vCWT27P9M99-s2RXnynKN-OQsBrv"]
+ldsr = ["https://heibox.uni-heidelberg.de/f/578df07c8fc04ffbadf3/?dl=1","ldsr.ckpt"]
+ldsrconfig = ["https://heibox.uni-heidelberg.de/f/31a76b13ea27482981b4/?dl=1.","config.yaml"]
+
+[upscale_hf] 
+esrganx4plus = ["lllyasviel/Annotators", "RealESRGAN_x4plus.pth"]
+remacri = ["https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/blob/main/4x_foolhardy_Remacri.pth","4x_foolhardy_Remacri.pth"]
+
+[vae_approx_hf]
+taesd = ["madebyollin/taesd", "taesd_decoder.safetensors"]
+taesdxl = ["madebyollin/taesdxl", "taesdxl_decoder.safetensors"]
+taesd3 = ["madebyollin/taesd3", "diffusion_pytorch_model.safetensors","taesd3.safetensors"]
+taef1 = ["madebyollin/taef1", "diffusion_pytorch_model.safetensors","taef1.safetensors"]
+
+[vae_ca]
+
+[vae_hf]
+flatpiecexl = ["konapieces/FlatpieceCoreXL", "vae/flatpiece.xl.vae.safetensors","flattpiece.xl.vae.safetensors"]
+lastpiecexl = ["konapieces/LastpieceCoreXL", "vae/lastpiece.xl.vae.safetensors","lastpiece.xl.vae.safetensors"]
+xlvae = ["madebyollin/sdxl-vae-fp16-fix", "sdxl.vae.safetensors"]
+sd15vae = ["stabilityai/sd-vae-ft-mse-original", "vae-ft-mse-840000-ema-pruned.safetensors"]
+
+[llm]
+#    "JingyeChen22/textdiffuser2_layout_planner",
+#    'JingyeChen22/textdiffuser2-full-ft',
+#    "microsoft/Phi-3-mini-4k-instruct",
+#    "llava-hf/llava-v1.6-mistral-7b-hf"
+
+[unet]
+hypersd = ["ByteDance/Hyper-SD", "Hyper-SDXL-1step-Unet-Comfyui.fp16.safetensors"]
+

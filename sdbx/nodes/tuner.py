@@ -14,6 +14,96 @@ from sdbx.config import DTYPE_T, TensorData
 import networkx as nx
 from networkx import MultiDiGraph
 
+# @dataclass
+source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+config_source_location = os.path.join(source, "config")
+
+class ReadMeta:
+    def __init__(self, file, meta):
+        model_tag = {
+                    'filename': '',
+                    'size':'',
+                    'dtype': '',
+                    'tensor_params': 0,
+                    'shape': '',
+                    "__metadata__": '',
+                    'info.files_metadata': '',
+                    'file_metadata':'',
+                    'name': '',
+                    'info.sharded': '',
+                    'info.metadata': '',
+                    'file_metadata.tensors':'',
+                    'modelspec.title':'',
+                    'modelspec.architecture':'',
+                    'modelspec.author':'',
+                    'modelspec.hash_sha256':'',
+                    'modelspec.resolution':'',
+                    'resolution': '',
+                    'ss_resolution':'',
+                    'ss_mixed_precision': '',
+                    'ss_base_model_version':'',
+                    'ss_network_module': '',
+                    'model.safetensors':'',
+                    'ds_config': '',
+                    }
+                            
+        if not os.path.exists(file):
+            raise RuntimeError(f"Not found: {file}")
+        else:
+            model_tag['filename'] = os.path.basename(file)
+            model_tag['size'] = os.path.getsize(file)
+
+    def data(self, file):
+
+        if Path(file).suffix in {'.pt', '.pth'}: #yes, this will be slow
+            model = torch.load(file, map_location='cpu') #Access model's metadata (e.g., layer names and parameter shapes)
+            for p in model.named_parameters():
+                print(f"Data: {p}, Size: {p.size()}")
+
+        elif Path(file).suffix in {".safetensors" or ".sft"}:
+            meta = self._parse_safetensors_metadata(file)
+            for key, value in self.model_tag.items(): print(key,value) #debug
+            #with open(f'{t}.json', 'w') as f: json.dump(meta, f)
+            return print(f"saved for {file}")
+        
+        elif Path(file).suffix in {".gguf"}:
+            meta = "" #parse gguf metadata(path)
+        else:
+            raise RuntimeError(f"Unknown file format: {file}")
+                   
+    def _parse_safetensors_metadata(self, file):
+        with open(file, 'rb') as f:
+            header = struct.unpack('<Q', f.read(8))[0]
+            return json.loads(f.read(header), object_hook=self._search_dict)
+
+    def _search_dict(self, meta):
+        try: self.model_tag['__metadata__'] = (meta.get('__metadata__')) 
+        except: pass
+        
+        # get path 
+        # model_class = Path(os.path.join(config_source_location, "model_classes.toml"))
+        # with open(model_class, "rb") as f: fd = tomllib.load(f)
+        # name = model_class.stem
+        # d[name] = fd
+        # with open(model_class, "rb") as f: data = tomllib.load(f)
+        # for each in config.model_classes.toml:
+        # meta.get()
+
+        for key, value in self.model_tag.items():
+            if meta.get(key, 'not_found') != 'not_found':
+                if self.model_tag[key] == '':
+                    self.model_tag[key] = meta.get(key)
+                if key == 'dtype': 
+                    self.model_tag['tensor_params'] += 1
+                if key == 'shape':
+                    if meta.get(key) > self.model_tag['shape']: self.model_tag['shape'] = self.meta.get(key) 
+        return meta
+        
+#path = os.path.join("c:",os.sep,"users","public","models","loras")
+#for t in os.listdir(path):
+#    if ".safetensors" in t:
+#        ReadMeta.data(os.path.normpath(os.path.join(path, t)))
+
 class NodeTuner:
     def __init__(self, fn):
         self.fn = fn
@@ -90,47 +180,3 @@ class NodeTuner:
             tuned_parameters |= p_tuned_parameters
         
         return tuned
-    
-# @dataclass
-class ReadMeta:
-    # pass a file to this class like so : ReadMeta.data(file)
-    def data(file: Path,):
-        dict_ref = {
-                    '__metadata__': '',
-                    'dtype': '',
-                    'ds_config': '',
-                    'modelspec.title':'',
-                    'modelspec.architecture':'',
-                    'modelspec.author':'',
-                    }
-            
-        def _search_dict(meta):
-            for key, value in dict_ref.items():
-                if meta.get(key, 'not_found') != 'not_found':
-                    if dict_ref[key] == '':
-                       dict_ref[key] = meta.get(key)
-
-            return meta
-        
-        def _parse_safetensors_metadata(file: Path):
-            with open(file, 'rb') as f:
-                header = struct.unpack('<Q', f.read(8))[0]
-                return json.loads(f.read(header).decode('utf-8'), object_hook=_search_dict)
-
-        if not os.path.exists(file):
-            raise RuntimeError(f"Not found: {file}")
-
-        if file.suffix in {'.pt', '.pth', '.ckpt'}: #yes, this will be slow
-            model = torch.load(file, map_location='cpu') #Access model's metadata (e.g., layer names and parameter shapes)
-            for x in model.named_parameters():
-                print(f"Data: {x}, Size: {x.size()}")
-
-        elif file.suffix in {".safetensors" or ".sft"}:
-            with open('sd3clip.json', 'w') as f: 
-                    json.dump(_parse_safetensors_metadata(file),f)
-            return print("saved")
-        
-        elif file.suffix in {".gguf"}:
-            meta = "" #parse gguf metadata(path)
-        else:
-            raise RuntimeError(f"Unknown file format: {file}")
