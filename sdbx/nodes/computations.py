@@ -8,6 +8,11 @@ from typing import Tuple, List
 
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter, soft_random
+from diffusers import AutoPipelineForText2Image, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler
+from diffusers.schedulers import AysSchedules
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+import torch
+from llama_cpp import Llama
 
 
 # AUTOCONFIG OPTIONS : INFERENCE
@@ -40,7 +45,6 @@ vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
 vae_config_file = "ssdxlvae.json"  # [compatibility] this too
 vae_path = os.listdir(config.get_path("models.vae"))
 
-
 # SYS IMPORT
 device = ""
 compile_unet = ""
@@ -69,13 +73,9 @@ def clear_memory_cache(device: str) -> None:
         torch.mps.empty_cache()
 
 
-class Prompt:
+class Inference:
     def __init__(self):
-        from diffusers import AutoPipelineForText2Image, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler
-        from diffusers.schedulers import AysSchedules
-        from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
-        import torch
-
+        self.imports()
         self.device = get_device()
         self.pipe = None
         self.generator = torch.Generator(device=self.device)
@@ -89,7 +89,7 @@ class Prompt:
             "seed": seed,
         }])
 
-    def encode_prompt(prompts, tokenizers, text_encoders):
+    def encode_prompt(self, prompts, tokenizers, text_encoders):
         embeddings_list = []
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
@@ -122,9 +122,13 @@ class Prompt:
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
-    def  load_token_encoder(**token_encoder):
+    def  load_token_encoder(self,**token_encoder):
+        tokenizer = []
+        text_encoder = []
         for t in token_encoder:
             #determine model class here
+            tokenizer[t] = token_encoder[t]
+            text_encoder[t] = token_encoder[t]
             token_args = {
                 'subfolder':'tokenizer',
             }
@@ -141,14 +145,16 @@ class Prompt:
                 token_encoder[t],
                 **encoder_args,
             ).to(self.device)
+
+        return tokenizer, text_encoder
     
-    def start_encoding(queue, tokenizer, token_encoder):
+    def start_encoding(self, queue, tokenizer, token_encoder):
         with torch.no_grad():
             for generation in queue:
-                generation['embeddings'] = encode_prompt(
+                generation['embeddings'] = self.encode_prompt(
                     [generation['prompt'], generation['prompt']],
-                    [tokenizer[t]],
-                    [token_encoder[t]]
+                    [*tokenizer],
+                    [*token_encoder]
             )
         return queue
 
@@ -163,14 +169,14 @@ class Prompt:
         if precision=='16':
             self.pipe_args["variant"]="fp16"
             self.pipe_args["torch_dtype"]=torch.bfloat16 if bf16 else torch.float16
-        print(f"{tc()} precision set for: {precision}, bfloat: {bf16}, using {pipe_args["torch_dtype"]}") #debug
+        print(f"{tc()} precision set for: {precision}, bfloat: {bf16}, using {self.pipe_args["torch_dtype"]}") #debug
 
-        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **pipe_args).to(self.device)
-        if compile_unet: pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-        return pipe
+        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_args).to(self.device)
+        if compile_unet: self.pipe.unet = torch.compile(self.pipe.unet, mode="reduce-overhead", fullgraph=True)
+        return self.pipe
 
     def run_inference(self, 
-        queue, num_inference_steps=8, guidance_scale=5.0, dynamic_guidance=False,
+        queue, inference_steps=8, guidance_scale=5.0, dynamic_guidance=False,
         scheduler = EulerAncestralDiscreteScheduler, lora="pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"):
         lora_path = config.get_path("models.loras")
 
@@ -191,13 +197,13 @@ class Prompt:
         # if lora2: pipe.load_lora_weights(lora2, weight_name=weight_name)
         # load lora into u-net only : pipeline.unet.load_attn_procs("jbilcke-hf/sdxl-cinematic-1", weight_name="pytorch_lora_weights.safetensors")
 
-        pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_args)
+        self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config, **scheduler_args)
         # if text_inversion: pipe.load_textual_inversion(text_inversion)
 
         print(f"{tc()} set offload {cpu_offload} and sequential as {sequential_offload} for {device} device") #debug 
         if device=="cuda":
-            if sequential_offload: pipe.enable_sequential_cpu_offload()
-            if cpu_offload: pipe.enable_model_cpu_offload() 
+            if sequential_offload: self.pipe.enable_sequential_cpu_offload()
+            if cpu_offload: self.pipe.enable_model_cpu_offload() 
 
         gen_args = {}
         if dynamic_guidance:
@@ -221,18 +227,19 @@ class Prompt:
         generator = torch.Generator(device=device)
 
         for i, generation in enumerate(queue, start=1):
-            image_start = perf_counter()                        #start the metric stopwatch
+            self.image_start = perf_counter()                        #start the metric stopwatch
             print(f"{tc()} planting seed {generation['seed']}...") #debug
             seed_planter(generation['seed'])
             generator.manual_seed(generation['seed'])
             print(f"{tc()} inference device: {device}....") #debug
 
-            generation['latents'] = pipe(
+            generation['latents'] = self.pipe(
                 prompt_embeds=generation['embeddings'][0],
                 negative_prompt_embeds =generation['embeddings'][1],
                 pooled_prompt_embeds=generation['embeddings'][2],
                 negative_pooled_prompt_embeds=generation['embeddings'][3],
                 num_inference_steps=inference_steps,
+                guidance_scale=guidance_scale,
                 generator=generator,
                 output_type='latent',
                 **gen_args,
@@ -244,13 +251,13 @@ class Prompt:
     def cleanup(self):
         clear_memory_cache(self.device)
 
-    def load_vae(file):
-        vae = AutoencoderKL.from_single_file(autoencoder, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
+    def load_vae(self,file):
+        vae = AutoencoderKL.from_single_file(file, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
         #vae = FromOriginalModelMixin.from_single_file(autoencoder, config=vae_config).to(device)
-        pipe.vae=vae
-        pipe.upcast_vae()
+        self.pipe.vae=vae
+        self.pipe.upcast_vae()
 
-    def autodecode(self, queue, file_prefix: str = "Shadowbox-"):
+    def autodecode(self, vae, queue, file_prefix: str = "Shadowbox-"):
         print(f"{tc()} decoding using {autoencoder}...") #debug
         vae_find = "flat"
         file_prefix = "Shadowbox-"
@@ -265,7 +272,7 @@ class Prompt:
 
         ### VAE SYSTEM
         vae_path = config.get_path("models.vae")
-        autoencoder = os.path.join(vae_path,next((w for w in os.listdir(path=vae_path) if "flat" in w), vae_default)) #autoencoder wants full path and filename
+        autoencoder = os.path.join(vae_path,next(vae, vae_default)) #autoencoder wants full path and filename
 
         vae_config_path = os.path.join(config.get_path("models"),"metadata")
         symlnk = os.path.join(vae_config_path,"config.json") #autoencoder also wants specific filenames
@@ -275,15 +282,15 @@ class Prompt:
         with torch.no_grad():
             counter = [s.endswith('png') for s in os.listdir(config.get_path("output"))].count(True) # get existing images
             for i, generation in enumerate(queue, start=1):
-                generation['total_time'] = perf_counter() - image_start
-                generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
+                generation['total_time'] = perf_counter() - self.image_start
+                generation['latents'] = generation['latents'].to(next(iter(self.pipe.vae.post_quant_conv.parameters())).dtype)
 
                 image = self.pipe.vae.decode(
-                    generation['latents'] / pipe.vae.config.scaling_factor,
+                    generation['latents'] / self.pipe.vae.config.scaling_factor,
                     return_dict=False,
                 )[0]
 
-                image = pipe.image_processor.postprocess(image, output_type='pil')[0]
+                image = self.pipe.image_processor.postprocess(image, output_type='pil')[0]
 
                 print(f"{tc()} saving") #debug     
                 counter += 1
@@ -307,11 +314,11 @@ class Prompt:
                     max_memory = round(torch.cuda.max_memory_allocated(device='cuda') / 1000000000, 2)
                     print('Max. memory used:', max_memory, 'GB')
 
-def gguf_load(checkpoint, threads, max_context, verbose):
+def gguf_load(checkpoint, threads=8, max_context=8192, verbose=True):
     #determine model class here
     # print(f"loading:GGUF{os.path.join(config.get_path('models.llms'), checkpoint)}")
     return Llama(
-        model_path=os.path.join(config.get_path("models.llms"), "codeninja-1.0-openchat-7b.Q5_K_M.gguf"),
+        model_path=os.path.join(config.get_path("models.llms"), checkpoint),
         seed=soft_random(), #if one_time_seed == False else hard_random(),
         #n_gpu_layers=gpu_layers if cpu_only == False else 0,
         n_threads=threads,
@@ -321,9 +328,9 @@ def gguf_load(checkpoint, threads, max_context, verbose):
         verbose=verbose,
     )
 
-def llm_prompt():
+def llm_prompt(system_prompt, user_prompt, streaming=True):
     print("Encoding Prompt")
-    return llama.create_chat_completion(
+    return Llama.create_chat_completion(
         messages=[
                 { "role": "system", "content": system_prompt },
                 { "role": "user", "content": user_prompt }

@@ -74,8 +74,6 @@ def timing(callback):
 
 ### RANDOM ROUTINES ###
 
-from torch import torch
-from natsort import natsorted
 from numpy.random import SeedSequence, Generator, Philox
 
 def soft_random(size=0x2540BE3FF): # returns a deterministic random number using Philox
@@ -87,6 +85,7 @@ def hard_random(hardness=5): # returns a non-prng random number use secrets
     return int(secrets.token_hex(hardness),16) # make hex secret be int
 
 def tensor_random(seed=None):
+    from torch import torch
     return torch.random.seed() if seed is None else torch.random.manual_seed(seed)
 
 def tensorify(hard, size=4): # creates an array of default size 4x1 using either softRandom or hardRandom
@@ -100,6 +99,7 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
     return num
 
 def seed_planter(seed, deterministic=True):
+    from torch import torch
     torch.manual_seed(seed)
     if torch.cuda.is_available()==True:
         if deterministic == True:
@@ -116,9 +116,3 @@ def seed_planter(seed, deterministic=True):
 
 def get_gpus():
     return ["cpu", "cuda", "mps", "xpu"]
-
-def cache_bin():
-    gc.collect()
-    if torch.cuda.is_available(): return torch.cuda.empty_cache()
-    elif torch.backends.mps.is_available(): return torch.mps.empty_cache()
-    elif torch.xpu.is_available(): return torch.xpu.empty_cache()
