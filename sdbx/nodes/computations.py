@@ -14,6 +14,8 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokeniz
 import torch
 from llama_cpp import Llama
 
+### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
+token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
 
 # AUTOCONFIG OPTIONS : INFERENCE
 # [universal] lower vram use (and speed on pascal apparently!!)
@@ -25,7 +27,7 @@ dynamic_guidance = True
 model_ays = "StableDiffusionXLTimesteps"
 # [compatibility] only for sdxl
 pcm_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
-pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/" + pcm_default
+pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
 cpu_offload = False  # [compatibility] lower vram use by pushing to cpu
 # [compatibility] certain types of models need this, it influences determinism as well
 bf16 = False
@@ -43,7 +45,6 @@ vae_slice = False  # [compatibility] serialize vae to lower memory
 # [compatibility] this should be detected by model type
 vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
 vae_config_file = "ssdxlvae.json"  # [compatibility] this too
-vae_path = os.listdir(config.get_path("models.vae"))
 
 # SYS IMPORT
 device = ""
@@ -122,7 +123,7 @@ class Inference:
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
-    def  load_token_encoder(self,**token_encoder):
+    def load_token_encoder(self,**token_encoder):
         tokenizer = []
         text_encoder = []
         for t in token_encoder:
@@ -177,10 +178,11 @@ class Inference:
 
     def run_inference(self, 
         queue, inference_steps=8, guidance_scale=5.0, dynamic_guidance=False,
-        scheduler = EulerAncestralDiscreteScheduler, lora="pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"):
+        scheduler = EulerAncestralDiscreteScheduler, lora=pcm_default):
         lora_path = config.get_path("models.loras")
+        lora = os.path.join(config.get_path("models.loras"), lora),
 
-        print(f"{tc()} set scheduler, lora = {os.path.join(lora_path, lora)}")  # lora2
+        print(f"{tc()} set scheduler, lora = {lora}")  # lora2
         scheduler_args = {
         }
 
@@ -252,26 +254,17 @@ class Inference:
         clear_memory_cache(self.device)
 
     def load_vae(self,file):
-        vae = AutoencoderKL.from_single_file(file, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
+        model_path=os.path.join(config.get_path("models.vae"), file)
+        vae = AutoencoderKL.from_single_file(model_path, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
         #vae = FromOriginalModelMixin.from_single_file(autoencoder, config=vae_config).to(device)
         self.pipe.vae=vae
         self.pipe.upcast_vae()
 
-    def autodecode(self, vae, queue, file_prefix: str = "Shadowbox-"):
+    def autodecode(self, vae, queue, file_prefix: str = "Shadowbox-", save=True):
         print(f"{tc()} decoding using {autoencoder}...") #debug
-        vae_find = "flat"
-        file_prefix = "Shadowbox-"
-        compress_level = 4 # optional png compression
-
-        ### AUTOCONFIG OPTIONS  : VAE
-        # pipe.upcast_vae()
-        vae_tile = True #[compatibility] tile vae input to lower memory
-        vae_slice = False #[compatibility] serialize vae to lower memory
-        vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors" #[compatibility] this should be detected by model type
-        vae_config_file ="ssdxlvae.json" #[compatibility] this too
 
         ### VAE SYSTEM
-        vae_path = config.get_path("models.vae")
+        vae_path=os.path.join(config.get_path("models.vae"), file)
         autoencoder = os.path.join(vae_path,next(vae, vae_default)) #autoencoder wants full path and filename
 
         vae_config_path = os.path.join(config.get_path("models"),"metadata")
@@ -291,13 +284,13 @@ class Inference:
                 )[0]
 
                 image = self.pipe.image_processor.postprocess(image, output_type='pil')[0]
-
+                
                 print(f"{tc()} saving") #debug     
                 counter += 1
                 filename = f"{file_prefix}-{counter}-batch-{i}.png"
                 
-
-                image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
+                image.save(os.path.join(config.get_path("output"), filename), optimize=True)
+            
                 metrics(generation, queue)
                 return image, queue
 
@@ -314,11 +307,11 @@ class Inference:
                     max_memory = round(torch.cuda.max_memory_allocated(device='cuda') / 1000000000, 2)
                     print('Max. memory used:', max_memory, 'GB')
 
-def gguf_load(checkpoint, threads=8, max_context=8192, verbose=True):
+def gguf_load(gguf, threads=8, max_context=8192, verbose=True):
     #determine model class here
     # print(f"loading:GGUF{os.path.join(config.get_path('models.llms'), checkpoint)}")
     return Llama(
-        model_path=os.path.join(config.get_path("models.llms"), checkpoint),
+        model_path=os.path.join(config.get_path("models.llms"), gguf),
         seed=soft_random(), #if one_time_seed == False else hard_random(),
         #n_gpu_layers=gpu_layers if cpu_only == False else 0,
         n_threads=threads,

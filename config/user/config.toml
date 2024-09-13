@@ -7,7 +7,7 @@ nodes = "nodes"                 # [default "nodes"]
 flows = "flows"                 # [default "flows"]
 input = "input"                 # [default "input"]
 output = "output"               # [default "output"]
-models = "models"               # [default "models]
+models = "/Users/Shared/ouerve/recent/darkshapes/models/"               # [default "models]
 
 [web]                           # http://listen:port and related settings. IPv4 format addresses.
 listen = "127.0.0.1"            # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0" 
@@ -38,7 +38,7 @@ vae = "mixed"                   # [default "mixed"] VAE = "mixed" | "float32" | 
 text-encoder = "float16"        # [default "float16"] Text encoder = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"
 
 [distributed]                   # Multi GPU and computer rendering
-role = false                    # [default false] mode = "worker" | "frontend" | false).
+role = false                    # [default false] mode = "worker" | "frontend" | false.
 name = "shadowbox"              # [default "shadowbox"] Exchange prompt requests and replies using queue_name.user_ID.
 connection-uri = "amqp://guest:guest@127.0.0.1" # [default "amqp://guest:guest@127.0.0.1"] AMQP communication URL.
 

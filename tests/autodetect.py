@@ -10,19 +10,18 @@ from collections import defaultdict
 from sdbx import config
 from sdbx.config import config, config_source_location
 
-from functools import cache
-from typing import Callable, Dict
-from dataclasses import dataclass
-from sdbx.config import DTYPE_T, TensorData
-import networkx as nx
-from networkx import MultiDiGraph
+full_path = os.path.join(config.get_path("models.diffusers"), "elan-mt-bt-en-ja.safetensors")
+filename = basedname(full_path)
+print(full_path)
 
-source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-config_source_location = os.path.join(source, "config")
+#source = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) #windows box
+#config_source_location = os.path.join(source, "config")
 
-class ReadMeta: # instance like so - instance = ReadMeta(full_path).data(filename, full_path)
+class ReadMeta:
+    empty = {}
     full_data = {}
     known = {}
+    meta = {}
     occurrence_counts = defaultdict(int)
     count_dict = {} # level of certainty, counts tensor block type matches
     model_tag = {  # measurements and metadata detected from the model
@@ -53,7 +52,7 @@ class ReadMeta: # instance like so - instance = ReadMeta(full_path).data(filenam
     }
 
     def __init__(
-        self, full_path, filename=""
+        self, filename, full_path
     ):
         self.full_path = full_path #the path of the file
         self.filename = filename #the title of the file only
@@ -78,27 +77,32 @@ class ReadMeta: # instance like so - instance = ReadMeta(full_path).data(filenam
                 print(f"Data: {p}, Size: {p.size()}")
 
         elif Path(filename).suffix in {".safetensors" or ".sft"}:
-            self.occurrence_counts.clear()  # scrub dictionaries
+            self.occurrence_counts.clear()
             self.count_dict.clear()
             self.full_data.clear()
             self.known.clear()
-            self.meta = self._parse_safetensors_metadata(full_path) #analyse file contents
-            self.full_data.update((k,v) for k,v in self.model_tag.items() if v != "") #make a new dict with all attributes
-            self.full_data.update((k,v) for k,v in self.count_dict.items() if v != 0) #part 2 dict boogaloo
-            class_key = list(self.count_dict.keys()) # key listing all model types
-            self.model_tag.clear() # clean up lingering values
-            self.meta.clear() #dump file contents
+            self.meta = self._parse_safetensors_metadata(full_path)
+            self.full_data.update(self.model_tag)
+            self.full_data.update(self.count_dict)
+            class_key = list(self.count_dict.keys())
+            for key, value in self.full_data.items():
+                if value != "":
+                    print(key,value) #debug
+            print(class_key)
+            self.model_tag.clear()
+            self.meta.clear()
             return class_key, self.full_data
 
         elif Path(filename).suffix in {".gguf"}:
-            meta = ""  # placeholder - parse gguf metadata(path) using llama lib
+           self.meta = ""  # parse gguf metadata(path)
         else:
             raise RuntimeError(f"Unknown file format: {filename}")
 
     @classmethod
     def _search_dict(self, meta):
+        keycount = 0
         self.meta = meta
-        if self.meta.get("__metadata__", "not_found") != "not_found": #bounce back from missing keys
+        if self.meta.get("__metadata__", "not_found") != "not_found":
             self.model_tag["__metadata__"] = meta.get("__metadata__")
         model_classes = Path(os.path.join(config_source_location, "classify.toml"))
         with open(model_classes, "rb") as f:
@@ -112,69 +116,26 @@ class ReadMeta: # instance like so - instance = ReadMeta(full_path).data(filenam
                 for num in self.meta:         #extracted metadata as values
                     if value in num:     #if value matches one of our key values
                         self.occurrence_counts[value] += 1 #count matches
-                self.count_dict[key] = self.occurrence_counts.get(value, 0)  #pair match count with type of model
+                self.count_dict[key] = self.occurrence_counts.get(value, 0) #pair match count with type of model
 
-        for key, value in self.model_tag.items(): #look at the tags in the file
+        for key, value in self.model_tag.items():
             if self.meta.get(key, "not_found") != "not_found": #handle inevitable exceptions invisibly
                 if self.model_tag[key] == "":  #be sure the value isnt empty
-                    self.model_tag[key] = meta.get(key)  #drop it like its hot
-                if key == "dtype": #counting these keys reveals tensor count
-                    self.model_tag["tensor_params"] += 1
-                if key == "shape": #
-                    if meta.get(key) > self.model_tag["shape"]:  #measure first shape size thats returned
+                    self.model_tag[key] = meta.get(key) #drop it like its hot
+                if key == "dtype":
+                    self.model_tag["tensor_params"] += 1 # count tensors
+                if key == "shape":
+                    if meta.get(key) > self.model_tag["shape"]: #measure first shape size thats returned
                         self.model_tag["shape"] = self.meta.get(key)  # (room for improvement here, would prefer to be largest shape, tbh)
         return meta
-        # fetch gguf data    
 
-class NodeTuner:
-    def __init__(self, fn):
-        self.fn = fn
-        self.name = fn.info.fname
 
-    @cache
-    def get_tuned_parameters(self, widget_inputs, model_types, metadata):
-        max_value = max(metadata.values())
-        largest_keys = [k for k, v in metadata.items() if v == max_value] # collect the keys of the largest pairs
-        
-        # size 50mb-850mb - vae
-        # sie 5-500mb pth - upscale (aura sr* 2gb .safetensors)
-        # vae shape? [512, 512, 3, 3]
-        #
-        # if unet - text interpreter (diffusion?)
-        # if transformer - text interpreter(transformers)
-        # mmdit -
-        # flux -
-        # pixxart s
-        # sd - enable pcm, ays
-        # if hunyuan - 
-        # if diffusers - image interpreter (diffusers)
-        # if sdxl - enable pcm, ays option, force upcast vae if default vae, otherwise use fp16
-        # if transformers - text model
-        # compare the values and assign sensible variables
-        # generate dict of tuned parameters like below:
-        # return the dict
+folder = "checkpoints"
+for each in os.listdir(os.path.join("c:",os.sep,"users","public","models",folder)):
+    filename = each
+    full_path = os.path.join("c:",os.sep,"users","public","models",folder, filename)
+    metareader = ReadMeta(os.path.basename(full_path), full_path).data(os.path.basename(full_path), full_path)
+    
 
-        # tuned parameters & hyperparameters only!! pcm parameters here 
 
-        # return {
-        #     "function name of node": {
-        #         "parameter name": "parameter value",
-        #         "parameter name 2": "parameter value 2"
-        #     }
-        co
-
-    def collect_tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
-        predecessors = graph.predecessors(node_id)
-
-        node = graph.nodes[node_id]
-
-        tuned_parameters = {}
-        for p in predecessors:
-            pnd = graph.nodes[p]  # predecessor node data
-            pfn = node_manager.registry[pnd['fname']]  # predecessor function
-
-            p_tuned_parameters = pfn.tuner.get_tuned_parameters(pnd['widget_inputs'])[node['fname']]
-
-            tuned_parameters |= p_tuned_parameters
-        
-        return tuned
+metareader = ReadMeta(full_path).data(os.path.basename(full_path), full_path)

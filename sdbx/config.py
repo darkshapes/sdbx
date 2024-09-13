@@ -34,7 +34,7 @@ def get_config_location():
 class LatentPreviewMethod(str, enum.Enum):
     NONE = "none"
     AUTO = "auto"
-    LATENT2RGB = "latent2rgb"
+    LATENT2RASTER = "latent2raster"
     TAESD = "taesd"
 
 @total_ordering
@@ -52,15 +52,15 @@ class VRAM(str, enum.Enum):
 
 class Precision(str, enum.Enum):
     MIXED = "mixed"
-    FP64 = "float64"
-    FP32 = "float32"
-    FP16 = "float16"
+    F64 = "float64"
+    F32 = "float32"
+    F16 = "float16"
     BF16 = "bfloat16"
     FP8E4M3FN = "float8_e4m3fn"
     FP8E5M2 = "float8_e5m2"
 
 # class TensorType:
-#     DTYPE_T = Literal["FP64", "FP32", "FP16", "BF16", "I64", "I32", "I16", "I8", "U8", "BOOL"]
+#     DTYPE_T = Literal["F64", "F32", "F16", "BF16", "I64", "I32", "I16", "I8", "U8", "BOOL"]
 
 # class TensorData:
 #     dtype: DTYPE_T
@@ -110,14 +110,14 @@ class MemoryConfig(ConfigModel):
     vram: VRAM = VRAM.NORMAL
     smart_memory: bool = True
 
-MixedPrecision = Union[Literal[Precision.MIXED, Precision.FP32, Precision.FP16, Precision.BF16]]
-EncoderPrecision = Union[Literal[Precision.FP32, Precision.FP16, Precision.BF16, Precision.FP8E4M3FN, Precision.FP8E5M2]]
+MixedPrecision = Union[Literal[Precision.MIXED, Precision.F32, Precision.F16, Precision.BF16]]
+EncoderPrecision = Union[Literal[Precision.F32, Precision.F16, Precision.BF16, Precision.FP8E4M3FN, Precision.FP8E5M2]]
 
 class PrecisionConfig(ConfigModel):
     fp: MixedPrecision = Precision.MIXED
-    unet: EncoderPrecision = Precision.FP32
+    unet: EncoderPrecision = Precision.F32
     vae: MixedPrecision = Precision.MIXED
-    text_encoder: EncoderPrecision = Precision.FP16
+    text_encoder: EncoderPrecision = Precision.F16
 
 class DistributedConfig(ConfigModel):
     role: Literal[False, Literal['worker', 'frontend']] = False
@@ -183,9 +183,13 @@ class Config(BaseSettings):
     def get_path(self, name):
         return self._path_dict[name]
     
-    def get_path_contents(self, name, extension="", path_name=True):
-        p = self.get_path(name) if path_name else name
-        return [os.path.join(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
+    def get_path_contents(self, name, extension="", path_name=True, base_name=False): #list contents of a directory
+            p = self.get_path(name) if path_name else name #now returns path in twice as sexy a way
+            if base_name == False:
+                callback = lambda p, g: os.path.join(p, g) #fullpath
+            else: 
+                callback = lambda p, g: os.path.basename(g) #filename
+            return [callback(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
     
     def get_path_tree(self, name, path_name=True):
         p = self.get_path(name) if path_name else name

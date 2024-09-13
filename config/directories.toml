@@ -1,14 +1,15 @@
 models = [
-    "alignment",            # controlnet, t2i adapters. photomaker, detectors, and classifiers 
-    "diffusers",            # diffusion weights in one folder period end of sentence full stop mic drop 
-    "embeddings",           # textual embedding. considering putting style_models inside 
-    "hypernetworks",        # enough of a difference to matter, though candidate for removal 
-    "huggingface",          # hf_cache should be here 
-    "loras",                # some of these overlap. controlnet is 5x as much mem when not lora form.
+    "alignment",            # controlnet, t2i adapters. photomaker, detectors, and classifiers
+    "civit",                # civit.green downloads
+    "diffusers",            # diffusion models, image weights
+    "embeddings",           # textual embedding.
+    "hypernetworks",        # similar to lora and textual embedding
+    "huggingface",          # huggingface downloads and cache
+    "loras",                # loras, all extension
     "llms",                 # GGGGGGGGGGGGGGGGUF 
-    "metadata",             # ok so what goes in here is config.TOML converted from .JSON and others 
-    "super_resolution",     # its not called upscale, its called SR!!!! 
-    "style_models",         # id like to remove this but i think it will make operators angry 
-    "transformers",         # transformers *and* transformerlikes, such as CLIP 
-    "vae",                  # vae has vae_approx. TAESD count to 4, why a whole folder 
+    "metadata",             # metadata and model specification files
+    "style_models",         # wildcards, style models
+    "transformers",         # text transformers and CLIP 
+    "upscale",              # "its not called upscale, its called SR!!!! Super Resolution!!!" - EXDYSA
+    "vae",                  # vae incl TAESD
 ]
