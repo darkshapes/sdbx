@@ -1,19 +1,5 @@
-import gc
-import os
-from time import perf_counter
 import datetime
 import time
-from diffusers import (
-    AutoPipelineForText2Image,
-    AutoencoderKL,
-    DDIMScheduler,
-    EulerAncestralDiscreteScheduler,
-    FromOriginalModelMixin,
-)
-from diffusers.schedulers import AysSchedules
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
-from pathlib import Path
-
 from sdbx.nodes.types import (
     node,
     Literal,
@@ -31,7 +17,9 @@ from sdbx.nodes.types import *
 from llama_cpp import Llama
 import sdbx.nodes.computations
 from sdbx.nodes.computations import Inference, get_device
-import safetensors
+
+# from time import perf_counter diagnostics
+
 
 # AUTOCONFIGURE OPTIONS : this should autodetec
 token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0"
@@ -84,7 +72,7 @@ def llm_prompt(
     return llama
 
 
-@node(name="Image Prompt", display=True)
+@node(name="Prompt", display=True)
 def diffusion_prompt(
     text_encoder: Llama,
     text_encoder_2: Llama = None,
@@ -104,9 +92,7 @@ def diffusion_prompt(
     return embeddings
 
 
-@node(
-    name="Safetensors Loader",
-)
+@node(name="Load",)
 def safetensors_loader(
     safetensors: Literal[
         *config.get_path_contents("models.llms", extension="safetnesors", base_name=True)] = None,
