@@ -1,15 +1,14 @@
 models = [
-    "alignment",            # controlnet, t2i adapters. photomaker, detectors, and classifiers
-    "civit",                # civit.green downloads
-    "diffusers",            # diffusion models, image weights
-    "embeddings",           # textual embedding.
-    "hypernetworks",        # similar to lora and textual embedding
-    "huggingface",          # huggingface downloads and cache
-    "loras",                # loras, all extension
-    "llms",                 # GGGGGGGGGGGGGGGGUF 
-    "metadata",             # metadata and model specification files
-    "style_models",         # wildcards, style models
-    "transformers",         # text transformers and CLIP 
-    "upscale",              # "its not called upscale, its called SR!!!! Super Resolution!!!" - EXDYSA
-    "vae",                  # vae incl TAESD
+    "audio",                # speech and audio models
+    "civitai",              # civitai.green or civitai.com downloads
+    "downloads",            # huggingface downloads and cache
+    "image",                # vae incl TAESD, diffusion models, image weights
+    "lora",                 # loras & hypernetworks, all types
+    "metadata",             # configurations
+    "text",                 # text transformers, CLIP, and llm
+    "upscale",              # "its not called upscale, its called Super Resolution!!!" - EXDYSA
+    "other",                # misc .pth files and any other types
 ]
+#other includes - controlnet, t2i adapters. photomaker, detectors, classifiers, style_models, wildcards, embeddings, 
+
+    

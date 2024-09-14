@@ -1,5 +1,5 @@
 from time import process_time_ns
-print(f'begin: {process_time_ns()}')
+# print(f'end: {process_time_ns()/1e6} ms') debug   
 
 import json
 import struct
@@ -7,10 +7,8 @@ from pathlib import Path
 import os
 from collections import defaultdict
 import platform
-print(f'import: {process_time_ns()}')  
 
 from functools import cache
-from typing import Callable, Dict
 from dataclasses import dataclass
 import networkx as nx
 from networkx import MultiDiGraph
@@ -181,16 +179,18 @@ class ReadMeta: # instance like so - ReadMeta(filename, full_path).data(filename
     def _parse_safetensors_metadata(self, full_path):
         with open(full_path, "rb") as json_file:  # open the model file header, anticipating json structured data
             header = struct.unpack("<Q", json_file.read(8))[0]
-            print(f'parse: {process_time_ns()}')  
-            return json.loads(json_file.read(header), object_hook=self._search_dict) #hook the search
+            try:
+                return json.loads(json_file.read(header), object_hook=self._search_dict) # hook search
+            except:
+                return print(f"error loading {full_path}")
 
     @classmethod
     def data(self, filename, full_path):
         if Path(filename).suffix in {".pt", ".pth", ".ckpt"}: #process torch formats elsewhere
             return
         elif Path(filename).suffix in {".safetensors" or ".sft"}:
-            self.occurrence_counts.clear()
-            self.full_data.clear()
+            self.occurrence_counts.clear() #empty values
+            self.full_data.clear() #prepare dict
             self.meta = self._parse_safetensors_metadata(full_path) #analyse file contents
             self.full_data.update((k,v) for k,v in self.model_tag.items() if v != "") #make a new dict with all attributes
             self.full_data.update((k,v) for k,v in self.count_dict.items() if v != 0) #part 2 dict boogaloo
@@ -228,6 +228,8 @@ class ReadMeta: # instance like so - ReadMeta(filename, full_path).data(filename
                             self.occurrence_counts[model_type] += 1 #count matches
                             self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0) #pair match count with type of model  
         return meta   
+# print(f'end: {process_time_ns()/1e6} ms')  debig
+# metareader = ReadMeta(each, full_path).data(each, full_path)
 
 
 class NodeTuner:
@@ -239,6 +241,7 @@ class NodeTuner:
     def get_tuned_parameters(self, widget_inputs, model_types, metadata):
         max_value = max(metadata.values())
         largest_keys = [k for k, v in metadata.items() if v == max_value] # collect the keys of the largest pairs
+        ReadMeta.full_data.get("size", 0)/psutil.virtual_memory().total
         # get system memory
         # get cpu generation
         # get gpu type
@@ -247,6 +250,28 @@ class NodeTuner:
         # goal - high, but stable resource allocation
         # intent - highest quality at reasonable speed
         # gpu > cpu
+
+        #check variable against available
+        # gpu mem
+        # cpu mem
+        # size of model
+        # if cpu know proc speed?
+        # bf16 = bf16
+        # fp16 = fp16
+        # fp16 = 
+        # bf16
+        # fp16
+        # fp32
+        # fp64
+        # ays
+        # pcm
+        # dyg
+        # gpu
+        # cpu
+        # mtcache
+        # cache
+        # compile
+        # nocompile
         # bf16>fp16>fp32
         # xl? ays>pcm>dynamic cfg
         # tokenizer? allocate gpu layers
@@ -260,9 +285,19 @@ class NodeTuner:
         # check file size
         # check tensor size
 
+        # 3072,3072 shape flux
+        # 11891971136 offset flux
+        # > 11901525888 flux
+        # 780 params flux
+        # flux flux
+
         # 49408 shape x value - sdxl
+    
+        6938041280 6938040682 6938040706
         # ~6,778,430-632KB size - fp16 sdxl
         # 2,519,599-841kb size - fp16 sd1.5
+
+        #lightning - no vae?
 
         # vae
         # 163mb size sd/xl vae f16
