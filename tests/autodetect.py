@@ -200,9 +200,7 @@ class ReadMeta:
     full_data, meta, count_dict = {}, {}, {}
     occurrence_counts = defaultdict(int)
 
-    def __init__(
-        self, filename, full_path
-    ):
+    def __init__(self, path):
         self.model_tag = {  # measurements and metadata detected from the model
             "filename": "",
             "size": "",
@@ -231,23 +229,23 @@ class ReadMeta:
             "ds_config": "",
         }
 
-        self.full_path = full_path  # the path of the file
-        self.filename = filename  # the title of the file only
+        self.path = path  # the path of the file
+        self.filename = os.path.basename(path)  # the title of the file only
         self.ext = Path(filename).suffix
 
-        if not os.path.exists(self.full_path):  # be sure it exists, then proceed
+        if not os.path.exists(self.path):  # be sure it exists, then proceed
             raise RuntimeError(f"Not found: {self.filename}")
         else:
             self.model_tag["filename"] = self.filename
-            self.model_tag["size"] = os.path.getsize(self.full_path)
+            self.model_tag["size"] = os.path.getsize(self.path)
 
-    def _parse_safetensors_metadata(self, full_path):
-        with open(full_path, "rb") as json_file:
+    def _parse_safetensors_metadata(self):
+        with open(self.path, "rb") as json_file:
             header = struct.unpack("<Q", json_file.read(8))[0]
             try:
                 return json.loads(json_file.read(header), object_hook=self._search_dict)
             except:
-                return print(f"error loading {full_path}")
+                return print(f"error loading {self.path}")
 
     def data(self):
         if self.ext in {".pt", ".pth", ".ckpt"}:  # process elsewhere
@@ -255,7 +253,7 @@ class ReadMeta:
         elif self.ext in {".safetensors" or ".sft"}:
             self.occurrence_counts.clear()
             self.full_data.clear()
-            self.meta = self._parse_safetensors_metadata(self.full_path)
+            self.meta = self._parse_safetensors_metadata(self.path)
             self.full_data.update((k, v)
                                   for k, v in self.model_tag.items() if v != "")
             self.full_data.update((k, v)
@@ -297,31 +295,33 @@ class ReadMeta:
 
         return meta
 
-def folder_run(config, search)
-    path_name = os.path.normpath(os.path.join(config,search))  # multi read
-    for filename in os.listdir(path_name):
-        full_path = os.path.normpath(os.path.join(path_name,filename))  # multi read
+
+def folder_run(path)
+    for filename in os.listdir(path):
+        fp = os.path.normpath(os.path.join(path, filename))  # full path
         if not os.path.isdir(filename):
-            metareader = ReadMeta.data(path_name, full_path)
-            return metareader
+            reader = ReadMeta(fp)  # object instantiation
+            data = reader.data()  # method call
+            return data
         else:
             print("no fies??")
-def single_run(config, path, search,)
-    full_path = os.path.join(config, path, search)
-    if not os.path.isdir(full_path):
-        metareader = ReadMeta.data(search, full_path)
-        return metareader
+
+def single_run(path, name)
+    fp = os.path.join(path, name)  # full path
+    if not os.path.isdir(fp):
+        reader = ReadMeta(fp)
+        data = reader.data()
+        return data
     else:
         print("no fies??")
             
-config_path = config
+models_path = config.get_path("models")
 search_path = "models"
-search_name = 
-metareader = folder_run(config_path, search_path)
+metadata = folder_run(models_path)
 #metareader = single_run(config_path, search_path, search_name)
 #for k, v in metareader.items():            #uncomment to view model properties
 #    print(k,v)
-evalmeta = EvalMeta.data(metareader)
+evalmeta = EvalMeta(metadata).data()  # class instantiation and method call in one-liner
 
 # user select model
 # match loader code to model type
@@ -348,4 +348,4 @@ evalmeta = EvalMeta.data(metareader)
 #else:
 #    each = "klF8Anime2VAE_klF8Anime2VAE.safetensors" #ae.safetensors #noosphere_v42.safetensors #luminamodel .safetensors #mobius-fp16.safetensors
 
-def prioritize
+# def prioritize
