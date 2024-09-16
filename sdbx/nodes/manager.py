@@ -19,12 +19,9 @@ from dulwich import porcelain
 from sdbx.nodes.helpers import cache
 
 class NodeManager:
-	def __init__(self, path, nodes_path, env_name=".node_env"):
-		self.path = path
+	def __init__(self, extensions, nodes_path, env_name=".node_env"):
+		self.node_modules = extensions["nodes"]
 		self.nodes_path = nodes_path
-		
-		with open(path, 'rb') as file:
-			self.node_modules = tomllib.load(file)["nodes"]
 		
 		self.initialize_environment(env_name)
 
@@ -33,7 +30,7 @@ class NodeManager:
 	
 	def initialize_environment(self, env_name=".node_env"):		
 		# Create environment if it doesn't exist
-		self.env_path = os.path.join(os.path.dirname(self.path), env_name)
+		self.env_path = os.path.join(os.path.dirname(self.nodes_path), env_name)
 		if not os.path.exists(self.env_path):
 			logging.info("Creating node environment...")
 			virtualenv.cli_run([str(self.env_path)])

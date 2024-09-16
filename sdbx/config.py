@@ -10,7 +10,7 @@ import platform
 import datetime
 from pathlib import Path
 from typing import Tuple, Type, Union, Literal, List
-from functools import total_ordering, cached_property
+from functools import cached_property, partial, total_ordering
 
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic_settings import (
@@ -243,9 +243,9 @@ class Config(BaseSettings):
         for filename in glob_source("*.toml") + glob_source("*.json"):
             filepath = Path(os.path.join(config_source_location, filename))
             ext = filepath.suffix
-            mode = "rb" if ext is ".toml" else "r"
-            with open(filepath, mode, encoding="utf-8") as f:
-                fd = tomllib.load(f) ext is ".toml" else json.load(f)
+            loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
+            with open(filepath, mode) as f:
+                fd = loader(f)
 
             name = filepath.stem
             d[name] = fd
@@ -253,18 +253,19 @@ class Config(BaseSettings):
         return d
     
     @cached_property
-    def extensions_path(self):
-        return os.path.join(self.path, "extensions.toml")
+    def extension_data(self):
+        with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
+            return tomllib.load(f)
 
     @cached_property
     def node_manager(self):
         from sdbx.nodes.manager import NodeManager # we must import this here lest we summon the dreaded ouroboros
-        return NodeManager(self.extensions_path, nodes_path=self.get_path("nodes"))
+        return NodeManager(self.extension_data, nodes_path=self.get_path("nodes"))
 
     @cached_property
     def client_manager(self):
         from sdbx.clients.manager import ClientManager
-        return ClientManager(self.extensions_path, clients_path=self.get_path("clients"))
+        return ClientManager(self.extension_data, clients_path=self.get_path("clients"))
 
     @cached_property
     def executor(self):
