@@ -233,6 +233,8 @@ class ReadMeta:
 
         self.full_path = full_path  # the path of the file
         self.filename = filename  # the title of the file only
+        self.ext = Path(filename).suffix
+
         if not os.path.exists(self.full_path):  # be sure it exists, then proceed
             raise RuntimeError(f"Not found: {self.filename}")
         else:
@@ -247,30 +249,26 @@ class ReadMeta:
             except:
                 return print(f"error loading {full_path}")
 
-    @classmethod
-    def data(self, filename, full_path):
-        filepath = Path(filename)
-        ext = filepath.suffix
-
-        if ext in {".pt", ".pth", ".ckpt"}:  # process elsewhere
+    def data(self):
+        if self.ext in {".pt", ".pth", ".ckpt"}:  # process elsewhere
             return
-        elif ext in {".safetensors" or ".sft"}:
+        elif self.ext in {".safetensors" or ".sft"}:
             self.occurrence_counts.clear()
             self.full_data.clear()
-            self.meta = self._parse_safetensors_metadata(full_path)
+            self.meta = self._parse_safetensors_metadata(self.full_path)
             self.full_data.update((k, v)
                                   for k, v in self.model_tag.items() if v != "")
             self.full_data.update((k, v)
                                   for k, v in self.count_dict.items() if v != 0)
             self.count_dict.clear()
             self.model_tag.clear()
-        elif ext is ".gguf":
+        elif self.ext is ".gguf":
             # placeholder - parse gguf metadata(path) using llama lib
             meta = ""
-        elif ext is ".bin":
+        elif self.ext is ".bin":
             meta = ""  # placeholder - parse bin metadata(path) using ...???
         else:
-            raise RuntimeError(f"Unrecognized file format: {filename}")
+            raise RuntimeError(f"Unrecognized file format: {self.filename}")
 
         return self.full_data
 
@@ -296,6 +294,7 @@ class ReadMeta:
                             self.occurrence_counts[model_type] += 1
                             self.count_dict[model_type] = self.occurrence_counts.get(
                                 model_type, 0)  # pair match count with type of model
+
         return meta
 
 def folder_run(config, search)
