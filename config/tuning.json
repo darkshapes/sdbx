@@ -1,0 +1,298 @@
+{
+    "known": {
+        "adaLN_modulation": "mmdit",
+        "mlp.fc": "mmdit",
+        "mlpX": "mmdit",
+        "w1q": "mmdit",
+        "self_attn.out_proj": "mmdit",
+        "w1o": "mmdit",
+        "mlpX.c_proj": "mmdit",
+        "mlpC.c_proj": "mmdit",
+        "w2q.": "mmdit",
+        "w2k.": "mmdit",
+        "w2v.": "mmdit",
+        "w2o.": "mmdit",
+        "w1k.": "mmdit",
+        "w1v.": "mmdit",
+        "mlpX.c_fc": "mmdit",
+        "mlpX.c_proj.": "mmdit",
+        "mlpC.c_fc": "mmdit",
+        "modC.": "mmdit",
+        "modX.": "mmdit",
+        "model.register_tokens": "auraflow",
+        "model.positional_encoding": "auraflow",
+        "model.init_x_linear": "auraflow",
+        "model.t_embedder.mlp.": "auraflow",
+        "modCX": "flux",
+        "img_attn.proj": "flux",
+        "time_in.in_layer": "flux",
+        "time_in.out_layer": "flux",
+        "vector_in.in_layer": "flux",
+        "vector_in.out_layer": "flux",
+        "guidance_in.in_layer": "flux",
+        "txt_in": "flux",
+        "img_in": "flux",
+        "img_mod.lin": "flux",
+        "txt_mod.lin": "flux",
+        "img_attn.qkv": "flux",
+        "txt_attn.qkv": "flux",
+        "t_embedder.mlp": "pixart_s",
+        "y_embedder.embedding_table": "pixart_s",
+        "wkqv.": "hunyuan",
+        "wqkv.": "hunyuan",
+        "q_norm": "hunyuan",
+        "k_norm": "hunyuan",
+        "out_proj": "hunyuan",
+        "kq_proj": "hunyuan",
+        "default_modulation.": "hunyuan",
+        "pooler": "hunyuan",
+        "t_embedder": "hunyuan",
+        "x_embedder": "hunyuan",
+        "mlp_t5": "hunyuan",
+        "time_extra_emb.extra_embedder": "hunyuan",
+        "to_q": "diffusers",
+        "to_k": "diffusers",
+        "to_v": "diffusers",
+        "norm_q": "diffusers",
+        "norm_k": "diffusers",
+        "to_out": "diffusers",
+        "norm1.norm": "diffusers",
+        "norm1.linear": "diffusers",
+        "ff.net.0": "diffusers",
+        "ff.net.2": "diffusers",
+        "time_extra_emb": "diffusers",
+        "time_embedding": "diffusers",
+        "pos_embd": "diffusers",
+        "text_embedder": "diffusers",
+        "extra_embedder": "diffusers",
+        "attn.norm_added_q": "diffusers",
+        "skip.connection": "sdxl",
+        "in.layers.2": "sdxl",
+        "out.layers.3": "sdxl",
+        "upsamplers": "sdxl",
+        "downsamplers": "sdxl",
+        "op": "sd",
+        "in_layers": "sd",
+        "out_layers": "sd",
+        "emb_layers": "sd",
+        "skip_connection": "sd",
+        "text_model": "diffusers_lora",
+        "self_attn": "diffusers_lora",
+        "to_q_lora": "diffusers_lora",
+        "to_k_lora": "diffusers_lora",
+        "to_v_lora": "diffusers_lora",
+        "to_out_lora": "diffusers_lora",
+        "text_projection": "diffusers_lora",
+        "to.q.lora": "unet_lora",
+        "to.k.lora": "unet_lora",
+        "to.v.lora": "unet_lora",
+        "to.out.0.lora": "unet_lora",
+        "proj.in": "unet_lora",
+        "proj.out": "unet_lora",
+        "emb.layers": "unet_lora",
+        "proj_in.": "transformers",
+        "proj_out.": "transformers",
+        "norm.": "transformers",
+        "norm1.": "unet",
+        "norm2.": "unet",
+        "norm3.": "unet",
+        "attn1.to_q.": "unet",
+        "attn1.to_k.": "unet",
+        "attn1.to_v.": "unet",
+        "attn1.to_out.0.": "unet",
+        "attn2.to_q.": "unet",
+        "attn2.to_k.": "unet",
+        "attn2.to_v.": "unet",
+        "attn2.to_out.0.": "unet",
+        "ff.net.0.proj.": "unet",
+        "ff.net.2.": "unet"
+    },
+    "peek": {
+        "model_peek": {
+            "780": {
+                "23802932552": "FLU-1D",
+                "23782506688": "FLU-1S",
+                "__comment": "flux full size"
+            },
+            "786": {
+                "11901525888": "FLU-01",
+                "__comment": "flux"
+            },
+            "824": {
+                "16463323066": "AUR-03",
+                "__comment": "auraflow"
+            },
+            "2166": {
+                "8240228270": "HUN-12",
+                "__comment": "hunyuan dit"
+            },
+            "1682": {
+                "5159140240": "KOL-01",
+                "__comment": "kolors"
+            },
+            "735": {
+                "4337667306": "STA-3M",
+                "__comment": "sd3, no text_encoder or vae"
+            },
+            "1448": {
+                "5973224240": "STA-3C",
+                "__comment": "sd3 no t5"
+            },
+            "1668": {
+                "10867168284": "STA-34",
+                "15761074532": "STA-32",
+                "__comment": "sd3 with 1/4 precision(int8) t5, sd3 with 1/2 precision(fp16) t5"
+            },
+            "437": {
+                "1262008531": "PIX-SI",
+                "__comment": "pixart sigma"
+            },
+            "2515": {
+                "6938040706": "STA-XL",
+                "__comment": "sdxl"
+            },
+            "612": {
+                "2447431856": "PIX-AL",
+                "__comment": "pixart alpha"
+            },
+            "1131": {
+                "3188362889": "STA-15"
+            },
+            "1065": {
+                "3188362889": "STA-15"
+            }
+        },
+        "vae_peek_12": {
+            "167666902": {
+                "244": "FLU-01"
+            },
+            "167335342": {
+                "248": "AUR-03-"
+            },
+            "167335343": {
+                "248": "KOL-01"
+            },
+            "334643238": {
+                "248": "PIX-SI"
+            },
+            "334643268": {
+                "248": "PIX-AL"
+            },
+            "167335344": {
+                "248": "SGM-VG",
+                "__comment": "segmind vega"
+            }
+        },
+        "vae_peek": {
+            "334641162": {
+                "250": "STA-XL"
+            },
+            "334641164": {
+                "248": "STA-XL"
+            },
+            "404581567": {
+                "304": "STA-15"
+            },
+            "334641190": {
+                "250": "STA-15"
+            },
+            "114560782": {
+                "248": "STA-15"
+            },
+            "167333134": {
+                "248": "STA-XL",
+                "250": "STA-XL"
+            }
+        },
+        "tf_peek": {
+            "220": {
+                "4893934904": [49, "T5X-XL"],
+                "__comment": "t5x mmdits"
+            },
+            "258": {
+                "891646390": [62, "T5V-11"],
+                "__comment": "t5 base dit"
+            },
+            "517": {
+                "1389382176": [2, "CLI-VG"],
+                "__comment": "clip g xl 3"
+            },
+            "1722": {
+                "397696772": [220, "CLI-OP"],
+                "__comment": "open clip"
+            },
+            "520": {
+                "1266183328": [4, "CLI-VH"],
+                "__comment": "clip h"
+            },
+            "242": {
+                "2950448704": [49, "T5V-UM"],
+                "__comment": "umt5 auraflow"
+            },
+            "196": {
+                "246144152": [2, "CLI-VL"],
+                "__comment": "clip l 15 xl 3"
+            }
+        },
+        "lora_peek": {
+            "134621524": {
+                "834": ["PCM", "STA-15"]
+            },
+            "1": {
+                "566": ["PCM", "STA-15"],
+                "1562": ["TCD", "STA-XL"]
+            },
+            "393854592": {
+                "2364": ["PCM", "DMD", "STA-XL"]
+            },
+            "103507000": {
+                "534": ["PCM", "STA-3"]
+            },
+            "21581612": {
+                "1120": ["SPO", "STA-XL"]
+            },
+            "371758976": {
+                "1680": ["SPO", "FLD", "STA-XL"]
+            },
+            "371841776": {
+                "1680": ["SPO", "STA-XL"]
+            },
+            "46687104": {
+                "1680": ["SPO", "STA-XL"]
+            },
+            "3227464": {
+                "256": ["SPO", "STA-15"]
+            },
+            "269127064": {
+                "834": ["HYP", "STA-15"]
+            },
+            "787359648": {
+                "2166": ["HYP", "STA-XL"]
+            },
+            "787359649": {
+                "2364": ["HYP", "STA-XL"]
+            },
+            "472049168": {
+                "682": ["HYP", "STA-3"]
+            },
+            "1388026440": {
+                "1008": ["HYP", "FLU-1D"]
+            },
+            "134621556": {
+                "834": ["LCM", "TCD", "STA-15"]
+            },
+            "393855224": {
+                "2364": ["LCM", "STA-XL"]
+            },
+            "393854624": {
+                "2364": ["LCM", "STA-XL"]
+            },
+            "509550144": {
+                "3156": ["FLA", "STA-XL"]
+            },
+            "239224692": {
+                "699": ["RT", "STA-VG"]
+            }
+        }
+    }
+}

@@ -1,5 +1,6 @@
 import os
 import enum
+import json
 import glob
 import shutil
 import logging
@@ -183,22 +184,39 @@ class Config(BaseSettings):
     def get_path(self, name):
         return self._path_dict[name]
     
-    def get_path_contents(self, name, extension="", path_name=True, base_name=False): #list contents of a directory
-            p = self.get_path(name) if path_name else name #now returns path in twice as sexy a way
-            if base_name == False:
-                callback = lambda p, g: os.path.join(p, g) #fullpath
-            else: 
-                callback = lambda p, g: os.path.basename(g) #filename
-            return [callback(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
-    
-    def get_path_tree(self, name, path_name=True):
+    def get_path_contents(self, name, extension="", path_name=True, base_name=False):  # List contents of a directory
         p = self.get_path(name) if path_name else name
-        with os.scandir(p) as it:
+
+        format_path = lambda p, g: os.path.join(p, g)
+
+        if base_name:  # TODO: should the client receive full paths?
+            format_path = lambda p, g: os.path.basename(g)  # Only return base name
+
+        return [format_path(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
+    
+    def get_path_tree(self, name, extension="", path_name=True, file_callback=(lambda e: e), _searching=None):
+        p = self.get_path(name) if path_name else name
+        _searching = _searching or ""
+        tree = []
+
+        recurse_tree = partial(self.get_path_tree, name=p, path_name=False, file_callback=file_callback)
+
+        with os.scandir(os.path.join(p, _searching)) as it:
             for entry in it:
-                if entry.is_file():  # If it's a file, add its name and modified time
-                    tree[entry.name] = datetime.fromtimestamp(entry.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                elif entry.is_dir():  # If it's a directory, recurse
-                    tree[entry.name] = self.get_path_tree(os.path.join(p, entry.name), path_name=False)
+                if not entry.is_dir() and not entry.name.endswith(extension):
+                    continue
+                current = os.path.join(_searching, entry.name)
+                full = os.path.join(p, current)
+                tree.append({
+                    "id": current,
+                    "name": entry.name,
+                    **(
+                        file_callback(full) if entry.is_file() else  # If it's a file, load contents as graph
+                        { "children": recurse_tree(_searching=current) }  # If it's a directory, recurse
+                    )
+                })
+        
+        return tree
 
     @cached_property
     def _path_dict(self):
@@ -220,11 +238,15 @@ class Config(BaseSettings):
     @cached_property
     def _defaults_dict(self):
         d = {}
+        glob_source = partial(glob.glob, root_dir=config_source_location)
 
-        for filename in glob.glob("*.toml", root_dir=config_source_location):
+        for filename in glob_source("*.toml") + glob_source("*.json"):
             filepath = Path(os.path.join(config_source_location, filename))
-            with open(filepath, "rb") as f:
-                fd = tomllib.load(f)
+            ext = filepath.suffix
+            mode = "rb" if ext is ".toml" else "r"
+            with open(filepath, mode, encoding="utf-8") as f:
+                fd = tomllib.load(f) ext is ".toml" else json.load(f)
+
             name = filepath.stem
             d[name] = fd
         
@@ -248,7 +270,11 @@ class Config(BaseSettings):
     def executor(self):
         from sdbx.executor import Executor
         return Executor(self.node_manager)
-
+    
+    @cached_property
+    def model_indexer(self):
+        from sdbx.indexer import ModelIndexer
+        return ModelIndexer()
 
 def parse() -> Config:
     parser = argparse.ArgumentParser(add_help=False)

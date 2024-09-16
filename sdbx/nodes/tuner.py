@@ -1,23 +1,18 @@
 from time import process_time_ns
 # print(f'end: {process_time_ns()/1e6} ms') debug   
 
+import os
 import json
 import struct
-from pathlib import Path
-import os
-from collections import defaultdict
 import platform
 
+from pathlib import Path
 from functools import cache
 from dataclasses import dataclass
+from collections import defaultdict
+
 import networkx as nx
 from networkx import MultiDiGraph
-
-config = {
-        'windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox'),
-        'darwin': os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Shadowbox'),
-        'linux': os.path.join(os.path.expanduser('~'), '.config', 'shadowbox'),
-    }[platform.system().lower()]
 
 class ReadMeta: # instance like so - ReadMeta(filename, full_path).data(filename, full_path)
     full_data, meta, count_dict = {}, {}, {} # level of certainty, counts tensor block type matches

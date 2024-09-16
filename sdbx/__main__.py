@@ -8,7 +8,9 @@ def main():
 		webbrowser.open(f"http://{config.web.listen}:{config.web.port}", new=0, autoraise=True)
 
 	uvicorn.run(
-		"sdbx:app", 
+		"sdbx:app",
+		factory=True,
+		
 		host=config.web.listen, 
 		port=config.web.port, 
 		reload=config.web.reload,

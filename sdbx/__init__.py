@@ -11,5 +11,4 @@ logger = logging.getLogger('uvicorn.error')
 from .config import config, source
 if "dev" in __version__: config.development = True
 
-from .server import create_app
-app = create_app()
+from .server import create_app as app

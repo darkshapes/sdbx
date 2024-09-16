@@ -1,15 +1,16 @@
-from fastapi import FastAPI, APIRouter
-from fastapi.staticfiles import StaticFiles
-
 from sdbx import config
-from sdbx.server.routes import register_routes
 
 def create_app():
-    api_router = APIRouter()
-    register_routes(api_router)
+    from fastapi import FastAPI, APIRouter
+    from fastapi.staticfiles import StaticFiles
 
     app = FastAPI()
-    app.include_router(api_router)
+    router = APIRouter()
+
+    from sdbx.server.routes import register_routes
+    
+    register_routes(router)
+    app.include_router(router)
 
     # Mount the built React app's static files
     app.mount("/", StaticFiles(directory=config.client_manager.selected_path, html=True), name="static")

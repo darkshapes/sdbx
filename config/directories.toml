@@ -8,6 +8,5 @@ models = [
     "upscale",              # "its not called upscale, its called Super Resolution!!!" - EXDYSA
     "other",                # misc .pth files and any other types
 ]
-#other includes - controlnet, t2i adapters. photomaker, detectors, classifiers, style_models, wildcards, embeddings, 
 
-    
+#other includes - controlnet, t2i adapters. photomaker, detectors, classifiers, style_models, wildcards, embeddings, 

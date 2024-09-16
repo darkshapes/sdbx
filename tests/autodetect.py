@@ -1,19 +1,12 @@
-from time import process_time_ns
-import psutil
 import os
 import json
 import struct
+import psutil
+import platform
+
+from math import isclose
 from pathlib import Path
 from collections import defaultdict
-import platform
-from math import isclose
-
-print(f'begin: {process_time_ns()/1e6} ms')
-config = {
-    'windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox'),
-    'darwin': os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Shadowbox'),
-    'linux': os.path.join(os.path.expanduser('~'), '.config', 'shadowbox'),
-}[platform.system().lower()]
 
 class EvalMeta:
     
@@ -48,7 +41,7 @@ class EvalMeta:
     vae_peek_12[167335343][248] = "KOL-01"
     vae_peek_12[334643238][248] = "PIX-SI"
     vae_peek_12[334643268][248] = "PIX-AL"
-    vae_peek_12[167335344][248] = "SGM-VG" #segmind vega
+    vae_peek_12[167335344][248] = "SGM-VG" # segmind vega
 
     vae_peek[334641162][250] = "STA-XL"
     vae_peek[334641164][248] = "STA-XL"
@@ -59,13 +52,13 @@ class EvalMeta:
     vae_peek[167333134][250] = "STA-XL"
 
     # CLIP-
-    tf_peek[220][4893934904] = [49,"T5X-XL"] #t5x mmdits
-    tf_peek[258][891646390] = [62,"T5V-11"] #t5 base dit
-    tf_peek[517][1389382176] = [2,"CLI-VG"] #clip g xl 3
-    tf_peek[1722][397696772] = [220,"CLI-OP"] #open clip
-    tf_peek[520][1266183328] = [4,"CLI-VH"] #clip h
-    tf_peek[242][2950448704] = [49,"T5V-UM"] #umt5 auraflow
-    tf_peek[196][246144152] = [2,"CLI-VL"]  #clip l 15 xl 3
+    tf_peek[220][4893934904] = [49,"T5X-XL"] # t5x mmdits
+    tf_peek[258][891646390] = [62,"T5V-11"] # t5 base dit
+    tf_peek[517][1389382176] = [2,"CLI-VG"] # clip g xl 3
+    tf_peek[1722][397696772] = [220,"CLI-OP"] # open clip
+    tf_peek[520][1266183328] = [4,"CLI-VH"] # clip h
+    tf_peek[242][2950448704] = [49,"T5V-UM"] # umt5 auraflow
+    tf_peek[196][246144152] = [2,"CLI-VL"]  # clip l 15 xl 3
 
     # LORA-
     lora_peek[134621524][834] = ["PCM","STA-15"]
@@ -104,24 +97,15 @@ class EvalMeta:
     
     @classmethod
     def data(self, extract)
-            if int(extract.get("unet", 0)) == 96:
-                vae_inside = True
-                if int(extract.get("sdxl", 0)) == 12:
-                    if "512" in extract.get("shape", 0):
-                        print(vae_peek_12[167666902][244]) #flux
-                    elif extract.get("mmdit", 0) != 4:
-                        print(vae_peek_12[167335343][248])  #kolors   
-                    else:
-                        for size, attributes in vae_peek_12.items():
-                            if (isclose(int(extract.get("size", 0)), size, rel_tol=vae_pct)
-                                or isclose(int(extract.get("size", 0)), size*2, rel_tol=vae_pct) 
-                                or isclose(int(extract.get("size", 0)), size/2, rel_tol=vae_pct)
-                                or int(extract.get("size", 0) == size)):
-                                    for tensor_params, model in attributes.items():
-                                        if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=vae_pct): 
-                                            print(f"VAE-{model} found") #found hook
+        if int(extract.get("unet", 0)) == 96:
+            vae_inside = True
+            if int(extract.get("sdxl", 0)) == 12:
+                if "512" in extract.get("shape", 0):
+                    print(vae_peek_12[167666902][244]) #flux
+                elif extract.get("mmdit", 0) != 4:
+                    print(vae_peek_12[167335343][248])  #kolors   
                 else:
-                    for size, attributes in vae_peek.items():
+                    for size, attributes in vae_peek_12.items():
                         if (isclose(int(extract.get("size", 0)), size, rel_tol=vae_pct)
                             or isclose(int(extract.get("size", 0)), size*2, rel_tol=vae_pct) 
                             or isclose(int(extract.get("size", 0)), size/2, rel_tol=vae_pct)
@@ -129,43 +113,50 @@ class EvalMeta:
                                 for tensor_params, model in attributes.items():
                                     if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=vae_pct): 
                                         print(f"VAE-{model} found") #found hook
-                # check lora
-            elif int(extract.get("diffusers",0)) > 256:
-                for size, attributes in lora_peek.items():
-                    if (isclose(int(extract.get("size",0)),size, rel_tol=0.05)
-                    or isclose(int(extract.get("size", 0)), size*2, rel_tol=lora_pct) 
-                    or isclose(int(extract.get("size", 0)), size/2, rel_tol=lora_pct)): 
-                        for tensor_params, desc in attributes.items():
-                            if isclose(int(extract.get("tensor_params", 0)),tensor_params, rel_tol=lora_pct):
-                                    rep_count = 0
-                                    for each in next(iter([desc,0])):
-                                        if rep_count <= 1:
-                                            if each.lower() not in str(extract.get('filename',0)).lower():
-                                                rep_count += 1
-                                            else:          
-                                                print(f"{each.lower()}-{desc[len(desc)-1]}") #found hook
-                # check clip
-            elif int(extract.get("transformers", 0)) >= 2:
-                clip_inside = True
-                for tensor_params, attributes in tf_peek.items():
-                    if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=.07):
-                        for size, model in attributes.items():
-                            if (isclose(int(extract.get("size", 0)), size, rel_tol=tf_pct) 
-                            or isclose(int(extract.get("size", 0)), size*2, rel_tol=tf_pct)
-                            or isclose(int(extract.get("size", 0)), size/2, rel_tol=tf_pct)):
-                                if isclose(int(extract.get("transformers", 0)), model[0], rel_tol=tf_pct):
-                                    print(f"CLI-{model[1]}") #found hook
-                # check model
-            if int(extract.get("size",0)) > 120000000:
-                for tensor_params, attributes, in model_peek.items():
-                    if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=model_pct):
-                        for size, model in attributes.items():
-                            if (isclose(int(extract.get("size", 0)), size, rel_tol=model_pct)
-                            or isclose(int(extract.get("size", 0)), size*2, rel_tol=model_pct)
-                            or isclose(int(extract.get("size", 0)), size/2, rel_tol=model_pct)):
-                                    print(f"{model}, vae: {vae_inside}, text_encoder: {clip_inside}") #found hook
-print(f'end: {process_time_ns()/1e6} ms')
-
+            else:
+                for size, attributes in vae_peek.items():
+                    if (isclose(int(extract.get("size", 0)), size, rel_tol=vae_pct)
+                        or isclose(int(extract.get("size", 0)), size*2, rel_tol=vae_pct) 
+                        or isclose(int(extract.get("size", 0)), size/2, rel_tol=vae_pct)
+                        or int(extract.get("size", 0) == size)):
+                            for tensor_params, model in attributes.items():
+                                if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=vae_pct): 
+                                    print(f"VAE-{model} found") #found hook
+            # check lora
+        elif int(extract.get("diffusers",0)) > 256:
+            for size, attributes in lora_peek.items():
+                if (isclose(int(extract.get("size",0)),size, rel_tol=0.05)
+                or isclose(int(extract.get("size", 0)), size*2, rel_tol=lora_pct) 
+                or isclose(int(extract.get("size", 0)), size/2, rel_tol=lora_pct)): 
+                    for tensor_params, desc in attributes.items():
+                        if isclose(int(extract.get("tensor_params", 0)),tensor_params, rel_tol=lora_pct):
+                                rep_count = 0
+                                for each in next(iter([desc, 0])):
+                                    if rep_count <= 1:
+                                        if each.lower() not in str(extract.get('filename', 0)).lower():
+                                            rep_count += 1
+                                        else:          
+                                            print(f"{each.lower()}-{desc[-1]}") #found hook
+            # check clip
+        elif int(extract.get("transformers", 0)) >= 2:
+            clip_inside = True
+            for tensor_params, attributes in tf_peek.items():
+                if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=.07):
+                    for size, model in attributes.items():
+                        if (isclose(int(extract.get("size", 0)), size, rel_tol=tf_pct) 
+                        or isclose(int(extract.get("size", 0)), size*2, rel_tol=tf_pct)
+                        or isclose(int(extract.get("size", 0)), size/2, rel_tol=tf_pct)):
+                            if isclose(int(extract.get("transformers", 0)), model[0], rel_tol=tf_pct):
+                                print(f"CLI-{model[1]}") #found hook
+            # check model
+        if int(extract.get("size",0)) > 120000000:
+            for tensor_params, attributes, in model_peek.items():
+                if isclose(int(extract.get("tensor_params", 0)), tensor_params, rel_tol=model_pct):
+                    for size, model in attributes.items():
+                        if (isclose(int(extract.get("size", 0)), size, rel_tol=model_pct)
+                        or isclose(int(extract.get("size", 0)), size*2, rel_tol=model_pct)
+                        or isclose(int(extract.get("size", 0)), size/2, rel_tol=model_pct)):
+                                print(f"{model}, vae: {vae_inside}, text_encoder: {clip_inside}") #found hook
 
 class ReadMeta:
     # level of certainty, counts tensor block type matches
@@ -333,9 +324,12 @@ class ReadMeta:
 
     @classmethod
     def data(self, filename, full_path):
-        if Path(filename).suffix in {".pt", ".pth", ".ckpt"}:  # process elsewhere
+        filepath = Path(filename)
+        ext = filepath.suffix
+
+        if ext in {".pt", ".pth", ".ckpt"}:  # process elsewhere
             return
-        elif Path(filename).suffix in {".safetensors" or ".sft"}:
+        elif ext in {".safetensors" or ".sft"}:
             self.occurrence_counts.clear()
             self.full_data.clear()
             self.meta = self._parse_safetensors_metadata(full_path)
@@ -345,18 +339,14 @@ class ReadMeta:
                                   for k, v in self.count_dict.items() if v != 0)
             self.count_dict.clear()
             self.model_tag.clear()
-
-        elif Path(filename).suffix in {".gguf"}:
+        elif ext is ".gguf":
             # placeholder - parse gguf metadata(path) using llama lib
             meta = ""
-        elif Path(filename).suffix in {".bin"}:
+        elif ext is ".bin":
             meta = ""  # placeholder - parse bin metadata(path) using ...???
         else:
-            try:
-                print(RuntimeError(f"Unrecognized file format: {filename}"))
-            except:
-                print("Path or File could not be read.")
-                pass
+            raise RuntimeError(f"Unrecognized file format: {filename}")
+
         return self.full_data
 
     def _search_dict(self, meta):
@@ -365,15 +355,15 @@ class ReadMeta:
             # handle inevitable exceptions invisibly
             if self.model_tag.get(num, "not_found") != "not_found":
                 self.model_tag[num] = meta.get(num)  # drop it like its hot
+            
             if "dtype" in num:
                 self.model_tag["tensor_params"] += 1  # count tensors
             elif "shape" in num:
                 # measure first shape size thats returned
                 if meta.get(num) > self.model_tag["shape"]:
                     self.model_tag["shape"] = self.meta.get(num)
-            if "data_offsets" in num:
-                pass
-            else:
+            
+            if "data_offsets" not in num:
                 if ("shapes" or "dtype") not in num:
                     for block, model_type in self.known.items():  # model type, dict data
                         if block in num:  # if value matches one of our key values
