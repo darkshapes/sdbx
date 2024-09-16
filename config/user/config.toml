@@ -1,13 +1,13 @@
 [extensions]
 disable = false                  # [default false] Toggle extensions. false | "clients" | "nodes" | true 
 
-[location]                      # Paths for loading and saving = "c:\foo\bar" | "/user/username/foo/bar"
+[location]                      # Paths for loading and saving = "c:\\foo\\bar" | "/user/username/foo/bar"
 clients = "clients"             # [default "clients"]
 nodes = "nodes"                 # [default "nodes"]
 flows = "flows"                 # [default "flows"]
 input = "input"                 # [default "input"]
 output = "output"               # [default "output"]
-models = "/Users/Shared/ouerve/recent/darkshapes/models/"               # [default "models]
+models = "models"               # [default "models]
 
 [web]                           # http://listen:port and related settings. IPv4 format addresses.
 listen = "127.0.0.1"            # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0" 

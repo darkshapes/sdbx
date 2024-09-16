@@ -21,16 +21,6 @@ from sdbx.nodes.computations import Inference, get_device
 # from time import perf_counter diagnostics
 
 
-# AUTOCONFIGURE OPTIONS : this should autodetec
-token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0"
-lora_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
-pcm_default = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
-vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
-model_default = "ponyFaetality_v11.safetensors"
-llm_default = "codeninja-1.0-openchat-7b.Q5_K_M.gguf"
-scheduler_default = "EulerAncestralDiscreteScheduler"
-
-
 def tc():
     print(str(datetime.timedelta(seconds=time.process_time())), end="")
 
