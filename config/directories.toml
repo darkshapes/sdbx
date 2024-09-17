@@ -1,6 +1,6 @@
 models = [
     "audio",                # speech and audio models
-    "downloads",            # huggingface, civitai downloads and cache
+    "download",            # huggingface, civitai downloads and cache
     "image",                # vae incl TAESD, diffusion models, image weights
     "lora",                 # loras & hypernetworks, all types
     "metadata",             # configurations

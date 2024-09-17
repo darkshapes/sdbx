@@ -7,9 +7,8 @@ from pathlib import Path
 from collections import defaultdict
 import llama_cpp
 from llama_cpp._internals import _LlamaModel
-from sdbx import config, logger
 
-print(f'begin: {process_time_ns()/1e6} ms')
+# print(f'begin: {process_time_ns()/1e6} ms')
 
 # def _path_dict():
 #     root = {
@@ -52,7 +51,8 @@ class EvalMeta:
     tf_leeway = 0.03
     lora_pct = 0.05
 
-    model_peek, vae_peek, tf_peek, vae_peek_12, lora_peek, = defaultdict(dict), defaultdict(dict),  defaultdict(dict), defaultdict(dict), defaultdict(dict)
+    model_peek, vae_peek, tf_peek, vae_peek_12, lora_peek, = defaultdict(
+        dict), defaultdict(dict),  defaultdict(dict), defaultdict(dict), defaultdict(dict)
 
     # sd1.5  4265097012 3188362889 4244098984 4244099040
     model_peek[1131][1280] = [224, "STA-15"]
@@ -136,12 +136,13 @@ class EvalMeta:
 
     def __returner(self, tag):
         self.tag = tag
-        print(f"{self.tag} {self.extract.get("extension", "")} {self.extract.get("filename", "")}") # logger.debug
+        print(f"{self.tag} {self.extract.get("extension", "")} {self.extract.get("filename", "")}")  # logger.debug
         return self.tag
 
     def data(self):
         extract = self.extract
-        if int(self.extract.get("unet", 0)) > 96: self.vae_inside = True
+        if int(self.extract.get("unet", 0)) > 96:
+            self.vae_inside = True
         if int(self.extract.get("unet", 0)) == 96:  # Check VAE
             self.process_vae()
         if int(self.extract.get("diffusers", 0)) > 256:  # Check LoRA
@@ -154,10 +155,9 @@ class EvalMeta:
             if int(self.extract.get("size", 0)) > 1e9:  # Check model
                 self.process_model()
         except ValueError as error_log:
-            #logger.exception(error_log)
+            # logger.exception(error_log)
             print(f'no model found {error_log}')
             print(f"Unknown model type '{self.extract}'.")
-
 
     def process_vae(self):
         if int(self.extract.get("sdxl", 0)) == 12:
@@ -234,7 +234,7 @@ class EvalMeta:
                                         # flux hook
                                         return self.__returner(model)
                             except KeyError as error_log:
-                                #logger.exception(error_log)
+                                # logger.exception(error_log)
                                 print(f'no shape key {error_log}')
                             else:
                                 model = f"{tag}{model}"
@@ -278,7 +278,7 @@ class EvalMeta:
                                 # found transformer
                                 return self.__returner(model)
                     except ValueError as error_log:
-                        #logger.exception(error_log)
+                        # logger.exception(error_log)
                         print(f'no shape key {error_log}')
                         model = model[1] or model
                         model = f"{tag}{model} estimate"
@@ -290,19 +290,24 @@ class EvalMeta:
                 for shape, model in attributes.items():
                     try:
                         if isclose(self.extract.get("shape", 0)[0], shape, rel_tol=self.model_block_pct):
-                            if (isclose(self.extract.get("diffusers", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("mmdit", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("flux", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("diffusers_lora", 0),  model[0], rel_tol=self.model_block_pct)):
+                            if isclose(self.extract.get("diffusers", 0), model[0], rel_tol=self.model_block_pct):
+                                model = model[1]
+                            elif isclose(self.extract.get("mmdit", 0), model[0], rel_tol=self.model_block_pct):
+                                model = model[1]
+                            elif isclose(self.extract.get("flux", 0), model[0], rel_tol=self.model_block_pct):
+                                model = model[1]
+                            elif isclose(self.extract.get("diffusers_lora", 0),  model[0], rel_tol=self.model_block_pct):
                                 model = model[1]
                             else:
-                                print(f"Unrecognized model, guessing -  {model[1]}")
+                                print(
+                                    f"Unrecognized model, guessing -  {model[1]}")
                                 model = model[1]
-                            print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
+                            print(
+                                f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
                             return self.__returner(model)  # found model
-                        
+
                     except KeyError as error_log:
-                        #logger.exception(error_log)
+                        # logger.exception(error_log)
                         print(f'no shape key {error_log}')
                         model = model[1]
                         print(
@@ -460,7 +465,8 @@ class ReadMeta:
         }
 
         self.path = path  # the path of the file
-        self.filename = os.path.basename(self.path)  # the title of the file only
+        self.filename = os.path.basename(
+            self.path)  # the title of the file only
         self.ext = Path(self.filename).suffix.lower()
 
         if not os.path.exists(self.path):  # be sure it exists, then proceed
@@ -468,7 +474,7 @@ class ReadMeta:
         else:
 
             self.model_tag["filename"] = self.filename
-            self.model_tag["extension"] = self.ext.replace(".","")
+            self.model_tag["extension"] = self.ext.replace(".", "")
             self.model_tag["size"] = os.path.getsize(self.path)
 
     def _parse_safetensors_metadata(self, path):
@@ -478,13 +484,14 @@ class ReadMeta:
                 return json.loads(json_file.read(header), object_hook=self._search_dict)
             except:
                 return print(f"error loading {full_path}")
-            
+
     def _parse_gguf_metadata(self, path):
         self.path = path
         with open(path, "rb") as llama_file:
             magic = llama_file.read(4)
             if magic != b"GGUF":
-                print(f"{magic} vs. b'GGUF'. wrong magic #") # uh uh uh. you didn't say the magic word
+                # uh uh uh. you didn't say the magic word
+                print(f"{magic} vs. b'GGUF'. wrong magic #")
             else:
                 llama_ver = struct.unpack("<I", llama_file.read(4))[0]
                 if llama_ver < 2:
@@ -493,10 +500,10 @@ class ReadMeta:
                     try:
                         return _LlamaModel(path_model=self.path, params=llama_cpp.llama_model_default_params(), verbose=True).metadata
                     except ValueError as error_log:
-                        #logger.exception(error_log)
-                        print(f'llama complaining: {error_log}')     #research                    
+                        # logger.exception(error_log)
+                        print(f'llama complaining: {error_log}')  # research
                     except:
-                        #logger.exception(error_log)
+                        # logger.exception(error_log)
                         return print(f"error loading {full_path}")
 
     def data(self, path):
@@ -507,9 +514,11 @@ class ReadMeta:
                 self.occurrence_counts.clear()
                 self.full_data.clear()
                 self.meta = self._parse_safetensors_metadata(self.path)
-                self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
-                self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                #for k, v in self.full_data.items():  # uncomment to view model properties
+                self.full_data.update((k, v)
+                                      for k, v in self.model_tag.items() if v != "")
+                self.full_data.update((k, v)
+                                      for k, v in self.count_dict.items() if v != 0)
+                # for k, v in self.full_data.items():  # uncomment to view model properties
                 #    print(k, v)
                 self.count_dict.clear()
                 self.model_tag.clear()
@@ -519,10 +528,10 @@ class ReadMeta:
                 # placeholder - parse gguf metadata(path) using llama lib
                 self.meta = ""
             elif self.ext == ".bin":
-                    # placeholder - parse bin metadata(path) using ...???
-                    self.meta = ""
+                # placeholder - parse bin metadata(path) using ...???
+                self.meta = ""
         except RuntimeError as error_log:
-            #logger.exception(error_log)
+            # logger.exception(error_log)
             print(f"Unrecognized file format: {self.filename} {error_log}")
 
         return self.full_data
@@ -547,8 +556,7 @@ class ReadMeta:
                         if block in num:  # if value matches one of our key values
                             # count matches
                             self.occurrence_counts[model_type] += 1
-                            self.count_dict[model_type] = self.occurrence_counts.get(
-                                model_type, 0)  # pair match count to model type
+                            self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0)  # pair match count to model type
 
         return self.meta
 
@@ -560,12 +568,12 @@ class ModelIndexer:
 
 # config_path = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox')
 # search_path = "models"
-# path_name =  os.path.normpath(os.path.join(config_path, search_path, "download")) #multi read
+# path_name =  os.path.normpath(os.path.join(config_path, search_path, "image")) #multi read
 
-# # each = "ae.safetensors" ##SCAN SINGLE FILE
-# # full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
-# # metareader = ReadMeta(full_path).data(full_path)
-# # evaluate = EvalMeta(metareader).data
+# each = "ae.safetensors" ##SCAN SINGLE FILE
+# full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
+# metareader = ReadMeta(full_path).data(full_path)
+# evaluate = EvalMeta(metareader).data
 
 
 # for each in os.listdir(path_name): ###SCAN DIRECTORY
@@ -574,16 +582,46 @@ class ModelIndexer:
 #     metareader = ReadMeta(full_path).data(full_path)
 #     if metareader is not None:
 #         evaluate = EvalMeta(metareader).data()
-path_name = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox',"models","text")
 
-for each in os.listdir(path_name): ###SCAN DIRECTORY
-      filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
-      full_path = os.path.join(path_name, filename)
-      metareader = ReadMeta(full_path).data(full_path)
-      if metareader is not None:
-          evaluate = EvalMeta(metareader).data()
+def test_config_get_path():
+    from sdbx import config
+
+    path_name = config.get_path_contents("models.download")
+    print(path_name)
+    for each in path_name:  # SCAN DIRECTORY
+        filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
+        full_path = config.get_path("models.download")
+        metareader = ReadMeta(full_path).data(full_path)
+        if metareader is not None:
+            evaluate = EvalMeta(metareader).data()
 
 
 
-print(f'end: {process_time_ns()/1e6} ms')
+test_config_get_path()
 
+# print(f'end: {process_time_ns()/1e6} ms')
+
+
+# match loader code to model type
+# check lora availability
+# if no lora, check if AYS or other optimization available
+# MATCH LORA TO MODEL TYPE BY PRIORITY
+#     PCM
+#     SPO
+#     HYP
+#     LCM
+#     RT
+#     TCD
+#     FLA
+# match loader code to model type
+# ram calc+lora
+# decide sequential offload on 75% util/ off 50% util
+# match dtype to lora load
+# MATCH VAE TO MODEL TYPE
+# match dtype to vae load
+
+
+# except:
+#    pass
+# else:
+#    each = "klF8Anime2VAE_klF8Anime2VAE.safetensors" #ae.safetensors #noosphere_v42.safetensors #luminamodel .safetensors #mobius-fp16.safetensors
