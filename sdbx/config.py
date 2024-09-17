@@ -1,16 +1,14 @@
 import os
-import enum
 import json
-import glob
-import shutil
 import logging
 import tomllib
 import argparse
-import platform
-import datetime
+
+from enum import Enum
+from glob import glob
 from pathlib import Path
 from typing import Tuple, Type, Union, Literal, List
-from functools import cached_property, partial, total_ordering
+from functools import cache, cached_property, partial, total_ordering
 
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic_settings import (
@@ -23,23 +21,26 @@ from pydantic_settings import (
 source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 config_source_location = os.path.join(source, "config")
 
+@cache
 def get_config_location():
+    from platform import system
+
     filename = "config.toml"
 
     return {
         'windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox', filename),
         'darwin': os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Shadowbox', filename),
         'linux': os.path.join(os.path.expanduser('~'), '.config', 'shadowbox', filename),
-    }[platform.system().lower()]
+    }[system().lower()]
 
-class LatentPreviewMethod(str, enum.Enum):
+class LatentPreviewMethod(str, Enum):
     NONE = "none"
     AUTO = "auto"
     LATENT2RASTER = "latent2raster"
     TAESD = "taesd"
 
 @total_ordering
-class VRAM(str, enum.Enum):
+class VRAM(str, Enum):
     HIGH = "high"
     NORMAL = "normal"
     LOW = "low"
@@ -51,7 +52,7 @@ class VRAM(str, enum.Enum):
             return order.index(self) < order.index(other)
         return NotImplemented
 
-class Precision(str, enum.Enum):
+class Precision(str, Enum):
     MIXED = "mixed"
     F64 = "float64"
     F32 = "float32"
@@ -132,6 +133,9 @@ class Config(BaseSettings):
     """
     Configuration options parsed from config.toml.
     """
+    model_config = SettingsConfigDict(
+        env_prefix='SDBX_',
+    )
 
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig)
     location: LocationConfig = Field(default_factory=LocationConfig)
@@ -144,15 +148,13 @@ class Config(BaseSettings):
 
     development: bool = False
 
-    def __init__(self, path: str):
-        if not isinstance(path, str):
-            raise TypeError("Config path must be a string")
+    def __new__(cls, path: str, *args, **kwargs):
+        cls.model_config['toml_file'] = path
+        cls.path = os.path.dirname(path)
+        return super().__new__(cls)
 
-        Config.path = path if os.path.exists(path) else os.path.join(config_source_location, "user")
-        super().__init__()
-        Config.path = os.path.dirname(path)
-        
-        if not os.path.exists(path):
+    def model_post_init(self, __context):
+        if not os.path.exists(self.path):
             self.generate_new_config()
 
     @classmethod
@@ -164,7 +166,7 @@ class Config(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
-        return (TomlConfigSettingsSource(settings_cls, settings_cls.path),)
+        return (TomlConfigSettingsSource(settings_cls),)
         
     def generate_new_config(self):
         logging.info(f"Creating config directory at {self.path}...")
@@ -175,7 +177,8 @@ class Config(BaseSettings):
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
         
-        shutil.copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
+        from shutil import copytree
+        copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
 
     def rewrite(self, key, value):
         # rewrites the config.toml key to value
@@ -192,7 +195,7 @@ class Config(BaseSettings):
         if base_name:  # TODO: should the client receive full paths?
             format_path = lambda p, g: os.path.basename(g)  # Only return base name
 
-        return [format_path(p, g) for g in glob.glob(f"**.{extension}", root_dir=p, recursive=True)]
+        return [format_path(p, g) for g in glob(f"**.{extension}", root_dir=p, recursive=True)]
     
     def get_path_tree(self, name, extension="", path_name=True, file_callback=(lambda e: e), _searching=None):
         p = self.get_path(name) if path_name else name
@@ -238,7 +241,7 @@ class Config(BaseSettings):
     @cached_property
     def _defaults_dict(self):
         d = {}
-        glob_source = partial(glob.glob, root_dir=config_source_location)
+        glob_source = partial(glob, root_dir=config_source_location)
 
         for filename in glob_source("*.toml") + glob_source("*.json"):
             filepath = Path(os.path.join(config_source_location, filename))
@@ -277,6 +280,9 @@ class Config(BaseSettings):
         from sdbx.indexer import ModelIndexer
         return ModelIndexer()
 
+
+import line_profiler
+@line_profiler.profile
 def parse() -> Config:
     parser = argparse.ArgumentParser(add_help=False)
 
@@ -297,6 +303,6 @@ def parse() -> Config:
     
     logging.basicConfig(encoding='utf-8', level=level)
     
-    return Config(args.config)
+    return Config(path=args.config)
 
 config = parse()
