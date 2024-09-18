@@ -1,36 +1,24 @@
 import os
-import ctypes
 import json
 import struct
-import multiprocessing as mp
-from multiprocessing import Process
 from time import process_time_ns
 from math import isclose
 from pathlib import Path
 from collections import defaultdict
-import llama_cpp
 from llama_cpp import Llama
 from sdbx import config, logger
 
 
 print(f'begin: {process_time_ns()*1e-6} ms')
 
-# def _path_dict():
-#     root = {
-#         n: os.path.join() for n, p in dict(self.location).items() # see self.location for details
-#     }
+# peek = config.get_default("tuning", "peek") # block and tensor values for identifying
+# known = config.get_default("tuning", "known") # raw block & tensor data
 
-#     for n, p in dict(self.location).items():
-#         if ".." in p:
-#             raise Exception("Cannot set location outside of config path.")
-
-#     models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
-
-#     return {**root, **models}
-
-# def get_default(name, prop):
-#     return self._defaults_dict[name][prop]
-
+# model_peek = peek['model_peek']
+# vae_peek_12 = peek['vae_peek_12']
+# vae_peek = peek['vae_peek']
+# tf_peek = peek['tf_peek']
+# lora_peek = peek['lora_peek']
 
 class EvalMeta:
     # determines identity of unknown tensor
@@ -51,6 +39,7 @@ class EvalMeta:
     vae_size_pct = 1e-2
     vae_xl_pct = 1e-9
     vae_sd1_pct = 3e-2
+    vae_sd1_full_pct = 1e-5
     vae_sd1_tp_pct = 9e-2
     tf_pct = 1e-4
     tf_leeway = 0.03
@@ -139,13 +128,15 @@ class EvalMeta:
         self.clip_inside = False
         self.vae_inside = False
 
-    def __returner(self, tag):
-        self.tag = tag
-        print(f"{self.tag} {self.extract.get("extension", "")} {self.extract.get("filename", "")}") # logger.debug
-        return self.tag
+    def __returner(self):
+        self.size = self.extract.get("size", "")
+        self.filename = self.extract.get("filename", "")
+        self.ext = self.extract.get("extension", "")
+        self.path = self.extract.get("path", "")
+        print(f"{self.tag} {self.size} {os.path.basename(self.path)}") # logger.debug
+        return (self.tag, self.size, self.path,)
 
     def data(self):
-        extract = self.extract
         if int(self.extract.get("unet", 0)) > 96: self.vae_inside = True
         if int(self.extract.get("unet", 0)) == 96:  # Check VAE
             self.process_vae()
@@ -154,18 +145,17 @@ class EvalMeta:
 
         if int(self.extract.get("transformers", 0)) >= 2:  # Check CLIP
             self.clip_inside = True
-            self.process_tf(extract, )
+            self.process_tf()
         try:
             if int(self.extract.get("size", 0)) > 1e9:  # Check model
                 self.process_model()
         except ValueError as error_log:
-            #logger.exception(error_log)
-            print(f'no model found {error_log}')
+            logger.debug(f"'[Unknown model type] No model found '{self.extract}''{error_log}'.", exc_info=True)
             print(f"Unknown model type '{self.extract}'.")
         else:
             if self.extract.get("general.name","") != "":
-                model = self.extract.get("general.name","")
-                return self.__returner(model)
+                self.tag = self.extract.get("general.architecture","").upper()
+                return self.__returner()
 
 
     def process_vae(self):
@@ -175,80 +165,86 @@ class EvalMeta:
             self.process_vae_no_12()
 
     def process_vae_12(self):
-        tag = "VAE-"
+        self.tag = "VAE-"
 
         if self.extract.get("mmdit", 0) != 4:
-            model = f"{tag}{self.vae_peek_12[167335343][248]}"
-            return self.__returner(model)  # kolors hook
+            self.tag = f"{self.tag}{self.vae_peek_12[167335343][248]}"
+            return self.__returner()  # kolors hook
+        if self.extract.get("shape", 0) == "[512]":
+            self.tag = f"{self.tag}{self.vae_peek_12[335304388][244]}"
+            return self.__returner()  # flux hook
         else:
             for size, attributes in self.vae_peek_12.items():
                 if (isclose(int(self.extract.get("size", 0)), size, rel_tol=self.vae_pct)
                     or isclose(int(self.extract.get("size", 0)), size*2, rel_tol=self.vae_pct)
                     or isclose(int(self.extract.get("size", 0)), size/2, rel_tol=self.vae_pct)
                         or int(self.extract.get("size", 0) == size)):
-                    for tensor_params, model in attributes.items():
+                    for tensor_params, name in attributes.items():
                         if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.vae_pct):
                             try:
                                 if 512 == self.extract.get("shape", 0)[0]:
-                                    model = f"{
-                                        tag}{self.vae_peek_12[167666902][244]}"
-                                    return self.__returner(model)  # flux hook
+                                    self.tag = f"{self.tag}{name}"
+                                    return self.__returner()  # flux hook
                             except:
+                                logger.debug(f"'No shape value found '{self.extract}'.", exc_info=True)
                                 pass
-                            model = f"{tag}{model}"
-                            return self.__returner(model)  # found vae 12
+                            self.tag = f"{self.tag}{name}"
+                            return self.__returner()  # found vae 12
 
     def process_vae_no_12(self):
-        tag = "VAE-"
+        self.tag = "VAE-"
 
         if isclose(self.extract.get("size", 0), 284594513, rel_tol=self.vae_sd1_pct):
             if isclose(self.extract.get("tensor_params", 0), 276, rel_tol=self.vae_sd1_tp_pct):
                 try:
                     if self.extract.get("shape", 0)[0] == 32:
-                        model = f"{tag}{model}"
-                        return self.__returner(model)  # sd1 hook
+                        """
+                        test shape nab
+                        """
                 except:
-                    model = f"{tag}{model}"
-                    return self.__returner(model)  # sd1 hook
+                    logger.debug(f"'No shape value found '{self.extract}'''.", exc_info=True)
+                    if isclose(self.extract.get("tensor_params", 0), 304, rel_tol=self.vae_sd1_full_pct):
+                        self.tag = f"{self.tag}{self.extract[404581567][304]}"
+                    else:
+                        self.tag = f"{self.tag}{self.extract[334641190][250]}"    
+                else:                    
+                    self.tag = f"{self.tag}{self.extract[284594513][248]}"
+                finally:
+                    return self.__returner()  # sd1 hook
         else:
             for size, attributes in self.vae_peek.items():
-                if (
-                    isclose(int(self.extract.get("size", 0)), 167333134, rel_tol=self.vae_xl_pct) or
-                    isclose(int(self.extract.get("size", 0)), 334641162, rel_tol=self.vae_xl_pct)
-                ):
-                    for tensor_params, model in attributes.items():
-                        if isclose(int(self.extract.get("tensor_params", 0)), 249, rel_tol=self.vae_pct):
-                            model = f"{tag}{self.vae_peek[167333134][248]}"
-                            return self.__returner(model)  # flux hook
-
                 if (
                     isclose(int(self.extract.get("size", 0)), size,   rel_tol=self.vae_size_pct) or
                     isclose(int(self.extract.get("size", 0)), size*2, rel_tol=self.vae_size_pct) or
                     isclose(int(self.extract.get("size", 0)), size/2, rel_tol=self.vae_size_pct)
                 ):
-                    for tensor_params, model in attributes.items():
+                    for tensor_params, name in attributes.items():
                         if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.vae_pct):
                             try:
                                 if 512 == self.extract.get("shape", 0)[0]:
+                                    """
+                                    check shape
+                                    """
+                            except:
+                                logger.debug(f"'[No shape key for vae '{self.extract}'.", exc_info=True)
+                                try:
                                     if self.extract.get("transformers", 0) == 4:
-                                        model = f"{tag}{
-                                            self.vae_peek_12[167335343][248]}"
-                                        # kolors hook
-                                        return self.__returner(model)
-                                    else:
-                                        model = f"{
-                                            tag}-{self.vae_peek[335304388][244]}"
-                                        # flux hook
-                                        return self.__returner(model)
-                            except KeyError as error_log:
-                                #logger.exception(error_log)
-                                print(f'no shape key {error_log}')
+                                        """
+                                        check shape
+                                        """                                    
+                                except:
+                                    logger.debug(f"'[No shape key for vae '{self.extract}'.", exc_info=True)
+                                    print(f'No shape key for VAE: {self.filename}')
+                                    self.tag = f"{self.tag}{name}" #unknown vae
+                                else:
+                                    self.tag = f"{self.tag}{name}"
+                                    return self.__returner() # kolors hook
                             else:
-                                model = f"{tag}{model}"
-                                return self.__returner(model)  # found vae
+                                self.tag = f"{self.tag}{self.vae_peek[335304388][244]}"
+                                return self.__returner() #   # flux hook
 
     def process_lora(self):
-        tag = "LORA-"
+        self.tag = "LORA-"
 
         for size, attributes in self.lora_peek.items():
             if (
@@ -264,63 +260,65 @@ class EvalMeta:
                                 if each.lower() not in str(self.extract.get('filename', 0)).lower():
                                     rep_count += 1
                                 else:
-                                    tag = f"{tag}{each}"
+                                    self.tag = f"{self.tag}{each}-"
                                     model = desc[len(desc)-1]
-                                    model = tag + "-" + model
-                                    return self.__returner(model)  # found lora
+                                    self.tag = self.tag + model
+                                    return self.__returner()  # found lora
 
-    def process_tf(self, extract):
-        self.extract = extract
-        tag = "CLI-"
+    def process_tf(self):
+        self.tag = "TRA-"
 
         for tensor_params, attributes in self.tf_peek.items():
             if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.tf_leeway):
-                for shape, model in attributes.items():
+                for shape, name in attributes.items():
                     try:
                         if isclose(self.extract.get("shape", 0)[0], shape, rel_tol=self.tf_pct):
-                            if isclose(int(self.extract.get("transformers", 0)), model[0], rel_tol=self.tf_pct):
-                                model = model[1]
-                                model = f"{tag}{model}"
+                            if isclose(int(self.extract.get("transformers", 0)), name[0], rel_tol=self.tf_pct):
+                                self.tag = f"{self.tag}{name[1]}"
                                 # found transformer
-                                return self.__returner(model)
+                                return self.__returner()
                     except ValueError as error_log:
-                        #logger.exception(error_log)
-                        print(f'no shape key {error_log}')
-                        model = model[1] or model
-                        model = f"{tag}{model} estimate"
-                        return self.__returner(model)  # estimated transformer
+                        logger.debug(f"'[No shape key for transformer '{self.extract}''{error_log}'.", exc_info=True)
+                        print(f'No shape key for transformers model : {error_log}')
+                        self.tag = f"{name[1]} estimate"
+                        return self.__returner()  # estimated transformer
 
     def process_model(self):
+        self.tag = "???-"
+        self.unrecognized = ""
         for tensor_params, attributes, in self.model_peek.items():
             if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.model_tensor_pct):
-                for shape, model in attributes.items():
+                for shape, name in attributes.items():
                     try:
                         if isclose(self.extract.get("shape", 0)[0], shape, rel_tol=self.model_block_pct):
-                            try:
-                                if (isclose(self.extract.get("diffusers", 0), model[0], rel_tol=self.model_block_pct)
-                                or isclose(self.extract.get("mmdit", 0), model[0], rel_tol=self.model_block_pct)
-                                or isclose(self.extract.get("flux", 0), model[0], rel_tol=self.model_block_pct)
-                                or isclose(self.extract.get("diffusers_lora", 0),  model[0], rel_tol=self.model_block_pct)):
-                                    model = model[1]
-                                else:
-                                    print(f"Unrecognized model, guessing -  {model[1]}")
-                                    model = model[1]
-                                print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
-                                return self.__returner(model)  # found model
-                            except TypeError as error_log:
-                                logger.exception(error_log)
-                                print(f" Missing block data, guessing model type-  {model[1]}")
-                                model = model[1]
-                                print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
-                                return self.__returner(model)  # found model
-                        
+                            if self.extract.get("diffusers", "not_found") != "not_found":
+                                if isclose(self.extract.get("diffusers", 0), name[0], rel_tol=self.model_block_pct):
+                                    self.tag = name[1]
+                            elif self.extract.get("mmdit", "not_found") != "not_found":
+                                if isclose(self.extract.get("mmdit", 0), name[0], rel_tol=self.model_block_pct):
+                                    self.tag = name[1]
+                            elif self.extract.get("flux", "not_found") != "not_found":
+                                if isclose(self.extract.get("flux", 0), name[0], rel_tol=self.model_block_pct):
+                                    self.tag = name[1]
+                            elif self.extract.get("diffusers_lora", "not_found") != "not_found":
+                                if isclose(self.extract.get("diffusers_lora", 0),  name[0], rel_tol=self.model_block_pct):
+                                    self.tag = name[1]
+                    except TypeError as error_log:
+                        logger.debug(f"'[No block data '{self.extract}''{error_log}'.", exc_info=True)
+                        self.unrecognized = "[]~~:"  # no block guess
+                        print(f" Missing block data, guessing diffusion model type-  {name[1]}")
+                        self.tag = name[1]
                     except KeyError as error_log:
-                        #logger.exception(error_log)
-                        print(f'no shape key {error_log}')
-                        model = model[1]
-                        print(
-                            f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
-                        return self.__returner(model)  # found model
+                        print(f'No diffusion model shape key {error_log}')
+                        logger.debug(f"'[No shape key for model '{self.extract}''{error_log}'.", exc_info=True)
+                        self.unrecognized = "_~~" #no model shape guess
+                        self.tag = name[1]
+                    else:
+                            self.unrecognized = "~~"
+                            self.tag = name[1]
+                    finally:
+                        print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside} - {self.unrecognized}")
+                        return self.__returner()  # found model
 
 
 class ReadMeta:
@@ -329,6 +327,7 @@ class ReadMeta:
     # return a dict of juicy info
 
     def __init__(self, path):
+        self.path = path  # the path of the file
         self.full_data, self.meta, self.count_dict = {}, {}, {}
 
         # level of certainty, counts tensor block type matches
@@ -450,6 +449,7 @@ class ReadMeta:
             #NO TOUCH!! critical values
             "filename": "", #universal
             "size": "", #file size in bytes
+            "path": "",
             "dtype": "", #precision
             "tensor_params": 0, #tensor count
             "shape": "", #largest first dimension of tensors
@@ -469,60 +469,87 @@ class ReadMeta:
 
         }
         self.occurrence_counts = defaultdict(int)
-        self.path = path  # the path of the file
         self.filename = os.path.basename(self.path)  # the title of the file only
         self.ext = Path(self.filename).suffix.lower()
 
         if not os.path.exists(self.path):  # be sure it exists, then proceed
+            logger.debug(f"'[Not found '{self.filename}'''.", exc_info=True)
             raise RuntimeError(f"Not found: {self.filename}")
+
         else:
             self.model_tag["filename"] = self.filename
             self.model_tag["extension"] = self.ext.replace(".","")
+            self.model_tag["path"] = self.path
             self.model_tag["size"] = os.path.getsize(self.path)
 
     def _parse_safetensors_metadata(self):
-        with open(self.path, "rb") as json_file:
-            header = struct.unpack("<Q", json_file.read(8))[0]
-            try:
-                return json.loads(json_file.read(header), object_hook=self._search_dict)
-            except:
-                return print(f"Error loading {full_path}")
+        try:
+            with open(self.path, "rb") as json_file:
+                """
+                try opening file
+                """
+        except:
+            log = f"Could not open file {self.path}"
+            logger.debug(log, exc_info=True)
+            print(log)
+        else:
+            with open(self.path, "rb") as json_file:
+                header = struct.unpack("<Q", json_file.read(8))[0]
+                try:
+                    return json.loads(json_file.read(header), object_hook=self._search_dict)
+                except:
+                    log = f"Path not found'{self.path}'''."
+                    logger.debug(log, exc_info=True)
+                    return print(log)
             
     def _parse_gguf_metadata(self):
-        with open(self.path, "rb") as llama_file:
-            magic = llama_file.read(4)
-            if magic != b"GGUF":
-                print(f"{magic} vs. b'GGUF'. wrong magic #") # uh uh uh. you didn't say the magic word
-            else:
-                llama_ver = struct.unpack("<I", llama_file.read(4))[0]
-                if llama_ver < 2:
-                    print(f"{llama_ver} / needs GGUF v2+ ")
+        try:
+            with open(self.path, "rb") as llama_file:
+                """
+                try opening file
+                """
+        except:
+            log = f"Could not open file {self.path}"
+            logger.debug(log, exc_info=True)
+            print(log)
+        else:
+            with open(self.path, "rb") as llama_file:
+                magic = llama_file.read(4)
+                if magic != b"GGUF":
+                    print(f"{magic} vs. b'GGUF'. wrong magic #") # uh uh uh. you didn't say the magic word
                 else:
-                    try:
-                        parser = Llama(model_path=self.path,vocab_only=True,verbose=False)
-                        self.meta = parser.metadata
-                        return self._search_dict(self.meta)
-                    except ValueError as error_log:
-                        logger.exception(error_log)
-                        print(f'Llama angry! Missing data! : {error_log}')     #research   
-                    except OSError as error_log:
-                        logger.exception(error_log)
-                        print(f'Llama angry! Bad file! :  {error_log}')     #research                                          
-                    except:
-                        logger.exception(Exception)
-                        return print(f"Sorry... Error loading ._. : {self.path}")
+                    llama_ver = struct.unpack("<I", llama_file.read(4))[0]
+                    if llama_ver < 2:
+                        print(f"{llama_ver} / needs GGUF v2+ ")
+                    else:
+                        try:
+                            parser = Llama(model_path=self.path,vocab_only=True,verbose=False)
+                            self.meta = parser.metadata
+                            return self._search_dict(self.meta)
+                        except ValueError as error_log:
+                            logger.debug(f"'[Failed load '{self.path}''{error_log}'.", exc_info=True)
+                            print(f'Llama angry! : {self.filename}')
+                            pass
+                        except OSError as error_log:
+                            logger.debug(f"'[Failed access '{self.path}''{error_log}'.", exc_info=True)
+                            print(f'Llama angry! :  {self.filename}')
+                            pass
+                        except:
+                            logger.exception(Exception)
+                            logger.debug(f"'[Failed unpack '{self.path}''{error_log}'.", exc_info=True)
+                            return print(f"Sorry... Error loading ._. : {self.filename}")
 
-    def data(self, path):
+    def data(self):
             if self.ext == ".pt" or self.ext == ".pth" or self.ext == ".ckpt":  # process closer to load
-                return
+                pass
             elif self.ext == ".safetensors" or self.ext == "":
                 self.occurrence_counts.clear()
                 self.full_data.clear()
                 self.meta = self._parse_safetensors_metadata()
                 self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
                 self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                for k, v in self.full_data.items():  # uncomment to view model properties
-                    print(k, v)
+                #for k, v in self.full_data.items():  # uncomment to view model properties
+                #   print(k, v)              ######################################DEBUG
                 self.count_dict.clear()
                 self.model_tag.clear()
                 self.meta = ""
@@ -533,12 +560,13 @@ class ReadMeta:
                 self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
                 self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
                 #for k, v in self.full_data.items():  # uncomment to view model properties
-                #    print(k, v)
+                #    print(k, v)              ######################################DEBUG
                 self.count_dict.clear()
                 self.model_tag.clear()
                 self.meta = ""
             elif self.ext == ".bin":  # placeholder - parse bin metadata(path) using ...???
                     self.meta = ""
+                    pass
             else :
                 print(f"Unrecognized file format: {self.filename}")
                 pass
@@ -549,7 +577,7 @@ class ReadMeta:
         self.meta = meta
         if self.ext == ".gguf":
             for key, value in self.meta.items():
-                #print(f"{key} {value}")
+                #print(f"{key} {value}")              ######################################DEBUG
                 if self.model_tag.get(key, "not_found") != "not_found":
                     self.model_tag[key] = self.meta.get(key)  # drop it like its hot
                 if self.model_tag.get("general.architecture", "") != "":
@@ -571,8 +599,7 @@ class ReadMeta:
                         for block, model_type in self.known.items():  # model type, dict data
                             if block in num:  # if value matches one of our key values
                                 self.occurrence_counts[model_type] += 1 # count matches
-                                self.count_dict[model_type] = self.occurrence_counts.get(
-                                    model_type, 0)  # pair match count to model type
+                                self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0)  # pair match count to model type
 
         return self.meta
 
@@ -586,27 +613,19 @@ config_path = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.e
 search_path = "models"
 path_name =  os.path.normpath(os.path.join(config_path, search_path, "download")) #multi read
 
-each = "TCD_XL_pytorch_lora_weights.safetensors" ##SCAN SINGLE FILE
-full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
-metareader = ReadMeta(full_path).data(full_path)
-evaluate = EvalMeta(metareader).data
+# each = "ae.safetensors" ##SCAN SINGLE FILE
+# full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
+# metareader = ReadMeta(full_path).data()
+# evaluate = EvalMeta(metareader).data()
 
 
-# for each in os.listdir(path_name): ###SCAN DIRECTORY
-#     filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
-#     full_path = os.path.join(path_name, filename)
-#     metareader = ReadMeta(full_path).data(full_path)
-#     if metareader is not None:
-#         evaluate = EvalMeta(metareader).data()
-# path_name = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox',"models","download")
-
-# for each in os.listdir(path_name): ###SCAN DIRECTORY
-#       if not os.path.isdir(os.path.join(path_name, each)):
-#         filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
-#         full_path = os.path.join(path_name, filename)
-#         metareader = ReadMeta(full_path).data(full_path)
-#         if metareader is not None:
-#             evaluate = EvalMeta(metareader).data()
+for each in os.listdir(path_name): ###SCAN DIRECTORY
+      if not os.path.isdir(os.path.join(path_name, each)):
+        filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
+        full_path = os.path.join(path_name, filename)
+        metareader = ReadMeta(full_path).data()
+        if metareader is not None:
+            evaluate = EvalMeta(metareader).data()
 
 
 
