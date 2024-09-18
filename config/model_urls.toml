@@ -2,6 +2,17 @@
 
 [sources]
 # maybe something about what hf/ca/gh/omd/gdrive are here
+[darkshapes_hf]
+suzume_8b = https://huggingface.co/darkshapes/suzume-llama-3-8B-multilingual-orpo-borda-top25-gguf
+aya_8b = https://huggingface.co/darkshapes/aya-23-8b-gguf
+mistral_7b_zh = https://huggingface.co/darkshapes/mistral-7b-v0.3-chinese-chat-4bit
+codeninja_7b = https://huggingface.co/darkshapes/codeninja-1.0-openchat-7b-gguf
+mistral_7b_orca = https://huggingface.co/darkshapes/mistral-7b-openorca-gguf
+mistral_7b_oasst = https://huggingface.co/darkshapes/mistral-7b-openorca-oasst_top1_230825v2-gguf
+bloom_mt0_b = https://huggingface.co/darkshapes/mt0-base
+bloom_mt0_sm = https://huggingface.co/darkshapes/mt0-small
+bloom_mt0_lg = https://huggingface.co/darkshapes/mt0-large
+pygmalion_7b = https://huggingface.co/darkshapes/pygmalion-2-7b-gguf
 
 [controlnet_hf]
 openpose = ["thibaud/controlnet-openpose-sdxl-1.0", "OpenPoseXL2.safetensors"]

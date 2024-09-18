@@ -25,6 +25,11 @@ class NodeTuner:
         max_value = max(metadata.values())
         largest_keys = [k for k, v in metadata.items() if v == max_value] # collect the keys of the largest pairs
         ReadMeta.full_data.get("size", 0)/psutil.virtual_memory().total
+
+        torch.device(0)
+        torch.get_default_dtype() (default float)
+        torch.cuda.mem_get_info(device=None) (3522586215, 4294836224)
+
         # get system memory
         # get cpu generation
         # get gpu type
@@ -89,102 +94,64 @@ class NodeTuner:
 
         # flash-attn/xformers
 
-        # check filename for clues
-        # check file size
-        # check tensor size
+### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
+token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
 
-        # 3072,3072 shape flux
-        # 11891971136 offset flux
-        # > 11901525888 flux
-        # 780 params flux
-        # flux flux
+# AUTOCONFIG OPTIONS : INFERENCE
+# [universal] lower vram use (and speed on pascal apparently!!)
+sequential_offload = True
+precision = '16'  # [universal], less memory for trivial quality decrease
+# [universal] half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
+dynamic_guidance = True
+# [compatibility for alignyoursteps to match model type
+model_ays = "StableDiffusionXLTimesteps"
+# [compatibility] only for sdxl
+pcm_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
+pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
+cpu_offload = False  # [compatibility] lower vram use by pushing to cpu
+# [compatibility] certain types of models need this, it influences determinism as well
+bf16 = False
+timestep_spacing = "trailing"  # [compatibility] DDIM, PCM "trailing"
+clip_sample = False  # [compatibility] PCM False
+set_alpha_to_one = False,  # [compatibility]PCM False
+rescale_betas_zero_snr = True  # [compatibility] DDIM True
+disk_offload = False  # [compatibility] last resort, but things work
+compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
 
-        # 49408 shape x value - sdxl
-    
-        6938041280 6938040682 6938040706
-        # ~6,778,430-632KB size - fp16 sdxl
-        # 2,519,599-841kb size - fp16 sd1.5
-
-        #lightning - no vae?
-
-        # vae
-        # 163mb size sd/xl vae f16
-        # 326mb size sd/xl vae f32
-        # size 50mb-850mb - vae
-        # [512, 512, 3, 3] shape vae
-        # unet - vae
-        # ~75mb size cascade stage a
-        # i64 dtype cascade stage a
-        # [8192,4] shape
-
-        # taesd
-        # 5mb taesd/xl decoder/encoder
-        # 10mb taesd sd3
-
-        # lora
-        # 20-500mb  upscale
-        # pth - upscale 
-        # bin
-        # 2gb aura sr* 
-        # safetensors aurasr
-
-        # lora
-        # 10240 shape x value - sdxl lora
-        # tensor params 700-4000 lora
-        # lightning lora 5000 params
-        # fp16, fp32, bf16 lora
-        # ss_base_model_version sdxl_base_v1.0 lora
-        # (metadata byte size)
-
-        #pcm lora
-        # fp16
-        # 2364 params
-        # 10240
-        # ~393854624 bytes
-        # lean on filename
-
-        #lcm lora
-        # fp16
-        # 2364 params
-        # 10240
-        # rt ssd1b lcm
-        # 100-400 mb
-        # 393854624
-        # 393854592
-        # 393855224
-        # lean on filename here
-        
-        # sd lora 134621556
+# AUTOCONFIG OPTIONS  : VAE
+# pipe.upcast_vae()
+vae_tile = True  # [compatibility] tile vae input to lower memory
+vae_slice = False  # [compatibility] serialize vae to lower memory
+# [compatibility] this should be detected by model type
+vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
+vae_config_file = "ssdxlvae.json"  # [compatibility] this too
 
 
-        # unet 
-        # > 2000 tensor params
+    lora=pcm_default
 
-        # transformers just shows up as transformers
-        # i64 transformers, open clip
-        # 
-        # 49408 shape clip
-        # 200-2000 params clip
-        # clip g mislabeled as diffusers lora!!!
+# Device and memory setup
+def get_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        return "mps"
+    else:
+        return "cpu"
 
-        # mmdit -
-        # flux -
-        # pixxart s
+def clear_memory_cache(device: str) -> None:
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    elif device == "mps":
+        torch.mps.empty_cache()
 
-        # sd - enable pcm, ays
-        # if hunyuan - 
-        # if diffusers - image interpreter (diffusers)
-        # if sdxl - enable pcm, ays option, force upcast vae if default vae, otherwise use fp16
 
-        # if transformers - text model
-        # compare the values and assign sensible variables
-        # generate dict of tuned parameters like below:
-        # return the dict
-
-        #control net
-        # 844 params
-        # 10240 x shape
-        # unet model type
+# SYS IMPORT
+device = ""
+compile_unet = ""
+queue = ""
+clear_cache = ""
+linux = ""
 
         # tuned parameters & hyperparameters only!! pcm parameters here 
 
@@ -200,9 +167,8 @@ class NodeTuner:
         # <2 tensor params
 
         # pt files
-        
 
-    def collect_tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
+    def tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
         predecessors = graph.predecessors(node_id)
 
         node = graph.nodes[node_id]

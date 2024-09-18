@@ -1,15 +1,19 @@
 import os
+import ctypes
 import json
 import struct
+import multiprocessing as mp
+from multiprocessing import Process
 from time import process_time_ns
 from math import isclose
 from pathlib import Path
 from collections import defaultdict
 import llama_cpp
-from llama_cpp._internals import _LlamaModel
+from llama_cpp import Llama
 from sdbx import config, logger
 
-print(f'begin: {process_time_ns()/1e6} ms')
+
+print(f'begin: {process_time_ns()*1e-6} ms')
 
 # def _path_dict():
 #     root = {
@@ -55,6 +59,7 @@ class EvalMeta:
     model_peek, vae_peek, tf_peek, vae_peek_12, lora_peek, = defaultdict(dict), defaultdict(dict),  defaultdict(dict), defaultdict(dict), defaultdict(dict)
 
     # sd1.5  4265097012 3188362889 4244098984 4244099040
+            # TP     Shape   MMD/DF
     model_peek[1131][1280] = [224, "STA-15"]
     # sdxl 6938040706+6938040714+6938041050+6938052474+6941318844+6938047840/6
     model_peek[2515][1280] = [980, "STA-XL"]
@@ -67,7 +72,7 @@ class EvalMeta:
     model_peek[1668][32128] = [550, "STA-32"]
     model_peek[1682][320] = [980, "KOL-01"]  # kolors
     model_peek[786][3072] = [2, "FLU-01"]  # flux
-    model_peek[780][3072] = [None, "FLU-1D"]  # flux full size
+    model_peek[780][3072] = [204, "FLU-1D"]  # flux full size
     model_peek[776][3072] = [2, "FLU-1S"]  # flux full size
     model_peek[824][8] = [208, "AUR-03"]  # auraflow
     model_peek[612][6] = [560, "PIX-AL"]  # pixart alpha
@@ -125,7 +130,7 @@ class EvalMeta:
     lora_peek[393854624][2364] = ["TCD", "STA-XL"]
     lora_peek[134621556][834] = ["LCM", "TCD", "STA-15"]
     lora_peek[393855224][2364] = ["LCM", "STA-XL"]
-    lora_peek[393854624][2364] = ["LCM", "STA-XL"]
+    lora_peek[393854624][2364] = ["LCM", 'TCD', "STA-XL"]
     lora_peek[509550144][3156] = ["FLA", "STA-XL"]
     lora_peek[239224692][699] = ["RT", "STA-VG"]
 
@@ -157,6 +162,10 @@ class EvalMeta:
             #logger.exception(error_log)
             print(f'no model found {error_log}')
             print(f"Unknown model type '{self.extract}'.")
+        else:
+            if self.extract.get("general.name","") != "":
+                model = self.extract.get("general.name","")
+                return self.__returner(model)
 
 
     def process_vae(self):
@@ -205,8 +214,7 @@ class EvalMeta:
             for size, attributes in self.vae_peek.items():
                 if (
                     isclose(int(self.extract.get("size", 0)), 167333134, rel_tol=self.vae_xl_pct) or
-                    isclose(int(self.extract.get("size", 0)),
-                            334641162, rel_tol=self.vae_xl_pct)
+                    isclose(int(self.extract.get("size", 0)), 334641162, rel_tol=self.vae_xl_pct)
                 ):
                     for tensor_params, model in attributes.items():
                         if isclose(int(self.extract.get("tensor_params", 0)), 249, rel_tol=self.vae_pct):
@@ -216,8 +224,7 @@ class EvalMeta:
                 if (
                     isclose(int(self.extract.get("size", 0)), size,   rel_tol=self.vae_size_pct) or
                     isclose(int(self.extract.get("size", 0)), size*2, rel_tol=self.vae_size_pct) or
-                    isclose(int(self.extract.get("size", 0)),
-                            size/2, rel_tol=self.vae_size_pct)
+                    isclose(int(self.extract.get("size", 0)), size/2, rel_tol=self.vae_size_pct)
                 ):
                     for tensor_params, model in attributes.items():
                         if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.vae_pct):
@@ -247,8 +254,7 @@ class EvalMeta:
             if (
                 isclose(int(self.extract.get("size", 0)), size,   rel_tol=self.lora_pct) or
                 isclose(int(self.extract.get("size", 0)), size*2, rel_tol=self.lora_pct) or
-                isclose(int(self.extract.get("size", 0)),
-                        size/2, rel_tol=self.lora_pct)
+                isclose(int(self.extract.get("size", 0)), size/2, rel_tol=self.lora_pct)
             ):
                 for tensor_params, desc in attributes.items():
                     if isclose(int(self.extract.get("tensor_params", 0)), tensor_params, rel_tol=self.lora_pct):
@@ -290,16 +296,23 @@ class EvalMeta:
                 for shape, model in attributes.items():
                     try:
                         if isclose(self.extract.get("shape", 0)[0], shape, rel_tol=self.model_block_pct):
-                            if (isclose(self.extract.get("diffusers", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("mmdit", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("flux", 0), model[0], rel_tol=self.model_block_pct):
-                            or isclose(self.extract.get("diffusers_lora", 0),  model[0], rel_tol=self.model_block_pct)):
+                            try:
+                                if (isclose(self.extract.get("diffusers", 0), model[0], rel_tol=self.model_block_pct)
+                                or isclose(self.extract.get("mmdit", 0), model[0], rel_tol=self.model_block_pct)
+                                or isclose(self.extract.get("flux", 0), model[0], rel_tol=self.model_block_pct)
+                                or isclose(self.extract.get("diffusers_lora", 0),  model[0], rel_tol=self.model_block_pct)):
+                                    model = model[1]
+                                else:
+                                    print(f"Unrecognized model, guessing -  {model[1]}")
+                                    model = model[1]
+                                print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
+                                return self.__returner(model)  # found model
+                            except TypeError as error_log:
+                                logger.exception(error_log)
+                                print(f" Missing block data, guessing model type-  {model[1]}")
                                 model = model[1]
-                            else:
-                                print(f"Unrecognized model, guessing -  {model[1]}")
-                                model = model[1]
-                            print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
-                            return self.__returner(model)  # found model
+                                print( f"{model}, VAE-{model}:{self.vae_inside}, CLI-{model}:{self.clip_inside}")
+                                return self.__returner(model)  # found model
                         
                     except KeyError as error_log:
                         #logger.exception(error_log)
@@ -317,8 +330,10 @@ class ReadMeta:
 
     def __init__(self, path):
         self.full_data, self.meta, self.count_dict = {}, {}, {}
+
         # level of certainty, counts tensor block type matches
-        self.occurrence_counts = defaultdict(int)
+        ## DO NOT CHANGE THESE VALUES
+        ## they may be labelled innacurately, ignore it
         self.known = {  # dict of tensor block keys with tag values
             "adaLN_modulation": "mmdit",
             "mlp.fc": "mmdit",
@@ -431,34 +446,29 @@ class ReadMeta:
             "ff.net.2.": "unet",
         }
 
-        self.model_tag = {  # measurements and metadata detected from the model
-            "filename": "",
-            "size": "",
-            "dtype": "",
-            "tensor_params": 0,
-            "shape": "",
-            "data_offsets": "",
-            "__metadata__": "",
-            "info.files_metadata": "",
-            "file_metadata": "",
-            "name": "",
-            "info.sharded": "",
-            "info.metadata": "",
-            "file_metadata.tensors": "",
-            "modelspec.title": "",
-            "modelspec.architecture": "",
-            "modelspec.author": "",
-            "modelspec.hash_sha256": "",
-            "modelspec.resolution": "",
-            "resolution": "",
-            "ss_resolution": "",
-            "ss_mixed_precision": "",
-            "ss_base_model_version": "",
-            "ss_network_module": "",
-            "model.safetensors": "",
-            "ds_config": "",
-        }
+        self.model_tag = {  # measurements and metadata detected from the model ggml.model imatrix.chunks_count
+            #NO TOUCH!! critical values
+            "filename": "", #universal
+            "size": "", #file size in bytes
+            "dtype": "", #precision
+            "tensor_params": 0, #tensor count
+            "shape": "", #largest first dimension of tensors
+            "general.name": "", # llm tags
+            "general.architecture": "",
+            "block_count":"",
+            "context_length": "", #length of messages
+            "type": "", 
+            "attention.head_count": "",
+            "attention.head_count_kv": "",
+            "general.name": "",
+            "tokenizer.ggml.model": "", #llm tags end here
+            "__metadata__": "", #extra
+            "data_offsets": "", #universal
+            "general.basename": "",
+            "name": "", #usually missing...
 
+        }
+        self.occurrence_counts = defaultdict(int)
         self.path = path  # the path of the file
         self.filename = os.path.basename(self.path)  # the title of the file only
         self.ext = Path(self.filename).suffix.lower()
@@ -466,22 +476,20 @@ class ReadMeta:
         if not os.path.exists(self.path):  # be sure it exists, then proceed
             raise RuntimeError(f"Not found: {self.filename}")
         else:
-
             self.model_tag["filename"] = self.filename
             self.model_tag["extension"] = self.ext.replace(".","")
             self.model_tag["size"] = os.path.getsize(self.path)
 
-    def _parse_safetensors_metadata(self, path):
-        with open(path, "rb") as json_file:
+    def _parse_safetensors_metadata(self):
+        with open(self.path, "rb") as json_file:
             header = struct.unpack("<Q", json_file.read(8))[0]
             try:
                 return json.loads(json_file.read(header), object_hook=self._search_dict)
             except:
-                return print(f"error loading {full_path}")
+                return print(f"Error loading {full_path}")
             
-    def _parse_gguf_metadata(self, path):
-        self.path = path
-        with open(path, "rb") as llama_file:
+    def _parse_gguf_metadata(self):
+        with open(self.path, "rb") as llama_file:
             magic = llama_file.read(4)
             if magic != b"GGUF":
                 print(f"{magic} vs. b'GGUF'. wrong magic #") # uh uh uh. you didn't say the magic word
@@ -491,64 +499,80 @@ class ReadMeta:
                     print(f"{llama_ver} / needs GGUF v2+ ")
                 else:
                     try:
-                        return _LlamaModel(path_model=self.path, params=llama_cpp.llama_model_default_params(), verbose=True).metadata
+                        parser = Llama(model_path=self.path,vocab_only=True,verbose=False)
+                        self.meta = parser.metadata
+                        return self._search_dict(self.meta)
                     except ValueError as error_log:
-                        #logger.exception(error_log)
-                        print(f'llama complaining: {error_log}')     #research                    
+                        logger.exception(error_log)
+                        print(f'Llama angry! Missing data! : {error_log}')     #research   
+                    except OSError as error_log:
+                        logger.exception(error_log)
+                        print(f'Llama angry! Bad file! :  {error_log}')     #research                                          
                     except:
-                        #logger.exception(error_log)
-                        return print(f"error loading {full_path}")
+                        logger.exception(Exception)
+                        return print(f"Sorry... Error loading ._. : {self.path}")
 
     def data(self, path):
-        try:
-            if self.ext in {".pt", ".pth", ".ckpt"}:  # process elsewhere
+            if self.ext == ".pt" or self.ext == ".pth" or self.ext == ".ckpt":  # process closer to load
                 return
-            elif self.ext in {".safetensors" or ".sft"}:
+            elif self.ext == ".safetensors" or self.ext == "":
                 self.occurrence_counts.clear()
                 self.full_data.clear()
-                self.meta = self._parse_safetensors_metadata(self.path)
+                self.meta = self._parse_safetensors_metadata()
+                self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
+                self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
+                for k, v in self.full_data.items():  # uncomment to view model properties
+                    print(k, v)
+                self.count_dict.clear()
+                self.model_tag.clear()
+                self.meta = ""
+            elif self.ext == ".gguf":
+                self.occurrence_counts.clear()
+                self.full_data.clear()
+                self.meta = self._parse_gguf_metadata()
                 self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
                 self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
                 #for k, v in self.full_data.items():  # uncomment to view model properties
                 #    print(k, v)
                 self.count_dict.clear()
                 self.model_tag.clear()
-            elif self.ext == ".gguf":
-                self.meta = self._parse_gguf_metadata(self.path)
-                print(self.meta)
-                # placeholder - parse gguf metadata(path) using llama lib
                 self.meta = ""
-            elif self.ext == ".bin":
-                    # placeholder - parse bin metadata(path) using ...???
+            elif self.ext == ".bin":  # placeholder - parse bin metadata(path) using ...???
                     self.meta = ""
-        except RuntimeError as error_log:
-            #logger.exception(error_log)
-            print(f"Unrecognized file format: {self.filename} {error_log}")
+            else :
+                print(f"Unrecognized file format: {self.filename}")
+                pass
 
-        return self.full_data
+            return self.full_data
 
     def _search_dict(self, meta):
         self.meta = meta
-        for num in list(self.meta):
-            # handle inevitable exceptions invisibly
-            if self.model_tag.get(num, "not_found") != "not_found":
-                self.model_tag[num] = self.meta.get(
-                    num)  # drop it like its hot
-            if "dtype" in num:
-                self.model_tag["tensor_params"] += 1  # count tensors
-            elif "shape" in num:
-                # measure first shape size thats returned
-                if self.meta.get(num) > self.model_tag["shape"]:
-                    self.model_tag["shape"] = self.meta.get(num)
-
-            if "data_offsets" not in num:
-                if ("shapes" or "dtype") not in num:
-                    for block, model_type in self.known.items():  # model type, dict data
-                        if block in num:  # if value matches one of our key values
-                            # count matches
-                            self.occurrence_counts[model_type] += 1
-                            self.count_dict[model_type] = self.occurrence_counts.get(
-                                model_type, 0)  # pair match count to model type
+        if self.ext == ".gguf":
+            for key, value in self.meta.items():
+                #print(f"{key} {value}")
+                if self.model_tag.get(key, "not_found") != "not_found":
+                    self.model_tag[key] = self.meta.get(key)  # drop it like its hot
+                if self.model_tag.get("general.architecture", "") != "":
+                    prefix = self.model_tag["general.architecture"]
+                    prefixless_key = key.replace(f"{prefix}.","")
+                    if self.model_tag.get(prefixless_key, "not_found") != "not_found":
+                        self.model_tag[prefixless_key] = value  # drop it like its hot
+        elif self.ext == ".safetensors" or self.ext == ".sft":
+            for num in list(self.meta): # handle inevitable exceptions invisibly
+                if self.model_tag.get(num, "not_found") != "not_found":
+                    self.model_tag[num] = self.meta.get(num)  # drop it like its hot
+                if "dtype" in num:
+                        self.model_tag["tensor_params"] += 1  # count tensors
+                elif "shape" in num: # measure first shape size thats returned
+                    if self.meta.get(num) > self.model_tag["shape"]:
+                        self.model_tag["shape"] = self.meta.get(num)
+                if "data_offsets" not in num:
+                    if ("shapes" or "dtype") not in num:
+                        for block, model_type in self.known.items():  # model type, dict data
+                            if block in num:  # if value matches one of our key values
+                                self.occurrence_counts[model_type] += 1 # count matches
+                                self.count_dict[model_type] = self.occurrence_counts.get(
+                                    model_type, 0)  # pair match count to model type
 
         return self.meta
 
@@ -558,14 +582,14 @@ class ModelIndexer:
         pass
 
 
-# config_path = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox')
-# search_path = "models"
-# path_name =  os.path.normpath(os.path.join(config_path, search_path, "download")) #multi read
+config_path = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox')
+search_path = "models"
+path_name =  os.path.normpath(os.path.join(config_path, search_path, "download")) #multi read
 
-# # each = "ae.safetensors" ##SCAN SINGLE FILE
-# # full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
-# # metareader = ReadMeta(full_path).data(full_path)
-# # evaluate = EvalMeta(metareader).data
+each = "TCD_XL_pytorch_lora_weights.safetensors" ##SCAN SINGLE FILE
+full_path = os.path.normpath(os.path.join(path_name, each)) #multi read
+metareader = ReadMeta(full_path).data(full_path)
+evaluate = EvalMeta(metareader).data
 
 
 # for each in os.listdir(path_name): ###SCAN DIRECTORY
@@ -574,16 +598,16 @@ class ModelIndexer:
 #     metareader = ReadMeta(full_path).data(full_path)
 #     if metareader is not None:
 #         evaluate = EvalMeta(metareader).data()
-path_name = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox',"models","text")
+# path_name = os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox',"models","download")
 
-for each in os.listdir(path_name): ###SCAN DIRECTORY
-      filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
-      full_path = os.path.join(path_name, filename)
-      metareader = ReadMeta(full_path).data(full_path)
-      if metareader is not None:
-          evaluate = EvalMeta(metareader).data()
+# for each in os.listdir(path_name): ###SCAN DIRECTORY
+#       if not os.path.isdir(os.path.join(path_name, each)):
+#         filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
+#         full_path = os.path.join(path_name, filename)
+#         metareader = ReadMeta(full_path).data(full_path)
+#         if metareader is not None:
+#             evaluate = EvalMeta(metareader).data()
 
 
 
-print(f'end: {process_time_ns()/1e6} ms')
-
+print(f'end: {process_time_ns()*1e-6} ms')

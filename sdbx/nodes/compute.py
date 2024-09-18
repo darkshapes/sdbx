@@ -13,66 +13,7 @@ from diffusers.schedulers import AysSchedules
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 import torch
 from llama_cpp import Llama
-
-### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
-token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
-
-# AUTOCONFIG OPTIONS : INFERENCE
-# [universal] lower vram use (and speed on pascal apparently!!)
-sequential_offload = True
-precision = '16'  # [universal], less memory for trivial quality decrease
-# [universal] half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
-dynamic_guidance = True
-# [compatibility for alignyoursteps to match model type
-model_ays = "StableDiffusionXLTimesteps"
-# [compatibility] only for sdxl
-pcm_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
-pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
-cpu_offload = False  # [compatibility] lower vram use by pushing to cpu
-# [compatibility] certain types of models need this, it influences determinism as well
-bf16 = False
-timestep_spacing = "trailing"  # [compatibility] DDIM, PCM "trailing"
-clip_sample = False  # [compatibility] PCM False
-set_alpha_to_one = False,  # [compatibility]PCM False
-rescale_betas_zero_snr = True  # [compatibility] DDIM True
-disk_offload = False  # [compatibility] last resort, but things work
-compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
-
-# AUTOCONFIG OPTIONS  : VAE
-# pipe.upcast_vae()
-vae_tile = True  # [compatibility] tile vae input to lower memory
-vae_slice = False  # [compatibility] serialize vae to lower memory
-# [compatibility] this should be detected by model type
-vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
-vae_config_file = "ssdxlvae.json"  # [compatibility] this too
-
-# SYS IMPORT
-device = ""
-compile_unet = ""
-queue = ""
-clear_cache = ""
-linux = ""
-
-# Utility function to print the time
-def tc() -> None:
-    print(str(datetime.timedelta(seconds=time.process_time())), end="")
-
-# Device and memory setup
-def get_device() -> str:
-    if torch.cuda.is_available():
-        return "cuda"
-    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        return "mps"
-    else:
-        return "cpu"
-
-def clear_memory_cache(device: str) -> None:
-    gc.collect()
-    if device == "cuda":
-        torch.cuda.empty_cache()
-    elif device == "mps":
-        torch.mps.empty_cache()
-
+from sdbx.nodes.tuner import tuned_parameters
 
 class Inference:
     def __init__(self):
@@ -82,13 +23,95 @@ class Inference:
         self.generator = torch.Generator(device=self.device)
         if queue not in globals(): queue = {}
 
-    def push_prompt(self, prompt, seed):
+    def tc() -> None:
+        print(str(datetime.timedelta(seconds=time.process_time())), end="")
+
+    def load_token_encoder(self,**token_encoder):
+        tokenizer = []
+        text_encoder = []
+        for t in token_encoder:
+            #determine model class here
+            tokenizer[t] = token_encoder[t]
+            text_encoder[t] = token_encoder[t]
+            token_args = {
+                'subfolder':'tokenizer',
+            }
+            encoder_args = {
+                'subfolder':'text_encoder',
+                'torch_dtype':torch.float16,
+                'variant':'fp16',           
+            }
+            tokenizer[t] = CLIPTokenizer.from_pretrained(
+                token_encoder[t],
+                **token_args,
+            )
+            text_encoder[t] = CLIPTextModel.from_pretrained(
+                token_encoder[t],
+                **encoder_args,
+            ).to(self.device)
+
+        return tokenizer, text_encoder
+
+    def load_lora(self, lora)
+        lora_path = config.get_path("models.loras")
+        lora = os.path.join(config.get_path("models.loras"), lora),
+        self.pipe.load_lora_weights(lora_path, weight_name=lora)
+        # load lora into u-net only : pipeline.unet.load_attn_procs("jbilcke-hf/sdxl-cinematic-1", weight_name="pytorch_lora_weights.safetensors")
+
+    def start_encoding(self, queue, tokenizer, token_encoder):
+        with torch.no_grad():
+            for generation in queue:
+                generation['embeddings'] = self.encode_prompt(
+                    [generation['prompt'], generation['prompt']],
+                    [*tokenizer],
+                    [*token_encoder]
+            )
+        return queue
+
+    def prompt_queue(self, prompt, seed):
         prompt = prompt
         seed = seed
-        return queue.extend([{
+        return self.queue.extend([{
             "prompt": prompt,
             "seed": seed,
         }])
+    
+        # if text_inversion: pipe.load_textual_inversion(text_inversion)
+
+    def scheduler_args():
+        if scheduler=="DDIMScheduler":
+            scheduler_args[ "timestep_spacing"]=timestep_spacing
+            scheduler_args["rescale_betas_zero_snr"]=rescale_betas_zero_snr #[compatibility] DDIM, v-pred?
+            if lora:
+                scheduler_args["clip_sample"]=clip_sample #[compatibility] PCM
+                scheduler_args["set_alpha_to_one"]=set_alpha_to_one, #[compatibility]PCM
+        # if scheduler=="DPMMultiStepScheduler":
+            # scheduler_args["algorithm_type"]=
+
+    def scheduler_args(scheduler=EulerAncestralDiscreteScheduler):
+        scheduler_args = {
+        }
+        if scheduler == "AysSchedules":
+            timesteps = AysSchedules[model_ays] # should be autodetected
+            gen_args["timesteps"]=timesteps
+        # add to self.gen_args
+        self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config, **scheduler_args)
+
+    def generation_args(inference_steps=8, guidance_scale=5.0, dynamic_guidance=False):
+        gen_args = {}
+        if dynamic_guidance:
+            print(f"{tc()} set dynamic cfg") #debug
+            def dynamic_cfg(pipe, step_index, timestep, callback_key):
+                if step_index == int(pipe.num_timesteps * 0.5):
+                    callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
+                    callback_key['add_text_embeds'] = callback_key['add_text_embeds'].chunk(2)[-1]
+                    callback_key['add_time_ids'] = callback_key['add_time_ids'].chunk(2)[-1]
+                    pipe._guidance_scale = 0.0
+                return callback_key
+            
+            gen_args["callback_on_step_end"]=dynamic_cfg
+            gen_args["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
+    
 
     def encode_prompt(self, prompts, tokenizers, text_encoders):
         embeddings_list = []
@@ -123,42 +146,6 @@ class Inference:
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
-    def load_token_encoder(self,**token_encoder):
-        tokenizer = []
-        text_encoder = []
-        for t in token_encoder:
-            #determine model class here
-            tokenizer[t] = token_encoder[t]
-            text_encoder[t] = token_encoder[t]
-            token_args = {
-                'subfolder':'tokenizer',
-            }
-            encoder_args = {
-                'subfolder':'text_encoder',
-                'torch_dtype':torch.float16,
-                'variant':'fp16',           
-            }
-            tokenizer[t] = CLIPTokenizer.from_pretrained(
-                token_encoder[t],
-                **token_args,
-            )
-            text_encoder[t] = CLIPTextModel.from_pretrained(
-                token_encoder[t],
-                **encoder_args,
-            ).to(self.device)
-
-        return tokenizer, text_encoder
-    
-    def start_encoding(self, queue, tokenizer, token_encoder):
-        with torch.no_grad():
-            for generation in queue:
-                generation['embeddings'] = self.encode_prompt(
-                    [generation['prompt'], generation['prompt']],
-                    [*tokenizer],
-                    [*token_encoder]
-            )
-        return queue
-
     def load_pipeline(self, model, precision=16, bfloat=False):
         #determine model class here
         self.pipe_args = {
@@ -176,54 +163,11 @@ class Inference:
         if compile_unet: self.pipe.unet = torch.compile(self.pipe.unet, mode="reduce-overhead", fullgraph=True)
         return self.pipe
 
-    def run_inference(self, 
-        queue, inference_steps=8, guidance_scale=5.0, dynamic_guidance=False,
-        scheduler = EulerAncestralDiscreteScheduler, lora=pcm_default):
-        lora_path = config.get_path("models.loras")
-        lora = os.path.join(config.get_path("models.loras"), lora),
-
-        print(f"{tc()} set scheduler, lora = {lora}")  # lora2
-        scheduler_args = {
-        }
-
-        if scheduler=="DDIMScheduler":
-            scheduler_args[ "timestep_spacing"]=timestep_spacing
-            scheduler_args["rescale_betas_zero_snr"]=rescale_betas_zero_snr #[compatibility] DDIM, v-pred?
-            if lora:
-                scheduler_args["clip_sample"]=clip_sample #[compatibility] PCM
-                scheduler_args["set_alpha_to_one"]=set_alpha_to_one, #[compatibility]PCM
-        # if scheduler=="DPMMultiStepScheduler":
-            # scheduler_args["algorithm_type"]=
-
-        self.pipe.load_lora_weights(lora_path, weight_name=lora)
-        # if lora2: pipe.load_lora_weights(lora2, weight_name=weight_name)
-        # load lora into u-net only : pipeline.unet.load_attn_procs("jbilcke-hf/sdxl-cinematic-1", weight_name="pytorch_lora_weights.safetensors")
-
-        self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config, **scheduler_args)
-        # if text_inversion: pipe.load_textual_inversion(text_inversion)
-
+    def run_inference(self, queue):
         print(f"{tc()} set offload {cpu_offload} and sequential as {sequential_offload} for {device} device") #debug 
         if device=="cuda":
             if sequential_offload: self.pipe.enable_sequential_cpu_offload()
             if cpu_offload: self.pipe.enable_model_cpu_offload() 
-
-        gen_args = {}
-        if dynamic_guidance:
-            print(f"{tc()} set dynamic cfg") #debug
-            def dynamic_cfg(pipe, step_index, timestep, callback_key):
-                if step_index == int(pipe.num_timesteps * 0.5):
-                    callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
-                    callback_key['add_text_embeds'] = callback_key['add_text_embeds'].chunk(2)[-1]
-                    callback_key['add_time_ids'] = callback_key['add_time_ids'].chunk(2)[-1]
-                    pipe._guidance_scale = 0.0
-                return callback_key
-            
-            gen_args["callback_on_step_end"]=dynamic_cfg
-            gen_args["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
-
-        if scheduler == "AysSchedules":
-            timesteps = AysSchedules[model_ays] # should be autodetected
-            gen_args["timesteps"]=timesteps
 
         print(f"{tc()} set generator") #debug
         generator = torch.Generator(device=device)
@@ -248,11 +192,9 @@ class Inference:
             ).images 
 
         self.pipe.unload_lora_weights()
+        tuner.clear_memory_cache(self.device)
         return queue
-
-    def cleanup(self):
-        clear_memory_cache(self.device)
-
+    
     def load_vae(self,file):
         model_path=os.path.join(config.get_path("models.vae"), file)
         vae = AutoencoderKL.from_single_file(model_path, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
@@ -307,11 +249,12 @@ class Inference:
                     max_memory = round(torch.cuda.max_memory_allocated(device='cuda') / 1000000000, 2)
                     print('Max. memory used:', max_memory, 'GB')
 
-def gguf_load(gguf, threads=8, max_context=8192, verbose=True):
+
+def load_llm(model, threads=8, max_context=8192, verbose=True):
     #determine model class here
     # print(f"loading:GGUF{os.path.join(config.get_path('models.llms'), checkpoint)}")
     return Llama(
-        model_path=os.path.join(config.get_path("models.llms"), gguf),
+        model_path=model
         seed=soft_random(), #if one_time_seed == False else hard_random(),
         #n_gpu_layers=gpu_layers if cpu_only == False else 0,
         n_threads=threads,
@@ -321,7 +264,7 @@ def gguf_load(gguf, threads=8, max_context=8192, verbose=True):
         verbose=verbose,
     )
 
-def llm_prompt(system_prompt, user_prompt, streaming=True):
+def text_queue(system_prompt, user_prompt, streaming=True):
     print("Encoding Prompt")
     return Llama.create_chat_completion(
         messages=[

@@ -8,7 +8,7 @@ import sdbx.nodes.computations
 from sdbx import config
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import seed_planter, soft_random
-from sdbx.nodes.computations import Inference, get_device
+from sdbx.nodes.compute import Inference, get_device
 
 # from time import perf_counter diagnostics
 
@@ -29,32 +29,14 @@ def tc():
 @node(name="Text Prompt", display=True)
 def llm_prompt(
     llama: Llama,
-    system_prompt: A[
-        str, Text(multiline=True, dynamic_prompts=True)
-    ] = "You're a guru for revealing what you know, yet wiser for revealing what you do not.",
+    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for knowing what you know, yet wiser for knowing what you do not.",
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     advanced_options: bool = False,
-    top_k: A[
-        int, Dependent(on="advanced_options", when=True), Slider(min=0, max=100)
-    ] = 40,
-    top_p: A[
-        float,
-        Dependent(on="advanced_options", when=True),
-        Slider(min=0, max=1, step=0.01, round=0.01),
-    ] = 0.95,
-    repeat_penalty: A[
-        float,
-        Dependent(on="advanced_options", when=True),
-        Numerical(min=0.0, max=2.0, step=0.01, round=0.01),
-    ] = 1,
-    temperature: A[
-        float,
-        Dependent(on="advanced_options", when=True),
-        Numerical(min=0.0, max=2.0, step=0.01, round=0.01),
-    ] = 0.2,
-    max_tokens: A[
-        int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=2)
-    ] = 256,
+    top_k: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=100)] = 40,
+    top_p: A[float,Dependent(on="advanced_options", when=True),Slider(min=0, max=1, step=0.01, round=0.01)] = 0.95,
+    repeat_penalty: A[float,Dependent(on="advanced_options", when=True),Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = 1,
+    temperature: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = 0.2,
+    max_tokens: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=2)] = 256,
     streaming: bool = True,  # triggers generator in next node?
 ) -> str:
     tc()
@@ -63,18 +45,14 @@ def llm_prompt(
     return llama
 
 
-@node(name="Prompt", display=True)
-def diffusion_prompt(
+@node(name="Image Prompt", display=True)
+def image_prompt(
     text_encoder: Llama,
     text_encoder_2: Llama = None,
     text_encoder_gguf: Llama = None,
     text_encoder_2_gguf: Llama = None,
-    prompt: A[
-        str, Text(multiline=True, dynamic_prompts=True)
-    ] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
-    seed: A[
-        int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)
-    ] = int(soft_random()),
+    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
+    seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = int(soft_random()),
     # type: ignore
     override_device: Literal[*next(iter(get_device()), "cpu")] = "",
 ) -> Tuple[Llama, Llama]:
@@ -83,30 +61,41 @@ def diffusion_prompt(
     return embeddings
 
 
-@node(name="Load",)
-def safetensors_loader(
-    safetensors: Literal[
-        *config.get_path_contents("models.llms", extension="safetnesors", base_name=True)] = None,
-    model_type: Literal[
-        "diffusion", "autoencoder", "super_resolution", "token_encoder"
-    ] = "diffusion",
+@node(name="Load Model", display=True)
+def Load(
+    model: Literal[*config.get_path_contents("models.llms", extension="safetnesors", base_name=True)] = None,
     # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
     advanced_options: bool = False,
-    override_device: A[
-        Literal[*get_device(), "cpu"], Dependent(on="advanced_options", when=True)
-    ] = "",  # type: ignore
-    precision: A[
-        int, Dependent(on="device", when=(not "cpu")), Slider(min=16, max=64, step=16)
-    ] = 16,
+    override_device: A[Literal[*get_device(), "cpu"], Dependent(on="advanced_options", when=True)] = "",  # type: ignore
+    precision: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
+    gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
+    threads: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
+    one_time_seed: A[bool, Dependent(on="advanced_options", when=True)] = False,
+    flash_attention: A[bool, Dependent(on="advanced_options", when=True)] = False,
+    verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
+    max_context: A[int,Dependent(on="advanced_options", when=True),Slider(min=0, max=32767, step=64),] = 8192,
 ) -> Tuple[Llama]:
     tc()
-    if model_type == "diffusion":
-        processor = Inference.load_pipeline(safetensors, precision, bfloat)
-    elif model_type == "autoencoder":
-        processor = Inference.load_vae(safetensors)
-    elif model_type == "token_encoder":
-        processor = Inference.load_token_encoder(safetensors)
+    metadata = ReadMeta(model).data
+    model_type = EvalMeta(metadata).data
+    if "LLM" in model_type:
+        llama = Inference.gguf_load(model, threads, max_context, verbose)
+    else:
+        if "VAE-" in model_type:
+            processor = Inference.load_vae(model)
+        if "CLI-" in model_type:
+            processor = Inference.load_token_encoder(model)
+        if "LORA-" in model_type:
+            processor = Inference.load_pipeline(model, precision, bfloat)   
+        if "LLM-" in model_type:
+            processor = Inference.load_llm(model) 
+
+    else:
+
+
+
+
     tc()
     return [*processor]
 
@@ -122,9 +111,7 @@ def gguf_loader(
         Slider(min=-1, max=35, step=1)] = -1,
     threads: A[int, 
                Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
-    max_context: A[int,
-        Dependent(on="advanced_options", when=True),
-        Slider(min=0, max=32767, step=64),] = 8192,
+
     one_time_seed: A[bool, Dependent(on="advanced_options", when=True)] = False,
     flash_attention: A[bool, Dependent(on="advanced_options", when=True)] = False,
     verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
