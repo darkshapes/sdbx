@@ -246,7 +246,10 @@ class Config(BaseSettings):
             ext = filepath.suffix
             loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
             with open(filepath, mode) as f:
-                fd = loader(f)
+                try:
+                    fd = loader(f)
+                except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
+                    raise SyntaxError(f"Couldn't read file {filepath}") from e
 
             name = filepath.stem
             d[name] = fd

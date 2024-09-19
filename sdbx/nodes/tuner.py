@@ -30,6 +30,85 @@ class NodeTuner:
         torch.get_default_dtype() (default float)
         torch.cuda.mem_get_info(device=None) (3522586215, 4294836224)
 
+
+
+    def tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
+        predecessors = graph.predecessors(node_id)
+
+        node = graph.nodes[node_id]
+
+        tuned_parameters = {}
+        for p in predecessors:
+            pnd = graph.nodes[p]  # predecessor node data
+            pfn = node_manager.registry[pnd['fname']]  # predecessor function
+
+            p_tuned_parameters = pfn.tuner.get_tuned_parameters(pnd['widget_inputs'])[node['fname']]
+
+            tuned_parameters |= p_tuned_parameters
+        
+        return tuned
+    
+    
+### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
+token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
+
+# AUTOCONFIG OPTIONS : INFERENCE
+# [universal] lower vram use (and speed on pascal apparently!!)
+sequential_offload = True
+precision = '16'  # [universal], less memory for trivial quality decrease
+# [universal] half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
+dynamic_guidance = True
+# [compatibility for alignyoursteps to match model type
+model_ays = "StableDiffusionXLTimesteps"
+# [compatibility] only for sdxl
+pcm_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
+pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
+cpu_offload = False  # [compatibility] lower vram use by pushing to cpu
+# [compatibility] certain types of models need this, it influences determinism as well
+bf16 = False
+timestep_spacing = "trailing"  # [compatibility] DDIM, PCM "trailing"
+clip_sample = False  # [compatibility] PCM False
+set_alpha_to_one = False,  # [compatibility]PCM False
+rescale_betas_zero_snr = True  # [compatibility] DDIM True
+disk_offload = False  # [compatibility] last resort, but things work
+compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
+
+# AUTOCONFIG OPTIONS  : VAE
+# pipe.upcast_vae()
+vae_tile = True  # [compatibility] tile vae input to lower memory
+vae_slice = False  # [compatibility] serialize vae to lower memory
+# [compatibility] this should be detected by model type
+vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
+vae_config_file = "ssdxlvae.json"  # [compatibility] this too
+
+# Device and memory setup
+def get_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        return "mps"
+    else:
+        return "cpu"
+
+def clear_memory_cache(device: str) -> None:
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    elif device == "mps":
+        torch.mps.empty_cache()
+
+
+# SYS IMPORT
+device = ""
+compile_unet = ""
+queue = ""
+clear_cache = ""
+linux = ""
+
+
+        # item[0][:3]  #VAE,CLI,LOR,LLM, anything else should be treated like a Diff model
+
+
         # get system memory
         # get cpu generation
         # get gpu type
@@ -94,64 +173,8 @@ class NodeTuner:
 
         # flash-attn/xformers
 
-### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
-token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
 
-# AUTOCONFIG OPTIONS : INFERENCE
-# [universal] lower vram use (and speed on pascal apparently!!)
-sequential_offload = True
-precision = '16'  # [universal], less memory for trivial quality decrease
-# [universal] half cfg @ 50-75%. sdxl architecture only. playground, vega, ssd1b, pony. bad for pcm
-dynamic_guidance = True
-# [compatibility for alignyoursteps to match model type
-model_ays = "StableDiffusionXLTimesteps"
-# [compatibility] only for sdxl
-pcm_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
-pcm_default_dl = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
-cpu_offload = False  # [compatibility] lower vram use by pushing to cpu
-# [compatibility] certain types of models need this, it influences determinism as well
-bf16 = False
-timestep_spacing = "trailing"  # [compatibility] DDIM, PCM "trailing"
-clip_sample = False  # [compatibility] PCM False
-set_alpha_to_one = False,  # [compatibility]PCM False
-rescale_betas_zero_snr = True  # [compatibility] DDIM True
-disk_offload = False  # [compatibility] last resort, but things work
-compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
-
-# AUTOCONFIG OPTIONS  : VAE
-# pipe.upcast_vae()
-vae_tile = True  # [compatibility] tile vae input to lower memory
-vae_slice = False  # [compatibility] serialize vae to lower memory
-# [compatibility] this should be detected by model type
-vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
-vae_config_file = "ssdxlvae.json"  # [compatibility] this too
-
-
-    lora=pcm_default
-
-# Device and memory setup
-def get_device() -> str:
-    if torch.cuda.is_available():
-        return "cuda"
-    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        return "mps"
-    else:
-        return "cpu"
-
-def clear_memory_cache(device: str) -> None:
-    gc.collect()
-    if device == "cuda":
-        torch.cuda.empty_cache()
-    elif device == "mps":
-        torch.mps.empty_cache()
-
-
-# SYS IMPORT
-device = ""
-compile_unet = ""
-queue = ""
-clear_cache = ""
-linux = ""
+# find model name in [models]
 
         # tuned parameters & hyperparameters only!! pcm parameters here 
 
@@ -167,19 +190,3 @@ linux = ""
         # <2 tensor params
 
         # pt files
-
-    def tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
-        predecessors = graph.predecessors(node_id)
-
-        node = graph.nodes[node_id]
-
-        tuned_parameters = {}
-        for p in predecessors:
-            pnd = graph.nodes[p]  # predecessor node data
-            pfn = node_manager.registry[pnd['fname']]  # predecessor function
-
-            p_tuned_parameters = pfn.tuner.get_tuned_parameters(pnd['widget_inputs'])[node['fname']]
-
-            tuned_parameters |= p_tuned_parameters
-        
-        return tuned
