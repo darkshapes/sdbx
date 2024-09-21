@@ -8,9 +8,6 @@ from collections import defaultdict
 from llama_cpp import Llama
 from sdbx import config, logger
 
-
-print(f'begin: {process_time_ns()*1e-6} ms')
-
 peek = config.get_default("tuning", "peek") # block and tensor values for identifying
 known = config.get_default("tuning", "known") # raw block & tensor data
 
@@ -26,15 +23,10 @@ class EvalMeta:
     # S2T, A2T, VLLM, INPAINT, CONTROL NET, T2I, PHOTOMAKER, SAMS. WHEW
 
     # CRITERIA THRESHOLDS
-    model_tensor_pct = 1e-4  # % of relative closeness to an actual checkpoint value
-    model_shape_pct = 1e-7
-    model_block_pct = 1e-4
-    vae_pct = 5e-3
-    vae_size_pct = 1e-3
-    vae_xl_pct = 1e-4
-    vae_sd1_pct = 3e-2
-    vae_sd1_full_pct = 1e-3
-    vae_sd1_tp_pct = 9e-2
+    model_tensor_pct = 2e-3  # fine tunings
+    model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
+    vae_pct = 5e-3           # please do not disrupt
+    vae_xl_pct = 1e-8
     tf_pct = 1e-4
     tf_leeway = 0.03
     lora_pct = 0.05
@@ -47,180 +39,171 @@ class EvalMeta:
     lora_peek = peek['lora_peek']
 
     def __init__(self, extract):
+        self.tag = ""
+        self.code = ""
         self.extract = extract
         self.clip_inside = False
         self.vae_inside = False
+        self.unet_value = int(self.extract.get("unet", 0))
+        self.diffuser_value = int(self.extract.get("diffusers", 0))
+        self.transformer_value = int(self.extract.get("transformers", 0))
+        self.size = int(self.extract.get("size", 0))
+        self.sdxl_value = int(self.extract.get("sdxl", 0))
+        self.tensor_value = int(self.extract.get("tensor_params", 0))
+        self.mmdit_value = int(self.extract.get("mmdit", 0))
+        self.flux_value = int(self.extract.get("flux", 0))
+        self.diff_lora_value = int(self.extract.get("diffusers_lora", 0))
 
-    def __returner(self):
-        self.size = self.extract.get("size", "")
+        self.name_value = self.extract.get("general.name","")
+        self.arch = self.extract.get("general.architecture","").upper()
+        self.tokenizer = self.extract.get("tokenizer.chat_template", "")
+        self.shape_value = self.extract.get("shape", 0)
+        if self.shape_value: self.shape_value = self.shape_value[0:1]
         self.filename = self.extract.get("filename", "")
         self.ext = self.extract.get("extension", "")
         self.path = self.extract.get("path", "")
-        #if self.tag[:3] == "VAE": 
-        print(f"{self.tag} {self.size} {os.path.basename(self.path)}") # logger.debug
-        return (self.tag, self.size, self.path,)
 
-    def data(self):
-        if int(self.extract.get("unet", 0)) > 96: self.vae_inside = True
-        if int(self.extract.get("unet", 0)) == 96:  # Check VAE
-            self.process_vae()
-        if int(self.extract.get("diffusers", 0)) > 256:  # Check LoRA
-            self.process_lora()
-
-        if int(self.extract.get("transformers", 0)) >= 2:  # Check CLIP
-            self.clip_inside = True
-            self.process_tf()
-        try:
-            if int(self.extract.get("size", 0)) > 1e9:  # Check model
-                self.process_model()
-        except ValueError as error_log:
-            logger.debug(f"'[Unknown model type] No model found '{self.extract}''{error_log}'.", exc_info=True)
-            print(f"Unknown model type '{self.extract}'.")
-        else:
-            if self.extract.get("general.name","") != "":
-                self.tag = f"LLM-{self.extract.get("general.architecture","").upper()}"
-                return self.__returner()
 
     def process_vae(self):
-        try:
-            if 512 == self.extract.get("shape", 0)[0]:
-                """
-                check shape
-                """
-                self.tag = "VAE-"
-                self.tag = f"{self.tag}{self.vae_peek_0['335304388']['244']}" # flux hook
-            return self.__returner()  
-        except:
-            pass
-        if self.extract.get("sdxl", 0) == 12:
-            if self.extract.get("mmdit", 0) == 4:
-                self.tag = "VAE-"
-                self.tag = f"{self.tag}{self.vae_peek_0['167335342']['248']}" #auraflow
-                return self.__returner()
-            elif (isclose(int(self.extract.get("size", 0)), 167335343, rel_tol=self.vae_xl_pct)
-                or isclose(int(self.extract.get("size", 0)), 167666902, rel_tol=self.vae_xl_pct)):
-                    self.tag = "VAE-"
-                    self.tag = f"{self.tag}{self.vae_peek_0['167335343']['248']}" #kolors
-                    return self.__returner()
+        if [32] == self.shape_value:
+            self.tag = "0"
+            self.key = '114560782'
+            self.sub_key = '248' # sd1 hook
+        elif [512] == self.shape_value:
+            self.tag = "0"
+            self.key = "335304388"
+            self.sub_key = "244" # flux hook
+        elif self.sdxl_value == 12:
+            if self.mmdit_value == 4:
+                self.tag = "0"
+                self.key = "167335342"
+                self.sub_key = "248"  # auraflow
+            elif (isclose(self.size, 167335343, rel_tol=self.vae_xl_pct)
+            or isclose(self.size, 167666902, rel_tol=self.vae_xl_pct)):
+                if "vega" in self.filename.lower():
+                    self.tag = '12'
+                    self.key = '167335344'
+                    self.sub_key = '248'  #vega
+                else:
+                    self.tag = "0"
+                    self.key = "167335343"
+                    self.sub_key = "248"  #kolors
             else:
-                self.process_vae_12()
-        else:
-            if isclose(self.extract.get("tensor_params", 0), 304, rel_tol=self.vae_xl_pct):
-                try:
-                    if self.extract.get("mmdit", 0) == 8:
-                        self.tag = "VAE-"
-                        self.tag = f"{self.tag}{self.vae_peek_0['404581567']['304']}" #sd1 hook
-                        return self.__returner() 
-                except:
-                    pass
+                self.tag = "12"
+                self.key = "334643238"
+                self.sub_key = "248" #pixart
+        elif self.mmdit_value == 8:
+            if isclose(self.size, 404581567, rel_tol=self.vae_xl_pct):
+                self.tag = "0"
+                self.key = "404581567"
+                self.sub_key = "304" #sd1 hook
             else:
-                try:
-                    if 32 == self.extract.get("shape", 0)[0]:
-                        """
-                        check shape
-                        """
-                        self.tag = "VAE-"
-                        self.tag = f"{self.tag}{self.vae_peek_0['114560782']['248']}" # sd1 hook
-                    return self.__returner()  
-                except:
-                    pass
-            self.process_vae_without_12()
-
-    def process_vae_12(self):
-        self.tag = "VAE-"
-        if (isclose(int(self.extract.get("tensor_params", 0)), 167335344, rel_tol=self.vae_xl_pct)
-        or"vega" in self.extract.get("filename", 0).lower()):
-            self.tag = f"{self.tag}{self.vae_peek_12['167335344']['248']}"# segmind vega
-            return self.__returner()
+                self.tag = "v"
+                self.key = "167333134"
+                self.sub_key = "248" #sdxl hook
+        elif isclose(self.size, 334641190, rel_tol=self.vae_xl_pct):
+            self.tag = "v"
+            self.key = "334641190"
+            self.sub_key = "250" #sd1 hook
         else:
-            self.tag = f"{self.tag}{self.vae_peek_12['334643238']['248']}" #pixart
-            return self.__returner()
+            self.tag = "v"
+            self.key = "334641162"
+            self.sub_key = "250" #sdxl hook
 
-    def process_vae_without_12(self):
-        self.tag = "VAE-"
-        if self.extract.get("mmdit", 0) == 8:
-            self.tag = f"{self.tag}{self.vae_peek['167333134']['248']}" #sxl hook
-            return self.__returner()
-        elif isclose(int(self.extract.get("size", 0)), 334641190, rel_tol=self.vae_xl_pct):
-            self.tag = f"{self.tag}{self.vae_peek['334641190']['250']}"
-        else:
-            self.tag = f"{self.tag}{self.vae_peek['334641162']['250']}" #sxl hook
-            return self.__returner()
-            
 
     def process_lora(self):
-        self.tag = "LORA-"
-
         for size, attributes in self.lora_peek.items():
             if (
-                isclose(int(self.extract.get("size", 0)), int(size),   rel_tol=self.lora_pct) or
-                isclose(int(self.extract.get("size", 0)), int(size)*2, rel_tol=self.lora_pct) or
-                isclose(int(self.extract.get("size", 0)), int(size)/2, rel_tol=self.lora_pct)
+                isclose(self.size, int(size),  rel_tol=self.lora_pct) or
+                isclose(self.size, int(size)*2, rel_tol=self.lora_pct) or
+                isclose(self.size, int(size)/2, rel_tol=self.lora_pct)
             ):
                 for tensor_params, desc in attributes.items():
-                    if isclose(int(self.extract.get("tensor_params", 0)), int(tensor_params), rel_tol=self.lora_pct):
-                        rep_count = 0
-                        for each in next(iter([desc, 0])):
-                            if rep_count <= 1:
-                                if each.lower() not in str(self.extract.get('filename', 0)).lower():
-                                    rep_count += 1
-                                else:
-                                    self.tag = f"{self.tag}{each}-"
-                                    model = desc[len(desc)-1]
-                                    self.tag = self.tag + model
-                                    return self.__returner()  # found lora
+                    if isclose(self.tensor_value, int(tensor_params), rel_tol=self.lora_pct):
+                        for each in next(iter([desc, 'not_found'])):
+                            if each.lower() in self.filename.lower():
+                                  self.tag = "l"
+                                  self.key = size
+                                  self.sub_key = tensor_params
+                                  self.value = each #lora hook                               
+                                      # found lora
 
     def process_tf(self):
-        self.tag = "TRA-"
-
         for tensor_params, attributes in self.tf_peek.items():
-            if isclose(int(self.extract.get("tensor_params", 0)), int(tensor_params), rel_tol=self.tf_leeway):
+            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.tf_leeway):
                 for shape, name in attributes.items():
-                    try:
-                        if isclose(self.extract.get("shape", 0)[0], int(shape), rel_tol=self.tf_pct):
-                            if isclose(int(self.extract.get("transformers", 0)), name[0], rel_tol=self.tf_pct):
-                                self.tag = f"{self.tag}{name[1]}" # found transformer
-                                return self.__returner()
-                    except ValueError as error_log:
-                        logger.debug(f"'[No shape key for transformer '{self.extract}''{error_log}'.", exc_info=True)
-                        self.tag = f"{name[1]} estimate"
-                        return self.__returner()  # estimated transformer
+                    if isclose(self.transformer_value, name[0], rel_tol=self.tf_pct):
+                            self.tag = "t"
+                            self.key = tensor_params
+                            self.sub_key = shape # found transformer
 
     def process_model(self):
-        self.tag = ""
-        self.unrecognized = ""
         for tensor_params, attributes, in self.model_peek.items():
-            if isclose(int(self.extract.get("tensor_params", 0)), int(tensor_params), rel_tol=self.model_tensor_pct):
+            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.model_tensor_pct):
                 for shape, name in attributes.items():
-                    try:
-                        if isclose(self.extract.get("shape", 0)[0], int(shape), rel_tol=self.model_block_pct):
-                            if self.extract.get("diffusers", "not_found") != "not_found":
-                                if isclose(self.extract.get("diffusers", 0), name[0], rel_tol=self.model_block_pct):
-                                    self.tag = name[1]
-                            elif self.extract.get("mmdit", "not_found") != "not_found":
-                                if isclose(self.extract.get("mmdit", 0), name[0], rel_tol=self.model_block_pct):
-                                    self.tag = name[1]
-                            elif self.extract.get("flux", "not_found") != "not_found":
-                                if isclose(self.extract.get("flux", 0), name[0], rel_tol=self.model_block_pct):
-                                    self.tag = name[1]
-                            elif self.extract.get("diffusers_lora", "not_found") != "not_found":
-                                if isclose(self.extract.get("diffusers_lora", 0),  name[0], rel_tol=self.model_block_pct):
-                                    self.tag = name[1]
-                    except TypeError as error_log:
-                        logger.debug(f"'[No block data '{self.extract}''{error_log}'.", exc_info=True)
-                        self.unrecognized = "[]~~:"  # no block guess
-                        self.tag = name[1]
-                    except KeyError as error_log:
-                        logger.debug(f"'[No shape key for model '{self.extract}''{error_log}'.", exc_info=True)
-                        self.unrecognized = "_~~" #no model shape guess
-                        self.tag = name[1]
+                    num = self.shape_value[0:1]
+                    if num:
+                        if (isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
+                        or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
+                        or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
+                        or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
+                        or isclose(self.diff_lora_value,  name[0], rel_tol=self.model_block_pct)):
+                            self.tag = "m"
+                            self.key = tensor_params
+                            self.sub_key = shape #found model
                     else:
-                            self.unrecognized = "~~"
-                            self.tag = name[1]
-                    finally:
-                        #print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside} - {self.unrecognized}")
-                        return self.__returner()  # found model
+                        logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
+                        self.tag = "m"
+                        self.key = tensor_params
+                        self.sub_key = shape               ######################################DEBUG
+                        #print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside} 
 
+    def data(self):
+
+        if self.name_value != "": # check LLM
+            self.tag = "c"
+            self.key = ""
+            self.sub_key = ""
+        if self.unet_value > 96: 
+            self.vae_inside = True
+        if self.unet_value == 96:  # Check VAE
+            self.code = self.process_vae()
+        if self.diffuser_value >= 256:  # Check LoRA
+            self.code = self.process_lora()
+        if self.transformer_value >= 2:  # Check CLIP
+            self.clip_inside = True
+            self.code = self.process_tf()
+        if self.size > 1e9:  # Check model
+            self.code = self.process_model()
+
+
+        self.tag_dict = {}
+        # 0 = vae_peek_0, 12 = vae_peek_12, v = vae_peek
+        # these are separated because file sizes are otherwise too similar
+        # please do not disrupt
+        if self.tag == "0":
+            self.code = f"VAE-{self.vae_peek_0[self.key][self.sub_key]}"
+        elif self.tag == "12":
+            self.code = f"VAE-{self.vae_peek_12[self.key][self.sub_key]}"
+        elif self.tag == "v":
+            self.code = f"VAE-{self.vae_peek[self.key][self.sub_key]}"
+        elif self.tag == "t":
+            name = self.tf_peek[self.key][self.sub_key]
+            self.code = f"TRA-{name[len(name)-1:][0]}"
+        elif self.tag == "l":
+            name = self.lora_peek[self.key][self.sub_key]
+            self.code = f"LOR-{self.value}-{name[len(name)-1:][0]}"
+        elif self.tag == "m":
+            name = self.model_peek[self.key][self.sub_key]
+            self.code = f"{name[len(name)-1:][0]}"
+        elif self.tag == "c": 
+            self.code = [f"LLM-{self.arch}{"" if self.tokenizer == "" else self.tokenizer}"]
+        else:
+            logger.debug(f"'Could not determine id '{self.extract}'.", exc_info=True)
+            # print(f"Unknown type:'{self.extract}'.")               ######################################DEBUG
+        self.tag_dict[self.filename] = ( self.code, self.size, self.path )
+        return self.tag_dict
+            
 class ReadMeta:
     # ReadMeta.data(filename,full_path_including_filename)
     # scan the header of a tensor file and discover its secrets
@@ -231,8 +214,8 @@ class ReadMeta:
         self.full_data, self.meta, self.count_dict = {}, {}, {}
 
         # level of certainty, counts tensor block type matches
-        ## DO NOT CHANGE THESE VALUES
-        ## they may be labelled innacurately, ignore it
+        ## please do not change these values
+        ## they may be labelled incorrectly, ignore it
         self.known = known
 
         self.model_tag = {  # measurements and metadata detected from the model ggml.model imatrix.chunks_count
@@ -243,19 +226,20 @@ class ReadMeta:
             "dtype": "", #precision
             "tensor_params": 0, #tensor count
             "shape": "", #largest first dimension of tensors
+            "data_offsets": "", #universal
             "general.name": "", # llm tags
             "general.architecture": "",
-            "block_count":"",
+            "tokenizer.chat_template": "",
             "context_length": "", #length of messages
-            "type": "", 
+            "block_count":"",
             "attention.head_count": "",
             "attention.head_count_kv": "",
-            "general.name": "",
             "tokenizer.ggml.model": "", #llm tags end here
-            "__metadata__": "", #extra
-            "data_offsets": "", #universal
+            "type": "", 
             "general.basename": "",
             "name": "", #usually missing...
+            "__metadata__": "", #extra
+
 
         }
         self.occurrence_counts = defaultdict(int)
@@ -290,7 +274,7 @@ class ReadMeta:
                 except:
                     log = f"Path not found'{self.path}'''."
                     logger.debug(log, exc_info=True)
-                    return print(log)
+                    print(log)
             
     def _parse_gguf_metadata(self):
         try:
@@ -318,11 +302,11 @@ class ReadMeta:
                             return self._search_dict(self.meta)
                         except ValueError as error_log:
                             logger.debug(f"'[Failed load '{self.path}''{error_log}'.", exc_info=True)
-                            print(f'Llama angry! Unknown Type : {self.filename}')
+                            print(f'Llama angry! Unrecognized model : {self.filename}')
                             pass
                         except OSError as error_log:
                             logger.debug(f"'[Failed access '{self.path}''{error_log}'.", exc_info=True)
-                            print(f'Llama angry! :  {self.filename}')
+                            print(f'Llama angry! OS prevented open on:  {self.filename}')
                             pass
                         except:
                             logger.exception(Exception)
@@ -392,9 +376,10 @@ class ReadMeta:
                                 self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0)  # pair match count to model type
 
         return self.meta
-
+    
+    def __repr__(self):
+        return f"ReadMeta(data={self.data()})"
 
 class ModelIndexer:
     def __init__(self):
         pass
-

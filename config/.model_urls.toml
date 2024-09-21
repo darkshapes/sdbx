@@ -14,14 +14,34 @@ bloom_mt0_sm = https://huggingface.co/darkshapes/mt0-small
 bloom_mt0_lg = https://huggingface.co/darkshapes/mt0-large
 pygmalion_7b = https://huggingface.co/darkshapes/pygmalion-2-7b-gguf
 
+[lora_hf]
+pcm_32 = ["https://huggingface.co/wangfuyun/PCM_Weights"]
+pcm_16 = ["https://huggingface.co/Kijai/converted_pcm_loras_fp16/tree/main/sdxl"]
+hyp-sta_15 = ["https://huggingface.co/ByteDance/Hyper-SD/tree/main"]
+lig-sta_xl = ["https://huggingface.co/ByteDance/SDXL-Lightning/tree/main"]
+lcm-sta_xl =_["https://huggingface.co/latent-consistency/lcm-lora-sdxl/tree/main"]
+spo-sta-xl = ["https://huggingface.co/SPO-Diffusion-Models/SPO-SDXL_4k-p_10ep_LoRA/tree/main"]
+fla-sta-m3 = ["https://huggingface.co/jasperai/flash-sd3"]
+fla-sta-15 ["https://huggingface.co/jasperai/flash-sd"]
+lrt-sgm-vg[" https://huggingface.co/segmind/Segmind-VegaRT"]
+
+[unet]
+hypersd = ["ByteDance/Hyper-SD", "Hyper-SDXL-1step-Unet-Comfyui.fp16.safetensors"]
+
+
+
+
 [controlnet_hf]
 openpose = ["thibaud/controlnet-openpose-sdxl-1.0", "OpenPoseXL2.safetensors"]
 
 [clip_hf]
 t5xxl16 = ["stabilityai/stable-diffusion-3-medium", "text_encoders/t5xxl_fp16.safetensors", "t5xxl_fp16.safetensors"]
 t5xxl8 = ["stabilityai/stable-diffusion-3-medium", "text_encoders/t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp8_e4m3fn.safetensors"]
+t5_gguf = ["https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf"]
 clipg = ["stabilityai/stable-diffusion-3-medium", "text_encoders/clip_g.safetensors", "clip_g.safetensors"]
 clipl = ["stabilityai/stable-diffusion-3-medium", "text_encoders/clip_l.safetensors", "clip_l.safetensors"]
+flux_clip_l = ["https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors"]
+
 
 [diffusion_hf]
 xlbase = ["stabilityai/stable-diffusion-xl-base-1.0", "sd_xl_base_1.0.safetensors"]
@@ -40,6 +60,10 @@ sd3med = ["stabilityai/stable-diffusion-3-medium", "sd3_medium.safetensors"]
 sd3medclip = ["stabilityai/stable-diffusion-3-medium", "sd3_medium_incl_clips.safetensors"]
 sd3medclipfp8 = ["stabilityai/stable-diffusion-3-medium", "sd3_medium_incl_clips_t5xxlfp8.safetensors"]
 sdzero123= ["stabilityai/stable-zero123", "stable_zero123.ckpt"] # unfortunate ckpt.
+flux_nf4 = ["https://huggingface.co/duuuuuuuden/flux1-nf4-unet/"]
+flu-1s-gguf = ["https://huggingface.co/city96/FLUX.1-schnell-gguf"]
+flx-1d-gguf=[" https://huggingface.co/city96/FLUX.1-dev-gguf"]
+flux_fp8 = ["https://huggingface.co/Kijai/flux-fp8/"]
 
 [gligen_hf]
 sd14 = ["comfyanonymous/GLIGEN_pruned_safetensors", "gligen_sd14_textbox_pruned.safetensors"]
@@ -136,6 +160,5 @@ sd15vae = ["stabilityai/sd-vae-ft-mse-original", "vae-ft-mse-840000-ema-pruned.s
 #    "microsoft/Phi-3-mini-4k-instruct",
 #    "llava-hf/llava-v1.6-mistral-7b-hf"
 
-[unet]
-hypersd = ["ByteDance/Hyper-SD", "Hyper-SDXL-1step-Unet-Comfyui.fp16.safetensors"]
+#https://raw.githubusercontent.com/Stability-AI/generative-models/main/configs/inference/sd_xl_base.yaml
 

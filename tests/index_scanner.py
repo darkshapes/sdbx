@@ -14,8 +14,6 @@ print(f'begin: {process_time_ns()*1e-6} ms')
 peek = config.get_default("tuning", "peek") # block and tensor values for identifying
 known = config.get_default("tuning", "known") # raw block & tensor data
 
-
-
 class EvalMeta:
     # determines identity of unknown tensor
     # return a tag to identify
@@ -60,8 +58,8 @@ class EvalMeta:
         self.path = self.extract.get("path", "")
         #if self.tag[:3] == "VAE": 
         print(f"{self.tag} {self.size} {os.path.basename(self.path)}") # logger.debug
-        return (self.tag, self.size, self.path,)
-
+        return [self.filename, [self.tag, self.size, self.path]]
+      
     def data(self):
         if int(self.extract.get("unet", 0)) > 96: self.vae_inside = True
         if int(self.extract.get("unet", 0)) == 96:  # Check VAE
