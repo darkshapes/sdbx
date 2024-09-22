@@ -27,41 +27,53 @@ class EvalMeta:
     model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
     vae_pct = 5e-3           # please do not disrupt
     vae_xl_pct = 1e-8
-    tf_pct = 1e-4
-    tf_leeway = 0.03
+    tra_pct = 1e-4
+    tra_leeway = 0.03
     lora_pct = 0.05
 
     model_peek = peek['model_peek']
     vae_peek_12 = peek['vae_peek_12']
     vae_peek = peek['vae_peek']
     vae_peek_0 = peek['vae_peek_0']
-    tf_peek = peek['tf_peek']
+    tra_peek = peek['tra_peek']
     lora_peek = peek['lora_peek']
 
-    def __init__(self, extract):
+    def __init__(self, extract, verbose=False):
         self.tag = ""
         self.code = ""
         self.extract = extract
         self.clip_inside = False
         self.vae_inside = False
+        self.verbose = verbose
+
+        # model measurements
+        #integer
         self.unet_value = int(self.extract.get("unet", 0))
         self.diffuser_value = int(self.extract.get("diffusers", 0))
         self.transformer_value = int(self.extract.get("transformers", 0))
-        self.size = int(self.extract.get("size", 0))
         self.sdxl_value = int(self.extract.get("sdxl", 0))
         self.tensor_value = int(self.extract.get("tensor_params", 0))
         self.mmdit_value = int(self.extract.get("mmdit", 0))
         self.flux_value = int(self.extract.get("flux", 0))
         self.diff_lora_value = int(self.extract.get("diffusers_lora", 0))
-
-        self.name_value = self.extract.get("general.name","")
-        self.arch = self.extract.get("general.architecture","").upper()
-        self.tokenizer = self.extract.get("tokenizer.chat_template", "")
+        self.hunyuan = int(self.extract.get("hunyuan", 0))
+        self.size = int(self.extract.get("size", 0))
         self.shape_value = self.extract.get("shape", 0)
         if self.shape_value: self.shape_value = self.shape_value[0:1]
+
+        #string value
         self.filename = self.extract.get("filename", "")
         self.ext = self.extract.get("extension", "")
         self.path = self.extract.get("path", "")
+        self.dtype = self.extract.get("dtype", "")
+        self.torch_dtype = self.extract.get("torch_dtype", "")
+
+        # model official metadata
+        self.name_value = self.extract.get("general.name","")
+        self.arch = self.extract.get("general.architecture","").upper()
+        self.tokenizer = self.extract.get("tokenizer.chat_template", "")
+        self.context_length = self.extract.get("context_length","")
+
 
 
     def process_vae(self):
@@ -111,7 +123,7 @@ class EvalMeta:
             self.sub_key = "250" #sdxl hook
 
 
-    def process_lora(self):
+    def process_lor(self):
         for size, attributes in self.lora_peek.items():
             if (
                 isclose(self.size, int(size),  rel_tol=self.lora_pct) or
@@ -128,11 +140,11 @@ class EvalMeta:
                                   self.value = each #lora hook                               
                                       # found lora
 
-    def process_tf(self):
-        for tensor_params, attributes in self.tf_peek.items():
-            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.tf_leeway):
+    def process_tra(self):
+        for tensor_params, attributes in self.tra_peek.items():
+            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.tra_leeway):
                 for shape, name in attributes.items():
-                    if isclose(self.transformer_value, name[0], rel_tol=self.tf_pct):
+                    if isclose(self.transformer_value, name[0], rel_tol=self.tra_pct):
                             self.tag = "t"
                             self.key = tensor_params
                             self.sub_key = shape # found transformer
@@ -147,7 +159,8 @@ class EvalMeta:
                         or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.diff_lora_value,  name[0], rel_tol=self.model_block_pct)):
+                        or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
+                        or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
                             self.tag = "m"
                             self.key = tensor_params
                             self.sub_key = shape #found model
@@ -156,7 +169,7 @@ class EvalMeta:
                         self.tag = "m"
                         self.key = tensor_params
                         self.sub_key = shape               ######################################DEBUG
-                        #print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside} 
+                        #if self.verbose is True: print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 
     def data(self):
 
@@ -169,10 +182,10 @@ class EvalMeta:
         if self.unet_value == 96:  # Check VAE
             self.code = self.process_vae()
         if self.diffuser_value >= 256:  # Check LoRA
-            self.code = self.process_lora()
+            self.code = self.process_lor()
         if self.transformer_value >= 2:  # Check CLIP
             self.clip_inside = True
-            self.code = self.process_tf()
+            self.code = self.process_tra()
         if self.size > 1e9:  # Check model
             self.code = self.process_model()
 
@@ -188,7 +201,7 @@ class EvalMeta:
         elif self.tag == "v":
             self.code = f"VAE-{self.vae_peek[self.key][self.sub_key]}"
         elif self.tag == "t":
-            name = self.tf_peek[self.key][self.sub_key]
+            name = self.tra_peek[self.key][self.sub_key]
             self.code = f"TRA-{name[len(name)-1:][0]}"
         elif self.tag == "l":
             name = self.lora_peek[self.key][self.sub_key]
@@ -197,21 +210,34 @@ class EvalMeta:
             name = self.model_peek[self.key][self.sub_key]
             self.code = f"{name[len(name)-1:][0]}"
         elif self.tag == "c": 
-            self.code = [f"LLM-{self.arch}{"" if self.tokenizer == "" else self.tokenizer}"]
+            self.code = f"LLM-{self.arch}"
         else:
+            if self.verbose is True: print(f"Unknown type:'{self.filename}'.")
+            # consider making ignore list for undetermined models
             logger.debug(f"'Could not determine id '{self.extract}'.", exc_info=True)
-            # print(f"Unknown type:'{self.extract}'.")               ######################################DEBUG
-        self.tag_dict[self.filename] = ( self.code, self.size, self.path )
-        return self.tag_dict
+            pass
+
+        if self.tag == "":
+            logger.debug(f"'Not indexed. 'No eval' should follow: '{self.extract}'.", exc_info=True)
+            pass
+        else: 
+            self.tag_dict[self.filename] = (
+                self.code, self.size, self.path, 
+                (self.context_length if self.context_length else self.dtype), 
+                (self.torch_dtype if self.torch_dtype else self.tokenizer if self.tokenizer else f"" )
+                )
+            if self.verbose is True: print(self.code, self.size, self.path)
+            return self.tag_dict
             
 class ReadMeta:
     # ReadMeta.data(filename,full_path_including_filename)
     # scan the header of a tensor file and discover its secrets
     # return a dict of juicy info
 
-    def __init__(self, path):
+    def __init__(self, path, verbose=False):
         self.path = path  # the path of the file
         self.full_data, self.meta, self.count_dict = {}, {}, {}
+        self.verbose = verbose
 
         # level of certainty, counts tensor block type matches
         ## please do not change these values
@@ -224,6 +250,7 @@ class ReadMeta:
             "size": "", #file size in bytes
             "path": "",
             "dtype": "", #precision
+            "torch_dtype": "",
             "tensor_params": 0, #tensor count
             "shape": "", #largest first dimension of tensors
             "data_offsets": "", #universal
@@ -234,11 +261,6 @@ class ReadMeta:
             "block_count":"",
             "attention.head_count": "",
             "attention.head_count_kv": "",
-            "tokenizer.ggml.model": "", #llm tags end here
-            "type": "", 
-            "general.basename": "",
-            "name": "", #usually missing...
-            "__metadata__": "", #extra
 
 
         }
@@ -322,8 +344,9 @@ class ReadMeta:
                 self.meta = self._parse_safetensors_metadata()
                 self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
                 self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                #for k, v in self.full_data.items():  # uncomment to view model properties
-                #   print(k, v)              ######################################DEBUG
+                if self.verbose:
+                    for k, v in self.full_data.items():  # uncomment to view model properties
+                        print(k, v)              ######################################DEBUG
                 self.count_dict.clear()
                 self.model_tag.clear()
                 self.meta = ""
@@ -333,8 +356,9 @@ class ReadMeta:
                 self.meta = self._parse_gguf_metadata()
                 self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
                 self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                #for k, v in self.full_data.items():  # uncomment to view model properties
-                #    print(k, v)              ######################################DEBUG
+                if self.verbose:
+                    for k, v in self.full_data.items():  # uncomment to view model properties
+                        print(k, v)              ######################################DEBUG
                 self.count_dict.clear()
                 self.model_tag.clear()
                 self.meta = ""
@@ -351,7 +375,8 @@ class ReadMeta:
         self.meta = meta
         if self.ext == ".gguf":
             for key, value in self.meta.items():
-                #print(f"{key} {value}")              ######################################DEBUG
+                if self.verbose == True:
+                    print(f"{key} {value}")              ######################################DEBUG
                 if self.model_tag.get(key, "not_found") != "not_found":
                     self.model_tag[key] = self.meta.get(key)  # drop it like its hot
                 if self.model_tag.get("general.architecture", "") != "":
@@ -361,6 +386,8 @@ class ReadMeta:
                         self.model_tag[prefixless_key] = value  # drop it like its hot
         elif self.ext == ".safetensors" or self.ext == ".sft":
             for num in list(self.meta): # handle inevitable exceptions invisibly
+                #if self.verbose == True:
+                     #print(num)
                 if self.model_tag.get(num, "not_found") != "not_found":
                     self.model_tag[num] = self.meta.get(num)  # drop it like its hot
                 if "dtype" in num:
