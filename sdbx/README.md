@@ -1,25 +1,54 @@
 
+# API CODE
+
 #### CLASS Config
 #### IMPORT from sdbx import config
 #### METHODS get_default, get_path_contents, get_path
-#### SYNTAX config.get_default(filename with no extension, header)
-####        config.get_path_contents("string_to_folder.string_to_sub_folder") (see config.json, directories.json)
-####        config.get_path("filename") or config.get_path("string_to_folder.filename")
-
+#### PURPOSE find source directories and data
+#### SYNTAX
+```
+        config.get_default(filename with no extension, key)               (!cannot find sub-keys on its own)
+        config.get_path_contents("string_to_folder.string_to_sub_folder") (see config/config.json, config/directories.json)
+        config.get_path("filename") or config.get_path("string_to_folder.filename")
+```
+### OUTPUT contents of a value for a key, file contents of a directory and sub directories, path to a file
 
 #### CLASS ReadMeta
 #### IMPORT from sdbx.indexer import ReadMeta
 #### METHODS data
-#### SYNTAX instance_name = ReadMeta(full_path_to_file).data()
+#### PURPOSE extract metadata from model files
+#### SYNTAX 
+```
+        instance_name = ReadMeta(full_path_to_file).data()                 (see config/tuning.json)
+```
 #### OUTPUT dict of int and str, a form filled model_tag[] 
 
 #### CLASS EvalMeta
 #### IMPORT from sdbx.indexer import EvalMeta
 #### METHODS, process_vae, process_vae_no_12, process_lora, process_tf, process_model 
-#### SYNTAX  instance_name = EvalMeta(dict_metadata_from_ReadMeta).data()
+#### PURPOSE interpret metadata from model files
+#### SYNTAX 
+```
+        instance_name = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
+```
 #### OUTPUT list of type str: 0: tag code, 1: file size, 2: full path (see tuner.json)
+
+#### CLASS IndexManager
+#### IMPORT from sdbx.nodes.tuner import IndexManager
+#### METHODS write_index, fetch_compatible
+#### PURPOSE manage model type lookups, search for compatibility data
+#### SYNTAX 
+```
+        store_writing = IndexManager().write_index(optional_filename)       (defaults to config/index.json)
+        root, *path = IndexManager().fetch_compatible(index, query)
+```
+#### OUTPUT json file with model metadata, a root value and list of model compatible codes
 
 #### Exception handling
 #### IMPORT from sdbx.config import logger
-#### logger.debug(self.path, error_log) 
-#### logger.exception(self.path, error_log) - hard lockup/os freeze only
+#### SYNTAX
+```
+        logger.debug(self.path, error_log, , exc_info=True)                 (quiet log)
+        logger.exception(self.path, error_log)                              (hard lockup/os freeze only)
+```
+#### OUTPUT detailed error message in log or console

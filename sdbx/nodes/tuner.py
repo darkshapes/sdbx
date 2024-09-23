@@ -3,6 +3,127 @@ import json
 import sdbx.indexer as indexer
 from sdbx import config, logger
 from sdbx.config import config_source_location
+from collections import defaultdict
+
+path_name =  config.get_path("models.download") #multi read
+
+from time import process_time_ns
+print(f'begin: {process_time_ns()*1e-6} ms')
+
+class IndexManager:
+    
+    def write_index(self, index_file="index.json"):
+        all_data = {
+            "DIF": defaultdict(dict),
+            "LLM": defaultdict(dict),
+            "LOR": defaultdict(dict),
+            "TRA": defaultdict(dict),
+            "VAE": defaultdict(dict),
+                    }  # Collect all data to write at once
+        for each in os.listdir(path_name):  # SCAN DIRECTORY
+            full_path = os.path.join(path_name, each)
+            if os.path.isfile(full_path):  # Check if it's a file
+                self.metareader = indexer.ReadMeta(full_path).data()
+                if self.metareader is not None:
+                    self.eval_data = indexer.EvalMeta(self.metareader).data()
+                    if self.eval_data != None:
+                        tag = self.eval_data[0]
+                        filename = self.eval_data[1][0]
+                        compatability = self.eval_data[1][1:2][0]
+                        data = self.eval_data[1][2:5]
+                        all_data[tag][filename][compatability] = (data)
+                    else:
+                        logger.debug(f"No eval: {each}.", exc_info=True)
+
+                else:
+                    log = f"No data: {each}."
+                    logger.debug(log, exc_info=True)
+                    print(log)
+        if all_data:
+            index_file = os.path.join(config_source_location, index_file)
+            print(index_file)
+            try:
+                os.remove(index_file)
+            except FileNotFoundError as error_log:
+                logger.debug(f"'Config file absent at write time: {index_file}.'{error_log}", exc_info=True)
+                pass
+            with open(os.path.join(config_source_location, index_file), "a", encoding="UTF-8") as index:
+                json.dump(all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
+        else:
+            log = "Empty model directory, or no data to write."
+            logger.debug(f"{log}{error_log}", exc_info=True)
+            print(log)
+
+    def fetch_compatible(self, data, query, path=None, index=False):
+        if path is None: path = []
+
+        if isinstance(data, dict):
+            for key, self.value in data.items():
+                self.current = path + [key]
+                if self.value == query:
+                    return self.__unpack()
+                elif isinstance(self.value, (dict, list)):
+                    self.match = self.fetch_compatible(self.value, query, self.current)
+                    if self.match:
+                        return self.match
+        elif isinstance(data, list):
+            for key, self.value in enumerate(data):
+                self.current = path if not index else path + [key]
+                if self.value == query:
+                    return self.__unpack()
+                elif isinstance(self.value, (dict, list)):
+                    self.match = self.fetch_compatible(self.value, query, self.current)
+                    if self.match:
+                        return self.match
+                    
+    def __unpack(self): 
+        iterate = []  
+        self.match = self.current, self.value           
+        for i in range(len(self.match)-1):
+            for j in (self.match[i]):
+                iterate.append(j)
+        iterate.append(self.match[len(self.match)-1])
+        return iterate
+
+#write = IndexManager().write_index()
+clip_data = config.get_default("tuning", "clip_data") 
+query = 'STA-XL'
+
+
+root, *path = IndexManager().fetch_compatible(clip_data, query)
+print(root)
+print(*path[:len(path)-1] if not None else """ignore""")
+vae_index = config.get_default("index", "VAE")
+print(next((key for key, value in vae_index.items() if query in value), None))
+tra_index = config.get_default("index", "TRA")
+print(next((key for key, value in tra_index.items() if root in value), None))
+for each in path:
+    if each != query:
+        print(next((key for key, value in tra_index.items() if each in value), None))
+
+#print(  next( ( value for key, value in vae_index.items() if query in value), None)  )
+#print(next((value for value in vae_index.values() if query in value), None))
+#next_query = root[0]
+#tra_index = config.get_default("index", "TRA") #
+#print((next((i for i in tra_index.values() if next_query in i), None)))
+
+
+print(f'end: {process_time_ns()*1e-6} ms')
+
+# check if user has these models
+# if so, add loaders for them and attach
+# if not, use main model
+
+# model_types = ["DIF", "LLM", "LOR", "TRA", "VAE"]
+
+# value_2 = IndexManager().fetch("STA-15",value, sub_string=True)
+# print(value)
+# # try:
+# #     result.append(index[key]) 
+# # except KeyError as error_log:
+# #     logger.debug(f"{log}{error_log}", exc_info=True)
+# #     pass
+# #obj = json.loads('{[{"key": ["foo"]}]}')
 
 
 # import psutil
@@ -20,100 +141,64 @@ from sdbx.config import config_source_location
 # from sdbx import config, indexer
 #from sdbx.config import get_default
 
-
-path_name =  config.get_path("models.download") #multi read
-
-# print(f'end: {process_time_ns()*1e-6} ms')
-
-class IndexManager:
-    def write_index(self):
-        all_data = []  # Collect all data to write at once
-        for each in os.listdir(path_name):  # SCAN DIRECTORY
-            full_path = os.path.join(path_name, each)
-            if os.path.isfile(full_path):  # Check if it's a file
-                metareader = indexer.ReadMeta(full_path).data()
-                if metareader is not None:
-                    all_data.append(indexer.EvalMeta(metareader).data())
-                    if all_data[len(all_data)-1] == None:
-                        all_data.pop(len(all_data)-1)
-                        logger.debug(f"No eval: {each}.", exc_info=True)
-                else:
-                    log = f"No data: {each}."
-                    logger.debug(log, exc_info=True)
-                    print(log)
-        if all_data:
-            try:
-                os.remove(os.path.join(config_source_location,".index.json"))
-            except FileNotFoundError as error_log:
-                logger.debug(f"'Config file absent at write time: 'index.json'.'{error_log}", exc_info=True)
-                pass
-            with open(os.path.join(config_source_location, ".index.json"), "a", encoding="UTF-8") as index:
-                json.dump(all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
-        else:
-            log = "Empty model directory, or no data to write."
-            logger.debug(f"{log}{error_log}", exc_info=True)
-            print(log)
-
-    def fetch_index(self, key, index_name, sub_string=False):
-        result = []
-        log = f"No key:{key}"
-
-        def _search_dict(index):
-                if sub_string == False:
-                    try:
-                        result.append(index[key]) 
-                    except KeyError as error_log:
-                        logger.debug(f"{log}{error_log}", exc_info=True)
-                        pass
-                else:
-                    for each in index:
-                        if key in index[each]:
-                            try:
-                                result.append(index[each])
-                            except KeyError as error_log:
-                                logger.debug(f"{log}{error_log}", exc_info=True)
-                                pass
-                return index
-        
-        with open(os.path.join(config_source_location, index_name), "rb") as index_file:
-                json.loads(index_file.read(), object_hook=_search_dict)
-        return result[0]
+# model str
+# lora
+# pcm
+# spo
+# tcd
+# hyp
+# fla
+# lcm
+# dmd
+# ays
+# vae
+# mem
+# quant
+# dtype 
+# sequential bool
+# cpu int
+# disk bool
+# batch limit int
+# upcast bool
+# cache eject bool
+# pipeline str
+# compile bool
+# scheduler str
+# scheduler properties str
+# cfg/dynamite guide str
+# steps int
 
 
+# filename = "noosphere_v42.safetensors"
+# fetch = IndexManager().fetch(filename,"index.json", sub_string=False)
+# print(fetch)
 
+# fetch_map = config.get_default("index",1)
 
-#data = IndexFile().write()
+# # fetch_map = IndexManager().fetch_map(0,"index.json")
+# print((fetch_map))
+
 
 
 
 #obj = json.loads('{[{"key": ["foo"]}]}')
 
+# model_code, model_size, model_path, model_precision = fetch[:4]
+# short_code = model_code[0:3] 
+# ver_code = [len(model_code)[-2:]]
 
-filename = "noosphere_v42.safetensors"
-fetch = IndexManager().fetch_index(filename,"index.json", sub_string=False)
-print(fetch)
+# lora_types = { 
+#     "PCM",
+#     "SPO",
+#     "TCD",
+#     "HYP",
+#     "LCM",
+#     "FLA"
+#     }
 
-#data = IndexFile().write()
-
-
-#obj = json.loads('{[{"key": ["foo"]}]}')
-
-model_code, model_size, model_path, model_precision = fetch[:4]
-short_code = model_code[0:3] 
-ver_code = [len(model_code)[-2:]]
-
-lora_types = { 
-    "PCM",
-    "SPO",
-    "TCD",
-    "HYP",
-    "LCM",
-    "FLA"
-    }
-
-for types in lora_types:
-    type_code = f"LOR-{types}-{model_code}"
-    fetch = IndexManager().fetch_index(type_code,"index.json", sub_string=True)
+# for types in lora_types:
+#     type_code = f"LOR-{types}-{model_code}"
+#     fetch = IndexManager().fetch(type_code,"index.json", sub_string=True)
 
 # if fetch, set lora to fetch else set ays if model_code == sta-xl, pla, 10
 
@@ -192,13 +277,13 @@ for types in lora_types:
 
 #         model_ays = "StableDiffusionTimesteps"
 #         vae_code = f"VAE-{model_code}"
-#         fetch = IndexManager().fetch_index(vae_code,"index.json",value=True)
+#         fetch = IndexManager().fetch(vae_code,"index.json",value=True)
 #         vae_file = os.path.basename(fetch[2])
 #         tra_code = f"TRA-CLI-VL"
-#         fetch = IndexManager().fetch_index(tra_code,"index.json",value=True)
+#         fetch = IndexManager().fetch(tra_code,"index.json",value=True)
 #         tra_file = os.path.basename(fetch[2])
 #         lor_code = f"VAE-{lor_code}"
-#         fetch = IndexManager().fetch_index(lor_code,"index.json",value=True)
+#         fetch = IndexManager().fetch(lor_code,"index.json",value=True)
 #         lor_file = os.path.basename(fetch[2])
 #         print(fetch)
 #         print(fetch)
@@ -252,74 +337,6 @@ for types in lora_types:
 #         return tuned
             
             
-
-
-
-        # Queue number = user set, >9 triggers lora fuse, torch compile
-        # Frame/Queue = Dynamic, 75 nearing 1/mb  50 rising from 1/mb
-        # Slice Queue  - dynamic/ 75 on, 50 off
-
-
-
-        # item[0][:3]  #VAE,CLI,LOR,LLM, anything else should be treated like a Diff model
-
-
-        # get system memory
-        # get cpu generation
-        # get gpu type
-        # get gpu generation
-        # get gpu memory
-        # goal - high, but stable resource allocation
-        # intent - highest quality at reasonable speed
-        # gpu > cpu
-
-
-        # match loader code to model type
-        # check lora availability
-        # if no lora, check if AYS or other optimization available
-
-        # match loader code to model type
-        # ram calc+lora
-        # decide sequential offload on 75% util/ off 50% util
-        # match dtype to lora load
-        # MATCH VAE TO MODEL TYPE
-        # match dtype to vae load
-
-
-        #check variable against available
-        # gpu mem
-        # cpu mem
-        # model_size of model
-        # if cpu know proc speed?
-        # bf16 = bf16
-        # fp16 = fp16
-        # fp16 = 
-        # bf16
-        # fp16
-        # fp32
-        # fp64
-        # ays
-        # pcm
-        # dyg
-        # gpu
-        # cpu
-        # mtcache
-        # cache
-        # compile
-        # nocompile
-        # bf16>fp16>fp32
-        # xl? ays>pcm>dynamic cfg
-        # tokenizer? allocate gpu layers
-        # dump cache!!!, full allocation every step
-        # try to compile
-        # except, skip
-        # except:
-        #    pass
-        # else:
-        #    each = "klF8Anime2VAE_klF8Anime2VAE.safetensors" #ae.safetensors #noosphere_v42.safetensors #luminamodel .safetensors #mobius-fp16.safetensors
-
-
-        # flash-attn/xformers
 
 
 # find model name in [models]

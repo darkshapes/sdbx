@@ -65,10 +65,9 @@ class EvalMeta:
         self.filename = self.extract.get("filename", "")
         self.ext = self.extract.get("extension", "")
         self.path = self.extract.get("path", "")
-        self.dtype = self.extract.get("dtype", "")
-        self.torch_dtype = self.extract.get("torch_dtype", "")
+        self.dtype = self.extract.get("dtype", "") if not "" else self.extract.get("torch.dtype", "")
 
-        # model official metadata
+        # model supplied metadata
         self.name_value = self.extract.get("general.name","")
         self.arch = self.extract.get("general.architecture","").upper()
         self.tokenizer = self.extract.get("tokenizer.chat_template", "")
@@ -121,7 +120,6 @@ class EvalMeta:
             self.tag = "v"
             self.key = "334641162"
             self.sub_key = "250" #sdxl hook
-
 
     def process_lor(self):
         for size, attributes in self.lora_peek.items():
@@ -194,23 +192,29 @@ class EvalMeta:
         # 0 = vae_peek_0, 12 = vae_peek_12, v = vae_peek
         # these are separated because file sizes are otherwise too similar
         # please do not disrupt
-        if self.tag == "0":
-            self.code = f"VAE-{self.vae_peek_0[self.key][self.sub_key]}"
-        elif self.tag == "12":
-            self.code = f"VAE-{self.vae_peek_12[self.key][self.sub_key]}"
-        elif self.tag == "v":
-            self.code = f"VAE-{self.vae_peek[self.key][self.sub_key]}"
+        if self.tag == "0" or self.tag == "12" or self.tag == "v":
+            self.code = "VAE"
+            if self.tag == "0":
+                self.lookup = f"{self.vae_peek_0[self.key][self.sub_key]}"
+            elif self.tag == "12":
+                self.lookup = f"{self.vae_peek_12[self.key][self.sub_key]}"
+            elif self.tag == "v":
+                self.lookup = f"{self.vae_peek[self.key][self.sub_key]}"
         elif self.tag == "t":
+            self.code = f"TRA"
             name = self.tra_peek[self.key][self.sub_key]
-            self.code = f"TRA-{name[len(name)-1:][0]}"
-        elif self.tag == "l":
+            self.lookup = f"{name[len(name)-1:][0]}" # type name is a list item
+        elif self.tag == "l":   
+            self.code = f"LOR"
             name = self.lora_peek[self.key][self.sub_key]
-            self.code = f"LOR-{self.value}-{name[len(name)-1:][0]}"
+            self.lookup = f"{self.value}-{name[len(name)-1:][0]}" # type name is a list item
         elif self.tag == "m":
+            self.code = f"DIF"
             name = self.model_peek[self.key][self.sub_key]
-            self.code = f"{name[len(name)-1:][0]}"
+            self.lookup = f"{name[len(name)-1:][0]}"
         elif self.tag == "c": 
-            self.code = f"LLM-{self.arch}"
+            self.code = f"LLM"
+            self.lookup = f"{self.arch}"
         else:
             if self.verbose is True: print(f"Unknown type:'{self.filename}'.")
             # consider making ignore list for undetermined models
@@ -218,17 +222,14 @@ class EvalMeta:
             pass
 
         if self.tag == "":
-            logger.debug(f"'Not indexed. 'No eval' should follow: '{self.extract}'.", exc_info=True)
+            logger.debug(f"'Not indexed. 'No eval error' should follow: '{self.extract}'.", exc_info=True)
             pass
-        else: 
-            self.tag_dict[self.filename] = (
-                self.code, self.size, self.path, 
-                (self.context_length if self.context_length else self.dtype), 
-                (self.torch_dtype if self.torch_dtype else self.tokenizer if self.tokenizer else f"" )
-                )
-            if self.verbose is True: print(self.code, self.size, self.path)
-            return self.tag_dict
-            
+        else:   #format [ model type code, filename, compatability code, file size, full file path]
+            if self.verbose is True: print(self.code, self.filename, self.size, self.path)
+            return self.code, (
+                self.filename, self.lookup,  self.size, self.path, 
+                (self.context_length if self.context_length else self.dtype))
+                            
 class ReadMeta:
     # ReadMeta.data(filename,full_path_including_filename)
     # scan the header of a tensor file and discover its secrets
