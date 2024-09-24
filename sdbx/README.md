@@ -30,6 +30,10 @@
 #### SYNTAX 
 ```
         instance_name = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
+                        tag = item[0]                   (TRA, LOR, LLM, DIF, VAE)
+                        filename = item[1][0]           (base-name only)
+                        compatability = item[1][1:2][0] (short code)
+                        data = item[1][2:5]             (meta data dict)
 ```
 #### OUTPUT list of type str: 0: tag code, 1: file size, 2: full path (see tuner.json)
 
@@ -39,10 +43,21 @@
 #### PURPOSE manage model type lookups, search for compatibility data
 #### SYNTAX 
 ```
+
+
         store_writing = IndexManager().write_index(optional_filename)       (defaults to config/index.json)
-        root, *path = IndexManager().fetch_compatible(index, query)
+        path = IndexManager().fetch_matching(index, query)                  (single type search)
+        vae, lora, tra = IndexManager().fetch_compatible(query)             (automated all type search)
+                value[0][0] filename
+                value[0][1] compatability short code
+                value[1][0] size
+                value[1][1] path
+                value[1][2] dtype
+
 ```
-#### OUTPUT json file with model metadata, a root value and list of model compatible codes
+#### OUTPUT json file with model metadata, a set of dicts with all compatible models, a dict of model compatible codes
+
+
 
 #### Exception handling
 #### IMPORT from sdbx.config import logger
