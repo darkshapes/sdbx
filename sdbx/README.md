@@ -19,7 +19,7 @@
 #### PURPOSE extract metadata from model files
 #### SYNTAX 
 ```
-        instance_name = ReadMeta(full_path_to_file).data()                 (see config/tuning.json)
+        metadata = ReadMeta(full_path_to_file).data()                 (see config/tuning.json)
 ```
 #### OUTPUT dict of int and str, a form filled model_tag[] 
 
@@ -29,7 +29,7 @@
 #### PURPOSE interpret metadata from model files
 #### SYNTAX 
 ```
-        instance_name = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
+        index_code = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
                         tag = item[0]                   (TRA, LOR, LLM, DIF, VAE)
                         filename = item[1][0]           (base-name only)
                         compatability = item[1][1:2][0] (short code)
@@ -44,15 +44,16 @@
 #### SYNTAX 
 ```
 
-
-        store_writing = IndexManager().write_index(optional_filename)       (defaults to config/index.json)
-        path = IndexManager().fetch_matching(index, query)                  (single type search)
-        vae, lora, tra = IndexManager().fetch_compatible(query)             (automated all type search)
-                value[0][0] filename
-                value[0][1] compatability short code
-                value[1][0] size
-                value[1][1] path
-                value[1][2] dtype
+        create_index = IndexManager().write_index(optional_filename)       # (defaults to config/index.json)
+        fetch = IndexManager().fetch_id(query_as_string)                   # (single id search, first candidate only)
+        a,b,c = IndexManager().fetch_compatible(fetch)                     # (automated all type search)
+        ## using next(iter(___)):
+                a,b,c[0][0] filename
+                a,b,c[0][0][1:2] compatability short code
+                a,b,c[0][1] size
+                a,b,c[0][1][1:2] path
+                a,b,c[0][1][2:3] dtype
+        filter = parse_compatible(self, query, a/b/c)                        #(show only a type of result)
 
 ```
 #### OUTPUT json file with model metadata, a set of dicts with all compatible models, a dict of model compatible codes
@@ -67,3 +68,50 @@
         logger.exception(self.path, error_log)                              (hard lockup/os freeze only)
 ```
 #### OUTPUT detailed error message in log or console
+
+
+#### Model Key
+AUR-03 Auraflow
+COM-XC Common Canvas XL C
+COM-XN Common Canvas XL NC
+FLU-1D Flux 1 Dev
+FLU-1S Flux 1 Schnell
+HUN-12 HunyuanDit 1.2
+KOL-01 Kolors 1
+LCM-PIX-AL Pixart Alpha LCM Merge
+LLM-AYA-23 Aya 23
+LLM-DEE-02-INS Deepseek Instruct
+LLM-DOL-25 Dolphin
+LLM-LLA-03 LLama3
+LLM-MIS-01 Mistral
+LLM-MIS-01-INS Mistral Instruct
+LLM-NEM-04-INS Nemotron Instruct
+LLM-OPE-12 OpenOrca
+LLM-PHI-35-INS Phi Instruct
+LLM-QWE-25-INS Qwen Instruct
+LLM-SOL-10-INS Solar Instruct
+LLM-STA-02 Starcoder
+LLM-STA-02-INS Starcoder 02 Instruct
+LLM-ZEP-01 Zephyr
+LORA-FLA-STA-XL Flash XL
+LORA-LCM-SSD-1B SSD 1B LCM
+LORA-LCM-STA-15 Stable Diffusion 1.5 LCM
+LUM-01 Lumina T2I
+LUM-NS Lumina Next SFT
+MIT-D1 Mitsua
+PIX-AL Pixart Alpha
+PIX-SI Pixart Sigma
+PLA-25 Playgroud 2.5
+SD1-TR Stable Diffusion 1.5 Turbo
+SDX-TR Stable Diffusion XL Turbo
+SEG-VG Segmind Vega
+SSD-1B SSD-1B
+SSD-1L SSD-1B LCM
+STA-15 Stable Diffusion 1.5
+STA-3D Stable Diffusion 3 Diffusers
+STA-3M Stable Diffusion 3 Medium
+STA-CA Stable Cascade
+STA-XL Stable Diffusion XL
+STA-XR Stable Diffusion XL Refiner
+TIN-SD Tiny Stable Diffusion 1.5
+WUR-01 Wuerstchen

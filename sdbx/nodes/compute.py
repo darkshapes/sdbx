@@ -13,7 +13,7 @@ from diffusers.schedulers import AysSchedules
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 import torch
 from llama_cpp import Llama
-from sdbx.nodes.tuner import tuned_parameters
+from sdbx.nodes.tuner import IndexManager, tuned_parameters
 
 class Inference:
     def __init__(self):
