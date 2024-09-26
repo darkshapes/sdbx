@@ -1,5 +1,12 @@
 {
     "DIF": {
+        "Illustrious-XL-v0.1.safetensors": {
+            "STA-XL": [
+                6938040760,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\Illustrious-XL-v0.1.safetensors",
+                "F16"
+            ]
+        },
         "PixArt-Sigma-XL-2-2K-MS.safetensors": {
             "PIX-SI": [
                 1262008531,

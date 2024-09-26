@@ -58,7 +58,31 @@
 ```
 #### OUTPUT json file with model metadata, a set of dicts with all compatible models, a dict of model compatible codes
 
+#### CLASS NodeTuner
+#### IMPORT from sdbx.nodes.tuner import NodeTuner
+#### METHODS get_tuned_parameters, tuned_parameters
+#### PURPOSE collect model defaults and apply to current node graph
+#### SYNTAX
+```
+        attune = get_tuned(self, metadata, widget_inputs, node_manager, node_id: str,  graph: MultiDiGraph,)
+        defaults = tuned_parameters(self, model) 
 
+        dict structure:
+                0 model-----------.
+                1 vae------.       |
+                2 lora----. |      |
+                3 tra----. ||      |
+                4 pipe-.0 size     |     
+                |       1 path     |     
+                |       2 dtype--. |
+                |                 ||
+                |               3 scheduler/scheduler args
+                |               4 steps
+        0 cache_jettison        5 cfg/dynamic guidance
+        1 cpu_offload
+        2 sequential_offload
+
+```
 
 #### Exception handling
 #### IMPORT from sdbx.config import logger
