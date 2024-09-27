@@ -1,12 +1,12 @@
 import os
 import json
 import struct
-from time import process_time_ns
 from math import isclose
 from pathlib import Path
 from collections import defaultdict
 from llama_cpp import Llama
-from sdbx import config, logger
+from sdbx import logger
+from sdbx import config
 
 peek = config.get_default("tuning", "peek") # block and tensor values for identifying
 known = config.get_default("tuning", "known") # raw block & tensor data
@@ -167,7 +167,8 @@ class EvalMeta:
                         self.tag = "m"
                         self.key = tensor_params
                         self.sub_key = shape               ######################################DEBUG
-                        #if self.verbose is True: print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
+                        if self.verbose is True: 
+                            print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 
     def data(self):
 
@@ -408,6 +409,174 @@ class ReadMeta:
     def __repr__(self):
         return f"ReadMeta(data={self.data()})"
 
-class ModelIndexer:
-    def __init__(self):
-        pass
+class IndexManager:
+
+    all_data = {
+        "DIF": defaultdict(dict),
+        "LLM": defaultdict(dict),
+        "LOR": defaultdict(dict),
+        "TRA": defaultdict(dict),
+        "VAE": defaultdict(dict),
+    }
+    
+    def write_index(self, index_file="index.json"):
+        # Collect all data to write at once
+        self.directories =  config.get_default("directories","models") #multi read
+        self.delete_flag = True
+        for each in self.directories:
+            self.path_name = config.get_path(f"models.{each}")
+            index_file = os.path.join(config.config_source_location, index_file)
+            for each in os.listdir(self.path_name):  # SCAN DIRECTORY           #todo - toggle directory scan
+                full_path = os.path.join(self.path_name, each)
+                if os.path.isfile(full_path):  # Check if it's a file
+                    self.metareader = ReadMeta(full_path).data()
+                    if self.metareader is not None:
+                        self.eval_data = EvalMeta(self.metareader).data()
+                        if self.eval_data != None:
+                            tag = self.eval_data[0]
+                            filename = self.eval_data[1][0]
+                            compatability = self.eval_data[1][1:2][0]
+                            data = self.eval_data[1][2:5]
+                            self.all_data[tag][filename][compatability] = (data)
+                        else:
+                            logger.debug(f"No eval: {each}.", exc_info=True)
+                    else:
+                        log = f"No data: {each}."
+                        logger.debug(log, exc_info=True)
+                        print(log)
+        if self.all_data:
+            if self.delete_flag:
+                try:
+                    os.remove(index_file)
+                    self.delete_flag =False
+                except FileNotFoundError as error_log:
+                    logger.debug(f"'Config file absent at write time: {index_file}.'{error_log}", exc_info=True)
+                    self.delete_flag =False
+                    pass
+            with open(os.path.join(config.config_source_location, index_file), "a", encoding="UTF-8") as index:
+                json.dump(self.all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
+        else:
+            log = "Empty model directory, or no data to write."
+            logger.debug(f"{log}{error_log}", exc_info=True)
+            print(log)
+
+     #recursive function to return model codes assigned to tree keys and transformer model values
+    def _fetch_txt_enc_types(self, data, query, path=None, return_index_nums=False):
+        if path is None: path = []
+
+        if isinstance(data, dict):
+            for key, self.value in data.items():
+                self.current = path + [key]
+                if self.value == query:
+                    return self._unpack()
+                elif isinstance(self.value, (dict, list)):
+                    self.match = self._fetch_txt_enc_types(self.value, query, self.current)
+                    if self.match:
+                        return self.match
+        elif isinstance(data, list):
+            for key, self.value in enumerate(data):
+                self.current = path if not return_index_nums else path + [key]
+                if self.value == query:
+                    return self._unpack()
+                elif isinstance(self.value, (dict, list)):
+                    self.match = self._fetch_txt_enc_types(self.value, query, self.current)
+                    if self.match:
+                        return self.match
+                    
+    #fix the recursive list so it doesnt make lists inside itself
+    def _unpack(self): 
+        iterate = []  
+        self.match = self.current, self.value           
+        for i in range(len(self.match)-1):
+            for j in (self.match[i]):
+                iterate.append(j)
+        iterate.append(self.match[len(self.match)-1])
+        return iterate
+    
+    #find the model code for a single model
+    def fetch_id(self, search_item):
+        print(search_item)
+        for each in self.all_data.keys(): 
+            peek_index = config.get_default("index", each)
+            if not isinstance(peek_index, dict):
+                continue  # Skip if peek_index is not a dict
+            if search_item in peek_index:
+                return {each}, peek_index[search_item]  # Return keys and corresponding value
+        # figure out a way to handle 'not found' here
+        # handle if search_item is not found in any peek_index
+
+    #get compatible models from a specific model code
+    def fetch_compatible(self, query): 
+        self.clip_data = config.get_default("tuning", "clip_data") 
+        self.lora_priority = config.get_default("algorithms", "lora_priority") 
+        self.vae_index = config.get_default("index", "VAE")
+        self.tra_index = config.get_default("index", "TRA")
+        self.lor_index = config.get_default("index", "LOR")
+        self.model_indexes = {
+            "vae": self.vae_index,
+            "tra": self.tra_index, 
+            "lor": self.lor_index
+            }
+        try:
+            lora_sorted = []
+            tra_sorted = []
+            path = self._fetch_txt_enc_types(self.clip_data, query)
+        except TypeError as error_log:
+            log = f"No match found for {query}"
+            logger.debug(f"{log}{error_log}", exc_info=True)
+            print(log)
+
+        else:
+            if path != [] and path!= None:
+                transformers_list = [each for each in path if each !=query]
+                tra_match = {}
+
+                for i in range(len(transformers_list)):
+                    tra_match[i] = self.filter_compatible(transformers_list[i], self.model_indexes["tra"])
+                try:   
+                    if list(tra_match)[0] == 0:
+                        logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
+                    else:
+                        for i in range(len(tra_match)):
+                            prefix = tra_match[i][0][0]
+                            suffix = tra_match[i][0][1]
+                            tra_sorted.append((prefix,suffix))
+                except IndexError as error_log:
+                    logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
+
+        vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
+        lora_match = self.filter_compatible(query, self.model_indexes["lor"])
+        j = 0
+        for each in self.lora_priority:
+            for i in range(len(lora_match)):
+                if each in lora_match[i][0][1]:
+                    lora_sorted.append(lora_match[i])
+                    j += 1
+        if vae_sorted == []: 
+            vae_sorted =str("∅")
+            logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
+        if lora_sorted == []: 
+            lora_sorted =str("∅")
+            logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
+        
+        if tra_sorted == [] or tra_sorted == None: 
+            tra_sorted =str("∅")
+            logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
+        return vae_sorted, lora_sorted, tra_sorted
+            
+    #within a dict of models of the same type, match model code & sort by file size
+    def filter_compatible(self, query, index):
+        pack = defaultdict(dict)
+        if index.items():
+            for k, v in index.items():
+                for code in v.keys():
+                    if query in code:
+                        pack[k, code] = v[code]
+                        
+            sort = sorted(pack.items(), key=lambda item: item[1])
+            return sort
+        else:
+            print("Compatible models not found")
+            return "∅"
+    
+

@@ -2,14 +2,18 @@
 # API CODE
 
 #### CLASS Config
-#### IMPORT from sdbx import config
+#### IMPORT from sdbx.config import
 #### METHODS get_default, get_path_contents, get_path
+#### VARIABLES config_source_location
 #### PURPOSE find source directories and data
+### RETURNS a dict of keys, a dict of files, a path str
 #### SYNTAX
 ```
         config.get_default(filename with no extension, key)               (!cannot find sub-keys on its own)
         config.get_path_contents("string_to_folder.string_to_sub_folder") (see config/config.json, config/directories.json)
         config.get_path("filename") or config.get_path("string_to_folder.filename")
+        
+        os.path.join(config_source_location,filename)
 ```
 ### OUTPUT contents of a value for a key, file contents of a directory and sub directories, path to a file
 
@@ -17,6 +21,7 @@
 #### IMPORT from sdbx.indexer import ReadMeta
 #### METHODS data
 #### PURPOSE extract metadata from model files
+#### RETURNS a dict of block data & model measurements for a single model
 #### SYNTAX 
 ```
         metadata = ReadMeta(full_path_to_file).data()                 (see config/tuning.json)
@@ -27,6 +32,7 @@
 #### IMPORT from sdbx.indexer import EvalMeta
 #### METHODS, process_vae, process_vae_no_12, process_lora, process_tf, process_model 
 #### PURPOSE interpret metadata from model files
+#### RETURNS a dict that identifies a single model as a certain type 
 #### SYNTAX 
 ```
         index_code = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
@@ -38,9 +44,10 @@
 #### OUTPUT list of type str: 0: tag code, 1: file size, 2: full path (see tuner.json)
 
 #### CLASS IndexManager
-#### IMPORT from sdbx.nodes.tuner import IndexManager
+#### IMPORT from sdbx.indexer import IndexManager
 #### METHODS write_index, fetch_compatible
 #### PURPOSE manage model type lookups, search for compatibility data
+#### RETURNS a .json file of available models & info, a dict of models that work with another
 #### SYNTAX 
 ```
 
@@ -50,6 +57,7 @@
         ## using next(iter(___)):
                 a,b,c[0][0] filename
                 a,b,c[0][0][1:2] compatability short code
+
                 a,b,c[0][1] size
                 a,b,c[0][1][1:2] path
                 a,b,c[0][1][2:3] dtype
@@ -60,12 +68,13 @@
 
 #### CLASS NodeTuner
 #### IMPORT from sdbx.nodes.tuner import NodeTuner
-#### METHODS get_tuned_parameters, tuned_parameters
+#### METHODS get_tuned_parameters, determine_tuning
 #### PURPOSE collect model defaults and apply to current node graph
+#### RETURNS a formatted dict of defaults, a dict of defaults
 #### SYNTAX
 ```
-        attune = get_tuned(self, metadata, widget_inputs, node_manager, node_id: str,  graph: MultiDiGraph,)
-        defaults = tuned_parameters(self, model) 
+
+        defaults = determine_tuning(self, model) 
 
         dict structure:
                 0 model-----------.
@@ -73,14 +82,14 @@
                 2 lora----. |      |
                 3 tra----. ||      |
                 4 pipe-.0 size     |     
-                |       1 path     |     
-                |       2 dtype--. |
-                |                 ||
-                |               3 scheduler/scheduler args
-                |               4 steps
-        0 cache_jettison        5 cfg/dynamic guidance
-        1 cpu_offload
-        2 sequential_offload
+                  |     1 path     |     
+                  |     2 dtype--. |
+                  |               ||
+                  |             3 scheduler/scheduler args
+                  |             4 steps
+            0 cache_jettison    5 cfg/dynamic guidance
+            1 cpu_offload
+            2 sequential_offload
 
 ```
 

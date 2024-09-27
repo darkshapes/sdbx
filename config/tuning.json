@@ -144,17 +144,6 @@
         "LUM-01": "LUM-01",
         "GEM-A": "LUM-NS"
     },
-    "lora_priority": [
-        "PCM",
-        "TCD",
-        "SPO",
-        "HYP",
-        "LIG",
-        "LCM",
-        "RT-",
-        "DMD",
-        "FLA"
-    ],
     "peek": {
         "model_peek": {
             "1131": {

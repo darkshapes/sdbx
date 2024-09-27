@@ -1,18 +1,28 @@
+pipelines = [
+    "StableDiffusionXLPipeline",
+    "FluxPipeline",
+    "HunyuanDiTPipeline",
+    "StableDiffusionPipeline",
+    "PixArtAlphaPipeline",
+    "PixArtSigmaPipeline",
+    "AuraFlowPipeline",
+]
 schedulers = [
-    "EulerDiscreteScheduler",
-    "EulerAncestralDiscreteScheduler",
+    "EulerDiscreteScheduler",           # default 0 STA-XL default, HUN,
+    "EulerAncestralDiscreteScheduler",  # default 1 SDXL turbo
+    "FlowMatchEulerDiscreteScheduler",  # default 2 AUR, FLU
+    "EDMDPMSolverMultistepScheduler2M", # default 3 PLA
+    "DPMSolverMultistepScheduler",      # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
+    "DDIMScheduler",                    # default 5 rescale_betas_zero_snr=True, timestep_spacing="trailing"
+    "LCMScheduler",                     # default 6
+    "TCDScheduler",                     # default 7
+    "AysSchedules",                     # default 8
     "HeunDiscreteScheduler",
     "UniPCMultistepScheduler",
-    "DDIMScheduler",                    # rescale_betas_zero_snr=True, timestep_spacing="trailing"
-    "DPMSolverMultistepScheduler",      # dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
     "LMSDiscreteScheduler",             # use_karras_sigmas=True
     "DEISMultistepScheduler",
-    "AysSchedules"
-]
 
-solvers = [
-    "dpmsolver++",
-    "sde-dpmsolver++",
-    "sde-dpmsolver",
-    "dpmsolver"
 ]
+lora_priority = ["PCM", "TCD", "SPO", "HYP", "LIG", "LCM", "RT-", "DMD", "FLA"]
+
+solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver"]

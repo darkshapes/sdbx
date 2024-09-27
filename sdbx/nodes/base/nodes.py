@@ -3,7 +3,7 @@ import datetime
 
 from llama_cpp import Llama
 
-import sdbx.nodes.computations
+import sdbx.nodes.compute
 
 from sdbx import config
 from sdbx.nodes.types import *
@@ -21,6 +21,14 @@ model_default = "ponyFaetality_v11.safetensors"
 llm_default = "codeninja-1.0-openchat-7b.Q5_K_M.gguf"
 scheduler_default = "EulerAncestralDiscreteScheduler"
 
+# list(self.algorithms) = get_defaults("algorithms","schedulers")
+# list(self.solvers) = get_defaults("algorithms","solvers")
+# llms = get_defaults("index","LLM")
+# diff = get_defaults("index","MODEL")
+# timestep_spacing="linspace" + use_exponential_sigmas=True"
+# #"Cannot set both `config.use_exponential_sigmas = True` and config.use_karras_sigmas = True`"
+# "DPMSolverMultistepScheduler",      # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
+# "DDIMScheduler",                    # default 5 rescale_betas_zero_snr=True, timestep_spacing="trailing"
 
 def tc():
     print(str(datetime.timedelta(seconds=time.process_time())), end="")
