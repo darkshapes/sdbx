@@ -1,27 +1,21 @@
 import time
 import datetime
-
 from llama_cpp import Llama
-
 import sdbx.nodes.compute
-
 from sdbx import config
+from sdbx.config import get_defaults
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import seed_planter, soft_random
 from sdbx.nodes.compute import Inference, get_device
-
+from sdbx.nodes.tuner import NodeTuner
 # from time import perf_counter diagnostics
 
 # AUTOCONFIGURE OPTIONS : this should autodetec
-token_encoder_default = "stabilityai/stable-diffusion-xl-base-1.0"
-lora_default = "pcm_sdxl_normalcfg_8step_converted_fp16.safetensors"
-pcm_default = "Kijai/converted_pcm_loras_fp16/tree/main/sdxl/"
-vae_default = "madebyollin/sdxl-vae-fp16-fix.safetensors"
-model_default = "ponyFaetality_v11.safetensors"
-llm_default = "codeninja-1.0-openchat-7b.Q5_K_M.gguf"
-scheduler_default = "EulerAncestralDiscreteScheduler"
 
-# list(self.algorithms) = get_defaults("algorithms","schedulers")
+algorithms = get_defaults("algorithms","schedulers")
+llm = get_defaults("index","LLM")
+diffusion = get_defaults("index","DIF")
+main_models = {**llm, **diffusion}
 # list(self.solvers) = get_defaults("algorithms","solvers")
 # llms = get_defaults("index","LLM")
 # diff = get_defaults("index","MODEL")
@@ -33,12 +27,20 @@ scheduler_default = "EulerAncestralDiscreteScheduler"
 def tc():
     print(str(datetime.timedelta(seconds=time.process_time())), end="")
 
+@node(name="", display=True)
+def generate_flow(
+    model: Literal[**main_models.keys()] = None
+    user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
+) -> Tuple[dict, str]:
+    flow = NodeTuner().determine_tuning(model)
+    #return flow
 
 @node(name="Text Prompt", display=True)
 def llm_prompt(
     llama: Llama,
+    external_user_prompt: str = None,
     system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for knowing what you know, yet wiser for knowing what you do not.",
-    user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
+    user_prompt: A[str,Dependent(on="external_user_prompt", when=not None) Text(multiline=True, dynamic_prompts=True)] = "",
     advanced_options: bool = False,
     top_k: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=100)] = 40,
     top_p: A[float,Dependent(on="advanced_options", when=True),Slider(min=0, max=1, step=0.01, round=0.01)] = 0.95,
@@ -47,11 +49,16 @@ def llm_prompt(
     max_tokens: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=2)] = 256,
     streaming: bool = True,  # triggers generator in next node?
 ) -> str:
-    tc()
+    if external_user_prompt:
+        user_prompt = external_user_prompt
     Inference.llm_request(system_prompt, user_prompt, streaming=True)
-    tc()
     return llama
 
+@node(name="Load Lora Model", display=True)
+    lora: Literal[*config.get_path_contents("models.loras", extension="safetensors", base_name=True)] = pcm_default,
+
+@node(name="Load Vision Model", display=True)
+    lora: Literal[*config.get_path_contents("models.loras", extension="safetensors", base_name=True)] = pc
 
 @node(name="Image Prompt", display=True)
 def image_prompt(
@@ -68,78 +75,44 @@ def image_prompt(
     embeddings = Inference.start_encoding(queue, text_encoder, text_encoder_2)
     return embeddings
 
-
-@node(name="Load Model", display=True)
-def Load(
-    model: Literal[*config.get_path_contents("models.llms", extension="safetnesors", base_name=True)] = None,
+@node(name="Load Diffusion Model", display=True)
+def diffusion_loader(
+    model: Literal[*config.get_defaults("index","DIF").keys()] = None,
     # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
     advanced_options: bool = False,
     override_device: A[Literal[*get_device(), "cpu"], Dependent(on="advanced_options", when=True)] = "",  # type: ignore
     precision: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
-    gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
-    threads: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
-    one_time_seed: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    flash_attention: A[bool, Dependent(on="advanced_options", when=True)] = False,
     verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    max_context: A[int,Dependent(on="advanced_options", when=True),Slider(min=0, max=32767, step=64),] = 8192,
-) -> Tuple[Llama]:
-    tc()
-    metadata = ReadMeta(model).data
-    model_type = EvalMeta(metadata).data
-    if "LLM" in model_type:
-        llama = Inference.gguf_load(model, threads, max_context, verbose)
-    else:
-        if "VAE-" in model_type:
-            processor = Inference.load_vae(model)
-        if "CLI-" in model_type:
-            processor = Inference.load_token_encoder(model)
-        if "LORA-" in model_type:
-            processor = Inference.load_pipeline(model, precision, bfloat)   
-        if "LLM-" in model_type:
-            processor = Inference.load_llm(model) 
-
-    else:
-
-
-
-
-    tc()
+) -> Llama:
     return [*processor]
 
 
-@node(name="GGUF Loader", display=True)
-def gguf_loader(
-    gguf: Literal[
-        *config.get_path_contents("models.llms", extension="gguf", base_name=True)] = llm_default,  # type: ignore
+@node(name="Load LLM Model", display=True)
+def llm_loader(
+    model: Literal[*config.get_defaults("index","LLM").keys())] = None,  # type: ignore
     advanced_options: bool = False,
     cpu_only: A[bool, Dependent(on="advanced_options", when=True)] = True,
-    gpu_layers: A[int, 
-        Dependent(on="cpu_only", when=False), 
-        Slider(min=-1, max=35, step=1)] = -1,
-    threads: A[int, 
-               Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
+    gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
+    threads: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
 
     one_time_seed: A[bool, Dependent(on="advanced_options", when=True)] = False,
     flash_attention: A[bool, Dependent(on="advanced_options", when=True)] = False,
+    max_context: A[int,Dependent(on="advanced_options", when=True),Slider(min=0, max=32767, step=64),] = 8192,
     verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    batch: A[int,
-        Dependent(on="advanced_options", when=True),
-        Numerical(min=0, max=512, step=1),
+    batch: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=512, step=1),
     ] = 1,
 ) -> Llama:
     tc()
     llama = Inference.gguf_load(gguf, threads, max_context, verbose)
     return llama
 
-
 @node(name="Generate", path=None, display=True)
 def diffusion(
     model: Llama,
-    queue: Llama,
+    lora: 
     # lora needs to be explicitly declared
-    lora: Literal[
-        *config.get_path_contents("models.loras", extension="safetensors", base_name=True)] = pcm_default,
+
     scheduler: Literal[
         *config.get_default("algorithms", "schedulers")] = scheduler_default,
     # only appears if Lora isnt a PCM/LCM and scheduler isnt "AysScheduler". lower to increase speed
@@ -166,7 +139,6 @@ def diffusion(
     )
     Inference.clear_memory_cache()
     return latent
-
 
 @node(name="Show & Save Image", display=True)
 def autodecode(

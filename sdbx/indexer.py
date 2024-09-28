@@ -73,8 +73,6 @@ class EvalMeta:
         self.tokenizer = self.extract.get("tokenizer.chat_template", "")
         self.context_length = self.extract.get("context_length","")
 
-
-
     def process_vae(self):
         if [32] == self.shape_value:
             self.tag = "0"
@@ -495,15 +493,19 @@ class IndexManager:
     
     #find the model code for a single model
     def fetch_id(self, search_item):
-        print(search_item)
         for each in self.all_data.keys(): 
             peek_index = config.get_default("index", each)
             if not isinstance(peek_index, dict):
                 continue  # Skip if peek_index is not a dict
             if search_item in peek_index:
-                return {each}, peek_index[search_item]  # Return keys and corresponding value
-        # figure out a way to handle 'not found' here
-        # handle if search_item is not found in any peek_index
+                break
+            else:
+                continue 
+        if search_item in peek_index:
+            for category, value in peek_index[search_item].items():
+                return each, category, value  # Return keys and corresponding value
+        else:
+            return "∅", "∅","∅"
 
     #get compatible models from a specific model code
     def fetch_compatible(self, query): 
@@ -518,39 +520,38 @@ class IndexManager:
             "lor": self.lor_index
             }
         try:
-            lora_sorted = []
-            tra_sorted = []
+            lora_sorted = {}
+            tra_sorted = {}
             path = self._fetch_txt_enc_types(self.clip_data, query)
         except TypeError as error_log:
             log = f"No match found for {query}"
             logger.debug(f"{log}{error_log}", exc_info=True)
             print(log)
-
+        if path == None:
+            tra_sorted =str("∅")
+            logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
         else:
-            if path != [] and path!= None:
-                transformers_list = [each for each in path if each !=query]
-                tra_match = {}
-
-                for i in range(len(transformers_list)):
-                    tra_match[i] = self.filter_compatible(transformers_list[i], self.model_indexes["tra"])
-                try:   
-                    if list(tra_match)[0] == 0:
-                        logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
-                    else:
-                        for i in range(len(tra_match)):
-                            prefix = tra_match[i][0][0]
-                            suffix = tra_match[i][0][1]
-                            tra_sorted.append((prefix,suffix))
-                except IndexError as error_log:
+            tra_match = {}
+            for i in range(len(path)-1):
+                tra_match[i] = self.filter_compatible(path[i], self.model_indexes["tra"])
+            try:
+                if tra_match[0] == []:
                     logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
-
+                    tra_sorted = {}
+                else:
+                    for each in tra_match.keys():
+                        tra_sorted[tra_match[each][0][0][1]] = tra_match[each][0][1]
+            except IndexError as error_log:
+                logger.debug(f"Error when returning encoder for {query} : {error_log}.", exc_info=True)
+                tra_sorted = {}
         vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
         lora_match = self.filter_compatible(query, self.model_indexes["lor"])
+        lora_match = dict(lora_match)
         j = 0
         for each in self.lora_priority:
-            for i in range(len(lora_match)):
-                if each in lora_match[i][0][1]:
-                    lora_sorted.append(lora_match[i])
+            for key, val in lora_match.items():
+                if each in key[1]:
+                    lora_sorted[key] = val
                     j += 1
         if vae_sorted == []: 
             vae_sorted =str("∅")
@@ -558,12 +559,18 @@ class IndexManager:
         if lora_sorted == []: 
             lora_sorted =str("∅")
             logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
+
+        return vae_sorted, tra_sorted, lora_sorted
+
+    def fetch_refiner(self):
+        self.dif_index = config.get_default("index", "DIF")
+        for key, value in self.dif_index.items():
+            if key == "STA-XR":
+                return value
+        return "∅"
+
         
-        if tra_sorted == [] or tra_sorted == None: 
-            tra_sorted =str("∅")
-            logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
-        return vae_sorted, lora_sorted, tra_sorted
-            
+
     #within a dict of models of the same type, match model code & sort by file size
     def filter_compatible(self, query, index):
         pack = defaultdict(dict)

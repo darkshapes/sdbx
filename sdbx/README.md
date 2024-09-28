@@ -61,7 +61,10 @@
                 a,b,c[0][1] size
                 a,b,c[0][1][1:2] path
                 a,b,c[0][1][2:3] dtype
-        filter = parse_compatible(self, query, a/b/c)                        #(show only a type of result)
+        filter = parse_compatible(self, query, a/b/c)                      #(show only a type of result)
+        fetch = IndexManager().fetch_refiner()                             # Just find STA-XR model only
+                                                                           #    template func for controlnet,
+                                                                           #    photomaker, other specialized models
 
 ```
 #### OUTPUT json file with model metadata, a set of dicts with all compatible models, a dict of model compatible codes
@@ -75,21 +78,35 @@
 ```
 
         defaults = determine_tuning(self, model) 
-
-        dict structure:
-                0 model-----------.
-                1 vae------.       |
-                2 lora----. |      |
-                3 tra----. ||      |
-                4 pipe-.0 size     |     
-                  |     1 path     |     
-                  |     2 dtype--. |
-                  |               ||
-                  |             3 scheduler/scheduler args
-                  |             4 steps
-            0 cache_jettison    5 cfg/dynamic guidance
-            1 cpu_offload
-            2 sequential_offload
+                                                 streaming
+        tuning dict :                            max_tokens
+                      model---------.            temperature
+                      vae----------. |           repeat_penalty
+                      lora--------.|||           top_p
+                      transformer. |||           top_k
+                  .---pipe        `file           class
+                 | .--compile      size           context           ##### LLM specific
+                 || .-refiner      dtype---model[ stage   
+                 ||| .scheduler    ||                   config
+                 ||||              ||                   upcast
+                 ||||              ||                   vae_slice  
+                 ||||              | `------------vae [ vae_tile       
+        pipe ]--' |||               `----------.              class          
+strength          |||                           `-------lora[ fuse
+cache_jettison    || `-------------scheduler[ cfg             lora scale         
+cpu_offload       ||                          dynamic_cfg
+sequential_offload| `--refiner[ available     algorithm
+max_batch         |           use_refiner     clip_sample
+noise_eta         |       denoising_start     timesteps            ##### 0-1000
+prompt            |   num_inference_steps     timestep_spacing     ##### str values
+                  |        high_noise_fra     inference_steps
+                  |         denoising_end     use_karras_sigmas
+                  |                           use_exponential_sigmas
+                  |                           use_beta_sigmas
+                  |                           rescale_betas_zero_snr
+                  `-compile [ mode            set_alpha_to_one
+                              fullgraph       interpolation_type
+                              compile_unet
 
 ```
 

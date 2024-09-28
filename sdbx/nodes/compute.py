@@ -13,24 +13,20 @@ from sdbx.nodes.helpers import seed_planter, soft_random, get_schedulers
 import torch
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
-
-NodeTuner().determine_tuning("filename")
 def tc(): print(str(datetime.timedelta(seconds=time.process_time())), end="")
-### GLOBAL AUTOCONFIGURE
-print(f"{tc()} determining device type...") #debug
 
-compile_unet = False #[performance] compile the model for speed, slows first gen only, doesnt work on my end
-queue = []    
-if torch.cuda.is_available(): device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
+#transfer this block to nodes ----------->
+# <------------ end of block for nodes
+
+#transfer this block to system config .json ----------->
+if torch.cuda.is_available(): 
+    device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
 else:  # https://pytorch.org/docs/master/notes/mps.html
    device = "mps" if (torch.backends.mps.is_available() & torch.backends.mps.is_built()) else "cpu"
+# <------------ end of block for system config .json
 
-### USER OPTIONS  : TOKEN ENCODER
-prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
-seed = int(soft_random())
 
-### AUTOCONFIGURE OPTIONS  : TOKEN ENCODER
-token_encoder = "stabilityai/stable-diffusion-xl-base-1.0" # this should autodetect
+token_encoder =  # this should autodetect
 ### TOKEN ENCODER SYSTEM
 queue.extend([{
   "prompt": prompt,
