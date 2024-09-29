@@ -1,172 +1,215 @@
-import time
-import datetime
+
+import os
+import PIL
+from PIL import Image
 from llama_cpp import Llama
-import sdbx.nodes.compute
+from transformers import AutoModel, TensorType, DataType, Tensor
 from sdbx import config
 from sdbx.config import get_defaults
 from sdbx.nodes.types import *
-from sdbx.nodes.helpers import seed_planter, soft_random
+from sdbx.nodes.helpers import soft_random
 from sdbx.nodes.compute import Inference, get_device
 from sdbx.nodes.tuner import NodeTuner
-# from time import perf_counter diagnostics
 
-# AUTOCONFIGURE OPTIONS : this should autodetec
-
+system = get_defaults("spec","data") #needs to be set by system @ launch
+spec = system["devices"]
+flash_attn = get_defaults("spec","flash-attention")
 algorithms = get_defaults("algorithms","schedulers")
-llm = get_defaults("index","LLM")
-diffusion = get_defaults("index","DIF")
-main_models = {**llm, **diffusion}
-# list(self.solvers) = get_defaults("algorithms","solvers")
-# llms = get_defaults("index","LLM")
-# diff = get_defaults("index","MODEL")
-# timestep_spacing="linspace" + use_exponential_sigmas=True"
-# #"Cannot set both `config.use_exponential_sigmas = True` and config.use_karras_sigmas = True`"
-# "DPMSolverMultistepScheduler",      # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
-# "DDIMScheduler",                    # default 5 rescale_betas_zero_snr=True, timestep_spacing="trailing"
+algorithms = get_defaults("algorithms","solvers")
 
-def tc():
-    print(str(datetime.timedelta(seconds=time.process_time())), end="")
+llms = get_defaults("index","LLM")
+diffusion_models = get_defaults("index","DIF")
+lora_models = get_defaults("index","LOR")
+vae_models = get_defaults("index","VAE")
+transformers = get_defaults("index","TRA")
+primary_models = {**llms, **diffusion_models}
 
-@node(name="", display=True)
-def generate_flow(
-    model: Literal[**main_models.keys()] = None
+@node(name="Genesis Node", display=True)
+def genesis_node(
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
-) -> Tuple[dict, str]:
-    flow = NodeTuner().determine_tuning(model)
-    #return flow
+    model: Literal[*primary_models.keys()] = next(iter([*primary_models.keys()]),""),
+) -> DataType:
+    strand = NodeTuner().determine_tuning(model)
+    return strand
 
-@node(name="Text Prompt", display=True)
-def llm_prompt(
-    llama: Llama,
-    external_user_prompt: str = None,
-    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "You're a guru for knowing what you know, yet wiser for knowing what you do not.",
-    user_prompt: A[str,Dependent(on="external_user_prompt", when=not None) Text(multiline=True, dynamic_prompts=True)] = "",
-    advanced_options: bool = False,
-    top_k: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=100)] = 40,
-    top_p: A[float,Dependent(on="advanced_options", when=True),Slider(min=0, max=1, step=0.01, round=0.01)] = 0.95,
-    repeat_penalty: A[float,Dependent(on="advanced_options", when=True),Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = 1,
-    temperature: A[float, Dependent(on="advanced_options", when=True), Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = 0.2,
-    max_tokens: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=2)] = 256,
-    streaming: bool = True,  # triggers generator in next node?
-) -> str:
-    if external_user_prompt:
-        user_prompt = external_user_prompt
-    Inference.llm_request(system_prompt, user_prompt, streaming=True)
-    return llama
+@node(name="Load Diffusion", display=True)
+def load_diffusion(
+    model: Literal[*diffusion_models.keys()] =  next(iter([*diffusion_models.keys()]),""),
+    # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
+    device: Literal[*system] = next(iter(*system), "cpu"),
+    precision: A[int, Dependent(on=next(iter(*spec["devices"]),""), when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
+    bfloat: A[bool, Dependent(on="precision", when="16")] = False,
+    verbose: bool = False,
+) ->  AutoModel:
+    #do model stuff
+    return model
 
-@node(name="Load Lora Model", display=True)
-    lora: Literal[*config.get_path_contents("models.loras", extension="safetensors", base_name=True)] = pcm_default,
+@node(name="Load LoRA", display=True)
+def load_lora(
+    lora: Literal[*lora_models.keys()] = next(iter([*lora_models.keys()]),""),
+    device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
+) -> Llama:
+    # Inference do_lora_stuff
+    return lora
+
+@node(name="Load Vae", display=True)
+def load_vae(
+    vae: Literal[*vae_models.keys()] =  next(iter([*vae_models.keys()]),""),
+    device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
+    vae_slice: bool = False,
+    vae_tile: bool = True,
+    upcast: bool = False
+) -> Tensor:
+    #do pipe ops
+    return vae
 
 @node(name="Load Vision Model", display=True)
-    lora: Literal[*config.get_path_contents("models.loras", extension="safetensors", base_name=True)] = pc
+def load_text_model(
+    transformer: Literal[*llms.keys()] = next(iter([*llms.keys()]),""),
+    batch: A[int, Numerical(min=0, max=512, step=1)] = 1,
+    device: Literal[*spec] = next(iter(*spec), "cpu"),
+    cpu_only: bool = (True if next(iter(*system), "cpu") == "cpu" else False), 
+    gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
+    flash_attention: bool = flash_attn, #autodetect
+    threads: A[int, Slider(min=0, max=64, step=1)] = 8,
+    max_context: A[int, Slider(min=0, max=32767, step=64),] = None, #let ollama do its thing
+    verbose: bool = False,
+    one_time_seed: bool = False,
+) -> Tensor | Llama:
+    llama = Inference.gguf_load(transformer, threads, max_context, verbose)
+    return llama
+
+@node(name="Text Prompt", display=True)
+def text_prompt(
+    model:  Tensor | Llama,
+    external_user_prompt: str = None,
+    prompt: A[str, Dependent(on="external_user_prompt", when=None), Text(multiline=True, dynamic_prompts=True)] = "", #prompt default
+    negative_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
+    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "", #system prompt default
+    top_k: A[int, Slider(min=0, max=100)] = None,
+    top_p: A[float, Slider(min=0, max=1, step=0.01, round=0.01)] = None,
+    repeat_penalty: A[float, Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = None,
+    temperature: A[float, Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = None,
+    max_tokens: A[int, Numerical(min=0, max=2)] = None,
+    streaming: bool = True,
+) ->  Tensor:
+    if external_user_prompt:
+        user_prompt = external_user_prompt
+    # if none, don't pass values
+    request = Inference.llm_request(system_prompt, user_prompt, streaming=True)
+    return request
+
+@node(name="Text Input", display=True)
+def text_input(
+    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
+) -> str:
+    return prompt
 
 @node(name="Image Prompt", display=True)
 def image_prompt(
-    text_encoder: Llama,
-    text_encoder_2: Llama = None,
-    text_encoder_gguf: Llama = None,
-    text_encoder_2_gguf: Llama = None,
-    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "A rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles",
+    text_encoder: Tensor | Llama,
+    text_encoder_2: Tensor | Llama = None,
+    text_encoder_3: Tensor | Llama = None,
+    lora: TensorType = None,
+    external_prompt: DataType = None,
+    external_negative_prompt: DataType = None,
+    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "system prompt",
     seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = int(soft_random()),
     # type: ignore
-    override_device: Literal[*next(iter(get_device()), "cpu")] = "",
-) -> Tuple[Llama, Llama]:
+    gpu_id: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=0, max=100)] = 0,
+) -> Llama:
     queue = Inference.push_prompt(prompt, seed)
     embeddings = Inference.start_encoding(queue, text_encoder, text_encoder_2)
     return embeddings
 
-@node(name="Load Diffusion Model", display=True)
-def diffusion_loader(
-    model: Literal[*config.get_defaults("index","DIF").keys()] = None,
-    # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
-    advanced_options: bool = False,
-    override_device: A[Literal[*get_device(), "cpu"], Dependent(on="advanced_options", when=True)] = "",  # type: ignore
-    precision: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
-    bfloat: A[bool, Dependent(on="precision", when="16")] = False,
-    verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
-) -> Llama:
-    return [*processor]
+# @node(name="Image Input", display=True)
+# def image_input(
+#  image: format(len(os.listdir(config.get_path("input")))),
+# ) -> Image
+# return image
 
+# @node(name="Autoencode", display=True)
+# def autoencode(
+#     image: Image,
+#     vae: Tensor,
+#     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
+# ) -> Image:
+#     batch = Inference.autoencode(vae, latent, file_prefix)
+#     for image in range(batch):
+#         return image
+    
+@node(name="Lora Fuse", path=None, display=True)
+def lora_fuse(
+    model: Tensor | Llama,
+    lora: Tensor = None,
+) -> Tensor | Llama:
+    #do pipe fuse operation
+    return model
 
-@node(name="Load LLM Model", display=True)
-def llm_loader(
-    model: Literal[*config.get_defaults("index","LLM").keys())] = None,  # type: ignore
-    advanced_options: bool = False,
-    cpu_only: A[bool, Dependent(on="advanced_options", when=True)] = True,
-    gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
-    threads: A[int, Dependent(on="advanced_options", when=True), Slider(min=0, max=64, step=1)] = 8,
-
-    one_time_seed: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    flash_attention: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    max_context: A[int,Dependent(on="advanced_options", when=True),Slider(min=0, max=32767, step=64),] = 8192,
-    verbose: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    batch: A[int, Dependent(on="advanced_options", when=True), Numerical(min=0, max=512, step=1),
-    ] = 1,
-) -> Llama:
-    tc()
-    llama = Inference.gguf_load(gguf, threads, max_context, verbose)
-    return llama
-
-@node(name="Generate", path=None, display=True)
-def diffusion(
-    model: Llama,
-    lora: 
-    # lora needs to be explicitly declared
-
-    scheduler: Literal[
-        *config.get_default("algorithms", "schedulers")] = scheduler_default,
-    # only appears if Lora isnt a PCM/LCM and scheduler isnt "AysScheduler". lower to increase speed
+@node(name="Generate Image", path=None, display=True)
+def generate_image(
+    model: Tensor | Llama,
+    encodings: Tensor,
+    lora_1: Tensor = None,
+    lora_2: Tensor = None,
+    scheduler: Literal[*algorithms.keys()] = next(iter([*algorithms.keys()]),""),
     inference_steps: A[int, Numerical(min=0, max=250, step=1)] = 8,
-    # default for sdxl-architecture. raise for sd-architecture, drop to 0 (off) to increase speed with turbo, etc. auto mode?
-    guidance_scale: A[
-        float, Numerical(min=0.00, max=50.00, step=0.01, round=".01")
-    ] = 5,
-    # lora2 = next(iter(m for m in os.listdir(config.get_path("models.loras")) if "adfdfd" in m and m.endswith(".safetensors")), "a default lora.safetensors")
-    # text_inversion = next((w for w in get_dir_files("models.embeddings"," ")),"None")
-    advanced_options: bool = False,
-    dynamic_guidance: A[bool, Dependent(on="advanced_options", when=True)] = False,
-    override_device: A[
-        Literal[*get_device(), "cpu"], Dependent(on="advanced_options", when=True)
-    ] = "",  # type: ignore
-) -> Llama:
+    guidance_scale: A[float, Numerical(min=0.00, max=50.00, step=0.01, round=".01")] = 5,
+    dynamic_guidance: bool = False,
+    compile_unet: bool = False,
+    device: Literal[*system] = next(iter(*system), "cpu"),
+) -> Tensor:
     latent = Inference.run_inference(
-        queue,
+        """queue""",
         inference_steps,
         guidance_scale,
         dynamic_guidance,
         scheduler,
-        lora=lora_default,
+        device
     )
     Inference.clear_memory_cache()
     return latent
 
-@node(name="Show & Save Image", display=True)
+@node(name="Autodecode", display=True)
 def autodecode(
-    # USER OPTIONS  : VAE/SAVE/PREVIEW
-    latent: Llama,
-    vae: Literal[
-        *config.get_path_contents("models.vae", extension="safetensors", base_name=True)] = vae_default,
+    latent: Tensor,
+    vae: Tensor,
     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
-    # advanced_options: bool = False,
-    # temp: bool = False,
+) -> Image:
+    batch = Inference.autodecode(vae, latent, file_prefix)
+    for image in range(batch):
+        return image
+
+@node(name="Save / Preview Image", display=True)
+def save_preview_img(
+    image: Image,
+    file_prefix: A[str, Text(multiline=False)]= "Shadowbox-",
     # format: A[Literal, Dependent(on:"temp", when="False"), "png","jpg","optimize"]] = "optimize",
     # compress_level: A[int, Slider(min=1, max=9, step=1),  Dependent(on:"format", when=(not "optimize"))] = 7,
+    compress_level: A[int, Slider(min=0, max=4, step=1)]= 4,
+    temp: bool = False,
 ) -> I[Any]:
-    # tempformat="optimize", compress_level="7"
-    batch = autodecode(vae, latent, file_prefix)
-    for image in range(batch):
+        # tempformat="optimize", compress_level="7"
+        image = """Inference.postprocess""" #pipe.image_processor.postprocess(image, output_type='pil')[0]
+        counter = format(len(os.listdir(config.get_path("output")))) #file count
+        file_prefix = os.path.join(config.get_path("output"), file_prefix)
+        image.save(f'{file_prefix + counter}.png')
+        print("Complete.")
         yield image
 
-
 @node(name="LLM Print", display=True)
-def llm_print(response: A[str, Text()]) -> I[str]:
-    tc()
+def llm_print( response: str) -> I[str]:
     print("Calculating Resposnse")
     for chunk in range(response):
-        delta = chunk["choices"][0]["delta"]
+        delta = chunk['choices'][0]['delta']
         # if 'role' in delta:               # this prints assistant: user: etc
-        # print(delta['role'], end=': ')
-        # yield (delta['role'], ': ')
-        if "content" in delta:  # the response itself
-            print(delta["content"], end="")
-            yield delta["content"], ""
+            # print(delta['role'], end=': ')
+            #yield (delta['role'], ': ')
+        if 'content' in delta:              # the response itself
+            print(delta['content'], end='')
+            yield delta['content'], ''
+
+#@node(name="Text Inversion")
+#def text_inversion(
+#    embeddings: next(other.keys(),"None")
+#)

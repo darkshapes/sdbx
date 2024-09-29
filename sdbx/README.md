@@ -77,29 +77,29 @@
 #### SYNTAX
 ```
 
-        defaults = determine_tuning(self, model) 
-                                                 streaming
-        tuning dict :                            max_tokens
-                      model---------.            temperature
-                      vae----------. |           repeat_penalty
-                      lora--------.|||           top_p
-                      transformer. |||           top_k
-                  .---pipe        `file           class
-                 | .--compile      size           context           ##### LLM specific
-                 || .-refiner      dtype---model[ stage   
+        defaults = determine_tuning(self, full_path_to_model)         context
+                                                                      streaming
+        tuning dict :                                                 max_tokens
+                      model---------.                                 temperature
+                      vae----------. |                                repeat_penalty
+                      lora--------.|||                                top_p
+                      transformer. |||  .-transformer[ use_fast       top_k
+                  .---pipe        `file'                              class
+                 | .--compile      size     .------------------model[ stage       
+                 || .-refiner      dtype---'    
                  ||| .scheduler    ||                   config
                  ||||              ||                   upcast
                  ||||              ||                   vae_slice  
                  ||||              | `------------vae [ vae_tile       
-        pipe ]--' |||               `----------.              class          
-strength          |||                           `-------lora[ fuse
-cache_jettison    || `-------------scheduler[ cfg             lora scale         
+        pipe ]--' |||               `----------.                class          
+strength          |||                           `---------lora[ fuse
+cache_jettison    || `-------------scheduler[ cfg               lora scale         
 cpu_offload       ||                          dynamic_cfg
 sequential_offload| `--refiner[ available     algorithm
 max_batch         |           use_refiner     clip_sample
 noise_eta         |       denoising_start     timesteps            ##### 0-1000
 prompt            |   num_inference_steps     timestep_spacing     ##### str values
-                  |        high_noise_fra     inference_steps
+system_prompt     |        high_noise_fra     inference_steps
                   |         denoising_end     use_karras_sigmas
                   |                           use_exponential_sigmas
                   |                           use_beta_sigmas

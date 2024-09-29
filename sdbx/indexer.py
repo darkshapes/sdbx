@@ -522,18 +522,21 @@ class IndexManager:
         try:
             lora_sorted = {}
             tra_sorted = {}
-            path = self._fetch_txt_enc_types(self.clip_data, query)
+            self.tra_req = self._fetch_txt_enc_types(self.clip_data, query)
         except TypeError as error_log:
             log = f"No match found for {query}"
             logger.debug(f"{log}{error_log}", exc_info=True)
             print(log)
-        if path == None:
+        if self.tra_req == None:
             tra_sorted =str("∅")
             logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
         else:
             tra_match = {}
-            for i in range(len(path)-1):
-                tra_match[i] = self.filter_compatible(path[i], self.model_indexes["tra"])
+            for i in range(len(self.tra_req)-1):
+                tra_match[i] = self.filter_compatible(self.tra_req[i], self.model_indexes["tra"])
+                if tra_match[i] == None:
+                    tra_match[i] == query
+                print(len(self.tra_req))
             try:
                 if tra_match[0] == []:
                     logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)

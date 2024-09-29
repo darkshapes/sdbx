@@ -54,15 +54,22 @@ class VRAM(str, Enum):
 
 class Precision(str, Enum):
     MIXED = "mixed"
-    F64 = "float64"
-    F32 = "float32"
-    F16 = "float16"
+    FP64 = "float64"
+    FP32 = "float32"
+    FP16 = "float16"
     BF16 = "bfloat16"
     FP8E4M3FN = "float8_e4m3fn"
     FP8E5M2 = "float8_e5m2"
+    IN64 =  "int64"
+    IN32 =  "int32"
+    IN16 =  "int16"
+    IN8 =  "int8"
+    UN8 =  "uint8"
+    NF4 = "nf4"
 
-# class TensorType:
-#     DTYPE_T = Literal["F64", "F32", "F16", "BF16", "I64", "I32", "I16", "I8", "U8", "BOOL"]
+class TensorDataType:
+    TYPE_T = Literal["F64", "F32", "F16", "BF16", "F8_E4M3", "F8_E5M2", "I64", "I32", "I16", "I8", "U8", "nf4", "BOOL"]
+    TYPE_R = Literal["fp64", "fp32", "fp16", "bf16", "fp8_e4m3fn", "fp8_e5m2", "i64", "i32", "i16", "i8", "u8", "nf4", "bool"]
 
 # class TensorData:
 #     dtype: DTYPE_T
@@ -112,14 +119,14 @@ class MemoryConfig(ConfigModel):
     vram: VRAM = VRAM.NORMAL
     smart_memory: bool = True
 
-MixedPrecision = Union[Literal[Precision.MIXED, Precision.F32, Precision.F16, Precision.BF16]]
-EncoderPrecision = Union[Literal[Precision.F32, Precision.F16, Precision.BF16, Precision.FP8E4M3FN, Precision.FP8E5M2]]
+MixedPrecision = Union[Literal[Precision.MIXED, Precision.FP32, Precision.FP16, Precision.BF16]]
+EncoderPrecision = Union[Literal[Precision.FP32, Precision.FP16, Precision.BF16, Precision.FP8E4M3FN, Precision.FP8E5M2]]
 
 class PrecisionConfig(ConfigModel):
     fp: MixedPrecision = Precision.MIXED
-    unet: EncoderPrecision = Precision.F32
+    unet: EncoderPrecision = Precision.FP32
     vae: MixedPrecision = Precision.MIXED
-    text_encoder: EncoderPrecision = Precision.F16
+    text_encoder: EncoderPrecision = Precision.FP16
 
 class DistributedConfig(ConfigModel):
     role: Literal[False, Literal['worker', 'frontend']] = False

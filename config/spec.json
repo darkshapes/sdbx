@@ -1,0 +1,11 @@
+{
+    "data": {
+        "gpu_ram": 4294836224,
+        "cpu_ram": 8457080832,
+        "flash-attention": "True",
+        "devices": [
+            "cuda",
+            "cpu"
+        ]
+    }
+}
