@@ -3,6 +3,7 @@
         "gpu_ram": 4294836224,
         "cpu_ram": 8457080832,
         "flash-attention": "True",
+        "low_cpu_mem_usage": "True",
         "devices": [
             "cuda",
             "cpu"

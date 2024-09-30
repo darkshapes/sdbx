@@ -87,27 +87,26 @@
                   .---pipe        `file'                              class
                  | .--compile      size     .------------------model[ stage       
                  || .-refiner      dtype---'    
-                 ||| .scheduler    ||                   config
-                 ||||              ||                   upcast
-                 ||||              ||                   vae_slice  
-                 ||||              | `------------vae [ vae_tile       
-        pipe ]--' |||               `----------.                class          
-strength          |||                           `---------lora[ fuse
-cache_jettison    || `-------------scheduler[ cfg               lora scale         
-cpu_offload       ||                          dynamic_cfg
-sequential_offload| `--refiner[ available     algorithm
+                 ||| .scheduler    ||                  config
+                 ||||              ||                  upcast
+                 ||||              ||                  slice  
+                 ||||              | `------------vae[ tile       
+seed     ]pipe--' |||               `----------.                class          
+cfg               |||                           `---------lora[ fuse
+cache_jettison    || `-------------scheduler[ algorithm         scale         
+cpu_offload       ||                          lu_lambdas        unet_only
+sequential_offload| `--refiner[ available     euler_at_final
 max_batch         |           use_refiner     clip_sample
 noise_eta         |       denoising_start     timesteps            ##### 0-1000
 prompt            |   num_inference_steps     timestep_spacing     ##### str values
-system_prompt     |        high_noise_fra     inference_steps
-                  |         denoising_end     use_karras_sigmas
-                  |                           use_exponential_sigmas
-                  |                           use_beta_sigmas
-                  |                           rescale_betas_zero_snr
-                  `-compile [ mode            set_alpha_to_one
-                              fullgraph       interpolation_type
-                              compile_unet
-
+system_prompt     |        high_noise_fra     interpolation_type
+strength          |         denoising_end     use_karras_sigmas
+dynamic_cfg       |                           use_exponential_sigmas
+file_prefix        `-compile [ unet           use_beta_sigmas
+inference_steps                fullgraph      rescale_betas_zero_snr
+                               mode           set_alpha_to_one
+                                  
+                                              
 ```
 
 #### Exception handling

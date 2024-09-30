@@ -536,7 +536,6 @@ class IndexManager:
                 tra_match[i] = self.filter_compatible(self.tra_req[i], self.model_indexes["tra"])
                 if tra_match[i] == None:
                     tra_match[i] == query
-                print(len(self.tra_req))
             try:
                 if tra_match[0] == []:
                     logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
