@@ -22,9 +22,10 @@ class NodeTuner:
             self.params["transformer"]["size"] = {}
             self.params["transformer"]["dtype"] = {}
             self.params["transformer"]["use_fast"] = {}
+            self.params["transformer"]["config"] = {}
             self.params["refiner"] = {}
             self.params["negative"] = {}
-            self.params["compile"]["compile_unet"] = {}
+            self.params["compile"]["unet"] = {}
             self.params["model"]["file"] = list(self.fetch)[1]
             self.params["model"]["size"] = list(self.fetch)[0]
             self.params["model"]["dtype"] = list(self.fetch)[2]
@@ -41,23 +42,23 @@ class NodeTuner:
             
             #give a number to each overhead condition
             # size?  >50%   >100%  >cpu  >cpu+gpu
-            oh_no = [True, False, False, False,]
+            oh_no = [False, False, False, False,]
             if gpu_ceiling > 1: 
                 #look for quant, load_in_4bit=True >75
-                oh_no[3] = True
+                oh_no[1] = True
                 if total_ceiling > 1:
-                    oh_no[1] = True
+                    oh_no[3] = True
                 elif cpu_ceiling > 1:
                     oh_no[2] = True
             elif gpu_ceiling < .5:
-                oh_no[0] = False
+                oh_no[0] = True
             
             self.params["pipe"]["cache_jettison"] = oh_no[3]
             self.params["pipe"]["cpu_offload"] = oh_no[2]
             self.params["pipe"]["sequential_offload"] = oh_no[1]
             self.params["pipe"]["max_batch"] = oh_no[2]
             self.params["pipe"]["seed"] = int(soft_random())
-            self.params["pipe"]["low_cpu_mem_usage"] = oh_no[0] if oh_no[1] else True
+            self.params["pipe"]["low_cpu_mem_usage"] = oh_no[0]#
             self.params["pipe"]["dynamic_cfg"] = False  
             self.params["pipe"]["file_prefix"] = "Shadowbox-"
 
@@ -80,6 +81,9 @@ class NodeTuner:
                 say less fam
                 """
             else:
+                self.params["pipe"]["config_path"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"])
+                self.params["model"]["config"] = os.path.join(self.params["model"]["class"],"model.safetensors")
+                self.params["model"]["yaml"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"])
                 self.params["pipe"]["prompt"] = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
                 self.vae,  self.tra, self.lora = IndexManager().fetch_compatible(self.params["model"]["class"])
                 self.num = 2
@@ -89,9 +93,9 @@ class NodeTuner:
                     self.params["vae"]["file"] = self.vae[0][1][1]
                     self.params["vae"]["size"] = self.vae[0][1][0]
                     self.params["vae"]["dtype"] = self.vae[0][1][2]
-                    self.params["vae"]["ile"] = oh_no[1]   # [compatibility] tile vae input to lower memory
+                    self.params["vae"]["tile"] = oh_no[1]   # [compatibility] tile vae input to lower memory
                     self.params["vae"]["slice"] = oh_no[2]  # [compatibility] serialize vae to lower memory
-                self.params["vae"]["config"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"])
+                self.params["vae"]["config"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"],"config.json")
                 self.params["vae"]["upcast"] = True if self.params["model"]["class"] == "STA-XL" else False #force vae to f32 by default, because the default vae is broken
 
                 if self.tra != "∅" and self.tra != {}: 
@@ -100,6 +104,7 @@ class NodeTuner:
                             self.params["transformer"]["size"][each] = self.tra[each][0]
                             self.params["transformer"]["dtype"][each] = self.tra[each][2]
                             self.params["transformer"]["use_fast"][each] = True
+                            self.params["transformer"]["config"][each] = os.path.join(each,"model.fp16.safetensors") if self.params["transformer"]["dtype"][each] == "F16" else os.path.join(each,"model.safetensors")
 
                     
                 if next(iter(self.lora.items()),0) != 0: 
@@ -108,19 +113,21 @@ class NodeTuner:
                     self.params["lora"]["dtype"] = next(iter(self.lora.items()),0)[1][2] 
                     self.params["lora"]["class"] = next(iter(self.lora.items()),0)[0][1]
                     #get steps from filename if possible (yet to determine another reliable way)
+                    print(self.params["lora"]["file"])
                     try:
-                        self.step = str(self.params["lora"]["file"][1]).lower()
-                        self.step  = self.step.rindex("step")
+                        self.step_title = self.params["lora"]["file"].lower()
+                        self.step  = self.step_title.rindex("step")
                     except ValueError as error_log:
                         logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
-                        self.params["pipe"]["inference_steps"] = 20
+                        self.params["pipe"]["num_inference_steps"] = 20
 
                     else:
                         if self.step != None:
-                            self.isteps = str(self.params["lora"]["file"][1])[self.step-2:self.step]
-                            self.params["pipe"]["inference_steps"] = self.isteps if self.isteps.isdigit() else self.isteps[1:]
+                            self.isteps = str(self.params["lora"]["file"][self.step-2:self.step])
+                            self.params["pipe"]["num_inference_steps"] = int(self.isteps) if self.isteps.isdigit() else int(self.isteps[1:])
                         else:
-                            self.params["pipe"]["inference_steps"] = 20
+                            self.params["pipe"]["num_inference_steps"] = 20
+                    self.params["scheduler"]["config"] = self.params["pipe"]["config_path"]
                     self.params["scheduler"]["timestep_spacing"] ="linspace"                      
                     self.params["scheduler"]["use_beta_sigmas"] = True
                     self.params["scheduler"]["lu_lambdas"]= False
@@ -128,9 +135,10 @@ class NodeTuner:
                     #get lora prams
 
                     # cfg enabled here
+                    self.params["lora"]["unet_only"] = False # x todo - add conditions where this is useful
                     self.params["lora"]["fuse"] = False
                     if "PCM" in self.params["lora"]["class"]:
-                        self.params["scheduler"]["algorithm"] = self.algorithms[5] #DDIM
+                        self.params["pipe"]["algorithm"] = self.algorithms[5] #DDIM
                         self.params["scheduler"]["timestep_spacing"] = "trailing"
                         self.params["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
                         self.params["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
@@ -149,35 +157,35 @@ class NodeTuner:
                         self.params["lora"]["scale"] = 1.0
                         self.params["lora"]["unet_only"] = False # x todo - add conditions where this is useful
                         if "TCD" in self.params["lora"]["class"]:
-                            self.params["pipe"]["inference_steps"] = 4
-                            self.params["scheduler"]["algorithm"] = self.algorithms[7] #TCD sampler
+                            self.params["pipe"]["num_inference_steps"] = 4
+                            self.params["pipe"]["algorithm"] = self.algorithms[7] #TCD sampler
                             self.params["pipe"]["noise_eta"] = 0.3
                             self.params["pipe"]["strength"] = .99
                         elif "LIG" in self.params["lora"]["class"]: #4 step model pref
-                            self.params["scheduler"]["algorithm"] = self.algorithms[0] #Euler sampler
+                            self.params["pipe"]["algorithm"] = self.algorithms[0] #Euler sampler
                             self.params["scheduler"]["interpolation_type"] = "Linear" #sgm_uniform/simple
                             self.params["scheduler"]["timestep_spacing"] = "trailing"                         
                         elif "DMD" in self.params["lora"]["class"]:
                             self.params["lora"]["fuse"] = False
-                            self.params["scheduler"]["algorithm"] = self.algorithms[6] #LCM
+                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
                             self.params["scheduler"]["timesteps"] = [999, 749, 499, 249]
                             self.params["scheduler"]["use_beta_sigmas"] = True         
                         elif "LCM" in self.params["lora"]["class"] or "RT" in self.params["lora"]["class"]:
-                            self.params["scheduler"]["algorithm"] = self.algorithms[6] #LCM
-                            self.params["pipe"]["inference_steps"] = 4
+                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
+                            self.params["pipe"]["num_inference_steps"] = 4
                         elif "FLA" in self.params["lora"]["class"]:
-                            self.params["scheduler"]["algorithm"] = self.algorithms[6] #LCM
-                            self.params["pipe"]["inference_steps"] = 4
+                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
+                            self.params["pipe"]["num_inference_steps"] = 4
                             self.params["scheduler"]["timestep_spacing"] = "trailing"
                             if "STA-3" in self.params["lora"]["class"]:
-                                self.params["scheduler"]["algorithm"] = self.algorithms[9] #LCM
+                                self.params["pipe"]["algorithm"] = self.algorithms[9] #LCM
                                 for each in self.params["transformer"]["file"].lower():
                                     if "t5" in each:
                                         for items in self.params["transformer"]:
                                             self.params["transformer"][items].pop(each)
                         elif "HYP" in self.params["lora"]["class"]:
-                            if self.params["pipe"]["inference_steps"] == 1:
-                                self.params["scheduler"]["algorithm"] = self.algorithms[7] #tcd FOR ONE STEP
+                            if self.params["pipe"]["num_inference_steps"] == 1:
+                                self.params["pipe"]["algorithm"] = self.algorithms[7] #tcd FOR ONE STEP
                                 self.params["scheduler"]["timestep_spacing"] = "trailing"
                             if "CFG" in str(self.params["lora"]["file"]).upper():
                                 if self.params["model"]["class"] == "STA-XL":
@@ -188,10 +196,10 @@ class NodeTuner:
                             or "STA-3" in self.params["lora"]["class"]):
                                 self.params["lora"]["scale"]=0.125
                             elif "STA-XL" in self.params["lora"]["class"]:
-                                if self.params["pipe"]["inference_steps"] == 1:
+                                if self.params["pipe"]["num_inference_steps"] == 1:
                                     self.params["scheduler"]["timesteps"] = 800
                                 else:
-                                    self.params["scheduler"]["algorithm"] = self.algorithms[5] #DDIM
+                                    self.params["pipe"]["algorithm"] = self.algorithms[5] #DDIM
                                     self.params["scheduler"]["timestep_spacing"] = "trailing"
                                     self.params["pipe"]["noise_eta"] = 1.0       
 
@@ -203,11 +211,11 @@ class NodeTuner:
                     if (self.params["model"]["class"] == "STA-15"
                     or self.params["model"]["class"] == "STA-XL"
                     or self.params["model"]["class"] == "STA3"):
-                        self.params["scheduler"]["algorithm"] = self.algorithms[8] #AlignYourSteps
+                        self.params["pipe"]["algorithm"] = self.algorithms[8] #AlignYourSteps
                         if "STA-15" == self.params["model"]["class"]: 
                             self.params["scheduler"]["model_ays"] = "StableDiffusionTimesteps"
                         elif "STA-XL" == self.params["model"]["class"]:
-                            self.params["pipe"]["inference_steps"] = 10
+                            self.params["pipe"]["num_inference_steps"] = 10
                             self.params["pipe"]["cfg"] = 5 
                             self.params["scheduler"]["model_ays"] = "StableDiffusionXLTimesteps"
                             self.params["pipe"]["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accels
@@ -215,20 +223,18 @@ class NodeTuner:
                             self.params["scheduler"]["lu_lambdas"]= True
                             self.params["scheduler"]["euler_at_final"] = True
                             self.params["scheduler"]["model_ays"] = "StableDiffusion3Timesteps"
-                            self.params["scheduler"]["algorithm"] = "AysSchedules"
-                            self.params["scheduler"]["algorithm_type"]= self.solvers[4] # DPM
+                            self.params["pipe"]["algorithm"] = "AysSchedules"
+                            self.params["pipe"]["algorithm_type"]= self.solvers[4] # DPM
                             self.params["scheduler"]["use_karras_sigmas"] = True 
                     elif "PLA" in self.params["model"]["class"]:
-                        self.params["scheduler"]["algorithm"] = self.algorithms[3] #EDMDPM
+                        self.params["pipe"]["algorithm"] = self.algorithms[3] #EDMDPM
                     elif ("FLU" in self.params["model"]["class"]
                     or "AUR" in self.params["model"]["class"]):
-                        self.params["scheduler"]["algorithm"] = self.algorithms[2] #EulerAncestral (Ancient Aliens)
+                        self.params["pipe"]["algorithm"] = self.algorithms[2] #EulerAncestral (Ancient Aliens)
 
-                if self.params["compile"]["unet"] == True:
-                    self.params["compile"]["fullgraph"] = True
-                    self.params["compile"]["mode"] = "reduce-overhead"
-                else:
-                    self.params["compile"]["compile_unet"] = False #if unet and possibly only on higher-end cards #[performance] unet only, compile the model for speed, slows first gen only 
+                self.params["compile"]["unet"] == True
+                self.params["compile"]["fullgraph"] = True
+                self.params["compile"]["mode"] = "reduce-overhead"  #if unet and possibly only on higher-end cards #[performance] unet only, compile the model for speed, slows first gen only 
 
                 if self.params["model"]["class"] == "STA-XL": 
                     self.params["refiner"]["available"] = IndexManager().fetch_refiner()
@@ -236,7 +242,7 @@ class NodeTuner:
                         self.params["refiner"]["use_refiner"] = False # refiner      
                         self.params["refiner"]["high_noise_fra"] = 0.8 #end noise 
                         self.params["refiner"]["denoising_end"] = self.params["pipe"]["refiner"]["high_noise_fra"]
-                        self.params["refiner"]["num_inference_steps"] = self.params["pipe"]["inference_steps"] #begin step
+                        self.params["refiner"]["num_num_inference_steps"] = self.params["pipe"]["num_inference_steps"] #begin step
                         self.params["refiner"]["denoising_start"] = self.params["pipe"]["refiner"]["high_noise_fra"] #begin noise
                     else: 
                         self.params["refiner"]["available"] = False

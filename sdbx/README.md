@@ -77,16 +77,16 @@
 #### SYNTAX
 ```
 
-        defaults = determine_tuning(self, full_path_to_model)         context
-                                                                      streaming
-        tuning dict :                                                 max_tokens
-                      model---------.                                 temperature
-                      vae----------. |                                repeat_penalty
-                      lora--------.|||                                top_p
-                      transformer. |||  .-transformer[ use_fast       top_k
-                  .---pipe        `file'                              class
-                 | .--compile      size     .------------------model[ stage       
-                 || .-refiner      dtype---'    
+        defaults = determine_tuning(self, full_path_to_model)           context
+                                                                        streaming
+        tuning dict :                                                   max_tokens
+                      model---------.                                   temperature
+                      vae----------. |                                  repeat_penalty
+                      lora--------.|||                                  top_p
+                      transformer. |||    .-transformer[ use_fast       top_k
+                  .---pipe        `file  |                              class
+                 | .--compile      size  |    .------------------model[ stage       
+                 || .-refiner      dtype'---'                           config
                  ||| .scheduler    ||                  config
                  ||||              ||                  upcast
                  ||||              ||                  slice  
@@ -104,7 +104,7 @@ strength          |         denoising_end     use_karras_sigmas
 dynamic_cfg       |                           use_exponential_sigmas
 file_prefix        `-compile [ unet           use_beta_sigmas
 inference_steps                fullgraph      rescale_betas_zero_snr
-                               mode           set_alpha_to_one
+config_path                    mode           set_alpha_to_one
                                   
                                               
 ```
