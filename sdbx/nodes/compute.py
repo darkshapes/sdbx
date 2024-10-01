@@ -218,8 +218,8 @@ class Inference:
         self.lora_file = os.path.basename(self.parameters["lora"]["file"])
         self.variant, self.tensor_dtype = self.float_converter(self.parameters["model"]["dtype"])
         self.use_low_cpu = self.parameters["pipe"]["low_cpu_mem_usage"]
-        self.scheduler = self.algorithm_converter(self.parameters["pipe"]["algorithm"])
-        self.model_config = self.parameters["pipe"]["config_path"]
+        self.scheduler = EulerDiscreteScheduler #.from_config(self.pipe.scheduler.config) #self.algorithm_converter(self.parameters["pipe"]["algorithm"])
+        self.model_config = self.parameters["pipe"]["config_name"]
         #self.model_config = self.parameters["model"]["yaml"]
         self.class_name = self.parameters["model"]["class"]
         
@@ -235,13 +235,14 @@ class Inference:
             "config_name": self.model_config,
             "low_cpu_mem_usage":self.use_low_cpu,
             "device_map": None,
+            "load_safety_checker": False,
+            "local_files_only": True,
             #"vae": self.parameters["pipe"]["config_path"],
             #"unet":None,
             #"feature_extractor":None,
             #"image_encoder":None,
             #"scheduler": self.scheduler,
-            #"local_files_only": True,
-            #"local_files_only":True,
+            
         }
 
         #symlink model
@@ -252,8 +253,8 @@ class Inference:
         print(self.lora_file, self.lora_path,self.model)
         #if self.parameters["lora"]["unet_only"]: self.pipe.unet.load_attn_procs(self.lora_path, weight_name=self.lora_file)
         #else: self.pipe.load_lora_weights(self.lora_path, weight_name=self.lora_file)
-        self.pipe.scheduler = DDIMScheduler.from_config(
-            self.pipe.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing")
+        self.pipe.scheduler = EulerDiscreteScheduler.from_config(
+            self.pipe.scheduler.config)#, rescale_betas_zero_snr=True, timestep_spacing="trailing")
             #**self.scheduler_args)
         #if self.parameters["lora"]["fuse"]: self.pipe.fuse_lora(lora_scale=self.parameters["lora"]["scale"]) 
         # if lora 2: self.pipe.load_lora_weights(self.lora_path, weight_name=self.lora_name)
