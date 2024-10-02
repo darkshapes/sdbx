@@ -4,250 +4,248 @@ from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
 from sdbx.nodes.helpers import soft_random
 from collections import defaultdict
+from diffusers.schedulers import AysSchedules
 import psutil
 
 class NodeTuner:
 
+    @cache
+    def _pipe_exp(self):
+        #self.queue["seed"] = int(soft_random())
+        self.pipe_dict["variant"] = list(self.fetch)[2]
+        self.pipe_dict["tokenizer"] = None
+        self.pipe_dict["text_encoder"] = None
+        self.pipe_dict["tokenizer_2"] = None
+        self.pipe_dict["text_encoder_2"] = None
+        if "STA-15" in self.category: self.pipe_dict["safety_checker"] = None
+        return self.pipe_dict
+    
+
     @cache        
-    def determine_tuning(self, model): 
+    def determine_tuning(self, model):
+        self.clip_skip = 2
         self.spec = config.get_default("spec","data")
         self.algorithms = list(config.get_default("algorithms","schedulers"))
         self.solvers = list(config.get_default("algorithms","solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
-        #print(self.sort, self.category, self.fetch)
+        self.metadata_path = config.get_path("models.metadata")
         if self.fetch != "∅" and self.fetch != None:
-            #print(self.category)
-            self.params = defaultdict(dict)
-            self.params["transformer"]["file"] = {}
-            self.params["transformer"]["size"] = {}
-            self.params["transformer"]["dtype"] = {}
-            self.params["transformer"]["use_fast"] = {}
-            self.params["transformer"]["config"] = {}
-            self.params["refiner"] = {}
-            self.params["negative"] = {}
-            self.params["compile"]["unet"] = {}
-            self.params["model"]["file"] = list(self.fetch)[1]
-            self.params["model"]["size"] = list(self.fetch)[0]
-            self.params["model"]["dtype"] = list(self.fetch)[2]
-            self.params["model"]["stage"] = self.sort
-            self.params["model"]["class"] = self.category
 
-         
+        
             peak_gpu = self.spec["gpu_ram"] #accomodate list of graphics card ram
-            overhead = self.params["model"]["size"]
+            overhead =  list(self.fetch)[0]
             peak_cpu = self.spec["cpu_ram"]
             cpu_ceiling =  overhead/peak_cpu
             gpu_ceiling = overhead/peak_gpu
             total_ceiling = overhead/peak_cpu+peak_gpu
             
-            #give a number to each overhead condition
-            # size?  >50%   >100%  >cpu  >cpu+gpu
+            
+            # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
             oh_no = [False, False, False, False,]
             if gpu_ceiling > 1: 
-                #look for quant, load_in_4bit=True >75
-                oh_no[1] = True
+                oh_no[1] = True #look for quant, load_in_4bit=True/load_in_8bit=True
                 if total_ceiling > 1:
                     oh_no[3] = True
                 elif cpu_ceiling > 1:
                     oh_no[2] = True
             elif gpu_ceiling < .5:
                 oh_no[0] = True
-            
-            self.params["pipe"]["cache_jettison"] = oh_no[3]
-            self.params["pipe"]["cpu_offload"] = oh_no[2]
-            self.params["pipe"]["sequential_offload"] = oh_no[1]
-            self.params["pipe"]["max_batch"] = oh_no[2]
-            self.params["pipe"]["seed"] = int(soft_random())
-            self.params["pipe"]["low_cpu_mem_usage"] = oh_no[0]#
-            self.params["pipe"]["dynamic_cfg"] = False  
-            self.params["pipe"]["file_prefix"] = "Shadowbox-"
 
-            if self.params["model"]["stage"] == "LLM":
-                self.params["model"]["context"] = self.params["model"].pop("dtype")
-                self.params["model"]["top_p"] = .95
-                self.params["model"]["top_k"] = 40
-                self.params["model"]["repeat_penalty"] =1
-                self.params["model"]["temperature"] = 0.2
-                self.params["model"]["max_tokens"] = 256
-                self.params["model"]["streaming"] = True   
-                self.params["pipe"]["prompt"] = "Tell a story about-"
-                self.params["pipe"]["system_prompt"] = "You are an assistant who gives an accurate and concise reply to the best of your ability."         
+            self.optimized = defaultdict(dict)
+            self.queue = defaultdict(dict)
+            self.pipe_dict = defaultdict(dict)
+            self.transformers = defaultdict(dict)
+            self.conditioning = defaultdict(dict)
+            self.lora_dict = defaultdict(dict)
+            self.fuse = defaultdict(dict)
+            self.schedule = defaultdict(dict)
+            self.gen_dict = defaultdict(dict)
+            self.refiner =  defaultdict(dict)
+            self.vae_dict = defaultdict(dict)
 
-            elif (self.params["model"]["stage"] == "VAE"
-            or self.params["model"]["stage"] == "TRA"
-            or self.params["model"]["stage"] == "LOR"):
+            self.optimized["model"] = list(self.fetch)[1]
+            self.optimized["cache_jettison"] = oh_no[3]
+            self.optimized["device"] = self.spec["devices"][0]
+            self.optimized["dynamic_cfg"] = False
+
+            self.optimized["sequential_offload"] = oh_no[1]
+            #disk_offload = False #[compatability] last resort, but things work
+
+            self.optimized["cpu_offload"] = oh_no[2]
+            self.optimized["compile_unet"] == False
+            self.optimized["compile"]["fullgraph"] = True
+            self.optimized["compile"]["mode"] = "reduce-overhead"       
+            self.optimized["refiner_file"] = IndexManager().fetch_refiner()
+            self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False #force vae to f32 by default, because the default vae is broken
+            self.optimized["vae_tile"] = oh_no[1]   # [compatibility] tile vae input to lower memory
+            self.optimized["vae_slice"] = oh_no[2]  # [compatibility] serialize vae to lower memory
+            self.optimized["file_prefix"] = "Shadowbox-"
+
+            if self.sort == "LLM":
+                """
+                llm stuff
+                """
+          
+            elif (self.sort  == "VAE"
+            or self.sort  == "TRA"
+            or self.sort  == "LOR"):
                 
                 """
                 say less fam
                 """
+
             else:
-                self.params["pipe"]["config_path"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"])
-                self.params["model"]["config"] = os.path.join(self.params["model"]["class"],"model.safetensors")
-                self.params["model"]["yaml"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"])
-                self.params["pipe"]["prompt"] = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
-                self.vae,  self.tra, self.lora = IndexManager().fetch_compatible(self.params["model"]["class"])
+                #self.queue["prompt"] = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
+                self.conditioning["padding"] = "max_length"
+                self.conditioning["truncation"] = True
+                self.conditioning["return_tensors"] = 'pt'
+                self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
                 self.num = 2
 
                 # ensure value returned
-                if self.vae != "∅":  
-                    self.params["vae"]["file"] = self.vae[0][1][1]
-                    self.params["vae"]["size"] = self.vae[0][1][0]
-                    self.params["vae"]["dtype"] = self.vae[0][1][2]
-                    self.params["vae"]["tile"] = oh_no[1]   # [compatibility] tile vae input to lower memory
-                    self.params["vae"]["slice"] = oh_no[2]  # [compatibility] serialize vae to lower memory
-                self.params["vae"]["config"] = os.path.join(config.get_path("models.metadata"),self.params["model"]["class"],"config.json")
-                self.params["vae"]["upcast"] = True if self.params["model"]["class"] == "STA-XL" else False #force vae to f32 by default, because the default vae is broken
+                if self._vae != "∅":  
+                    self.optimized["vae"] = self._vae[0][1][1]
+                    self.vae_dict["variant"] = "fp16", #self._vae[0][1][2]
+                    self.vae_dict["cache_dir"] = "vae_"
+                
+                self.conditioning_list = ["tokenizer", "text_encoder", "tokenizer_2", "text_encoder_2","tokenizer_3", "text_encoder_3"]
+                if self._tra != "∅" and self._tra != {}: 
+                        self.transformers["num_hidden_layers"] = 12 - (self.clip_skip-1)
+                        i = 0
+                        for each in self._tra:
+                            #self.transformers["tokenizer][each] = self._tra[each][1]
+                            self.transformers["text_encoder"][each] = self._tra[each][1]
+                            self.transformers["variant"][each] = self._tra[each][2]
 
-                if self.tra != "∅" and self.tra != {}: 
-                        for each in self.tra:
-                            self.params["transformer"]["file"][each] = self.tra[each][1]
-                            self.params["transformer"]["size"][each] = self.tra[each][0]
-                            self.params["transformer"]["dtype"][each] = self.tra[each][2]
-                            self.params["transformer"]["use_fast"][each] = True
-                            self.params["transformer"]["config"][each] = os.path.join(each,"model.fp16.safetensors") if self.params["transformer"]["dtype"][each] == "F16" else os.path.join(each,"model.safetensors")
-
-                    
-                if next(iter(self.lora.items()),0) != 0: 
-                    self.params["lora"]["file"] = next(iter(self.lora.items()),0)[1][1]
-                    self.params["lora"]["size"] = next(iter(self.lora.items()),0)[1][0] 
-                    self.params["lora"]["dtype"] = next(iter(self.lora.items()),0)[1][2] 
-                    self.params["lora"]["class"] = next(iter(self.lora.items()),0)[0][1]
+                if next(iter(self._lora.items()),0) != 0: 
+                    self.optimized["fuse"] = False
+                    self.lora_dict["file"] = next(iter(self._lora.items()),0)[1][1]
+                    self.lora_dict["class"] = next(iter(self._lora.items()),0)[0][1]
                     #get steps from filename if possible (yet to determine another reliable way)
-                    print(self.params["lora"]["file"])
+                    print(self.lora_dict["file"])
                     try:
-                        self.step_title = self.params["lora"]["file"].lower()
+                        self.step_title = self.lora_dict["file"].lower()
                         self.step  = self.step_title.rindex("step")
                     except ValueError as error_log:
                         logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
-                        self.params["pipe"]["num_inference_steps"] = 20
-
+                        self.gen_dict["num_inference_steps"] = 20
                     else:
                         if self.step != None:
-                            self.isteps = str(self.params["lora"]["file"][self.step-2:self.step])
-                            self.params["pipe"]["num_inference_steps"] = int(self.isteps) if self.isteps.isdigit() else int(self.isteps[1:])
+                            self.isteps = str(self.lora_dict["file"][self.step-2:self.step])
+                            self.gen_dict["num_inference_steps"] = int(self.isteps) if self.isteps.isdigit() else int(self.isteps[1:])
                         else:
-                            self.params["pipe"]["num_inference_steps"] = 20
-                    self.params["scheduler"]["config"] = self.params["pipe"]["config_path"]
-                    self.params["scheduler"]["timestep_spacing"] ="linspace"                      
-                    self.params["scheduler"]["use_beta_sigmas"] = True
-                    self.params["scheduler"]["lu_lambdas"]= False
-                    self.params["scheduler"]["euler_at_final"] = False
-                    #get lora prams
+                            self.gen_dict["num_inference_steps"] = 20
 
                     # cfg enabled here
-                    self.params["lora"]["unet_only"] = False # x todo - add conditions where this is useful
-                    self.params["lora"]["fuse"] = False
-                    if "PCM" in self.params["lora"]["class"]:
-                        self.params["pipe"]["algorithm"] = self.algorithms[5] #DDIM
-                        self.params["scheduler"]["timestep_spacing"] = "trailing"
-                        self.params["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
-                        self.params["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
-                        self.params["scheduler"]["clip_sample"] = False
-                        self.params["pipe"]["cfg"] = 5 if "normal" in str(self.params["lora"]["file"]).lower() else 3
-                    elif "SPO" in self.params["lora"]["class"]:
-                        if "STA-15" in self.params["lora"]["class"]:
-                            self.params["pipe"]["cfg"] = 7.5
-                        elif "STA-XL" in self.params["lora"]["class"]:
-                            self.params["pipe"]["cfg"] = 5 
+                    if "PCM" in self.lora_dict["class"]:
+                        self.algorithm = self.algorithms[5] #DDIM
+                        self.schedule["timestep_spacing"] = "trailing"
+                        self.schedule["set_alpha_to_one"] = False,  # [compatibility]PCM False
+                        self.schedule["rescale_betas_zero_snr"] = True,  # [compatibility] DDIM True 
+                        self.schedule["clip_sample"] = False
+                        self.gen_dict["guidance_scale"] = 5 if "normal" in str(self.lora_dict["file"]).lower() else 3
+                    elif "SPO" in self.lora_dict["class"]:
+                        if "STA-15" in self.lora_dict["class"]:
+                            self.gen_dict["guidance_scale"] = 7.5
+                        elif "STA-XL" in self.lora_dict["class"]:
+                            self.gen_dict["guidance_scale"] = 5
                     else:
                     #lora parameters
                     # cfg disabled below this line
-                        self.params["pipe"]["cfg"] = 0
-                        self.params["lora"]["fuse"] = True
-                        self.params["lora"]["scale"] = 1.0
-                        self.params["lora"]["unet_only"] = False # x todo - add conditions where this is useful
-                        if "TCD" in self.params["lora"]["class"]:
-                            self.params["pipe"]["num_inference_steps"] = 4
-                            self.params["pipe"]["algorithm"] = self.algorithms[7] #TCD sampler
-                            self.params["pipe"]["noise_eta"] = 0.3
-                            self.params["pipe"]["strength"] = .99
-                        elif "LIG" in self.params["lora"]["class"]: #4 step model pref
-                            self.params["pipe"]["algorithm"] = self.algorithms[0] #Euler sampler
-                            self.params["scheduler"]["interpolation_type"] = "Linear" #sgm_uniform/simple
-                            self.params["scheduler"]["timestep_spacing"] = "trailing"                         
-                        elif "DMD" in self.params["lora"]["class"]:
-                            self.params["lora"]["fuse"] = False
-                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
-                            self.params["scheduler"]["timesteps"] = [999, 749, 499, 249]
-                            self.params["scheduler"]["use_beta_sigmas"] = True         
-                        elif "LCM" in self.params["lora"]["class"] or "RT" in self.params["lora"]["class"]:
-                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
-                            self.params["pipe"]["num_inference_steps"] = 4
-                        elif "FLA" in self.params["lora"]["class"]:
-                            self.params["pipe"]["algorithm"] = self.algorithms[6] #LCM
-                            self.params["pipe"]["num_inference_steps"] = 4
-                            self.params["scheduler"]["timestep_spacing"] = "trailing"
-                            if "STA-3" in self.params["lora"]["class"]:
-                                self.params["pipe"]["algorithm"] = self.algorithms[9] #LCM
-                                for each in self.params["transformer"]["file"].lower():
+                        self.optimized["fuse"] = True
+                        self.fuse["scale"] = 1.0
+                        self.fuse["unet_only"] = False # x todo - add conditions where this is useful
+                        self.gen_dict["guidance_scale"] = 0
+                        if "TCD" in self.lora_dict["class"]:
+                            self.gen_dict["num_inference_steps"] = 4
+                            self.algorithm = self.algorithms[7] #TCD sampler
+                            self.gen_dict["eta"] = 0.3
+                            self.gen_dict["strength"] = .99
+                        elif "LIG" in self.lora_dict["class"]: #4 step model pref
+                            self.algorithm = self.algorithms[0] #Euler sampler
+                            self.schedule["interpolation_type"] = "Linear", #sgm_uniform/simple
+                            self.schedule["timestep_spacing"] = "trailing",                         
+                        elif "DMD" in self.lora_dict["class"]:
+                            self.optimized["fuse"] = False
+                            self.algorithm = self.algorithms[6] #LCM
+                            self.schedule["timesteps"] = [999, 749, 499, 249]
+                            self.schedule["use_beta_sigmas"] = True         
+                        elif "LCM" in self.lora_dict["class"] or "RT" in self.lora_dict["class"]:
+                            self.algorithm = self.algorithms[6] #LCM
+                            self.gen_dict["num_inference_steps"] = 4
+                        elif "FLA" in self.lora_dict["class"]:
+                            self.algorithm = self.algorithms[6] #LCM
+                            self.gen_dict["num_inference_steps"] = 4
+                            self.schedule["timestep_spacing"] = "trailing"
+                            if "STA-3" in self.lora_dict["class"]:
+                                self.algorithm = self.algorithms[9] #LCM
+                                for each in self.transformers["file"].lower():
                                     if "t5" in each:
-                                        for items in self.params["transformer"]:
-                                            self.params["transformer"][items].pop(each)
-                        elif "HYP" in self.params["lora"]["class"]:
-                            if self.params["pipe"]["num_inference_steps"] == 1:
-                                self.params["pipe"]["algorithm"] = self.algorithms[7] #tcd FOR ONE STEP
-                                self.params["scheduler"]["timestep_spacing"] = "trailing"
-                            if "CFG" in str(self.params["lora"]["file"]).upper():
-                                if self.params["model"]["class"] == "STA-XL":
-                                    self.params["pipe"]["cfg"] = 5
-                                elif self.params["model"]["class"] == "STA-15":
-                                    self.params["pipe"]["cfg"] = 7.5                                   
-                            if ("FLU" in self.params["lora"]["class"]
-                            or "STA-3" in self.params["lora"]["class"]):
-                                self.params["lora"]["scale"]=0.125
-                            elif "STA-XL" in self.params["lora"]["class"]:
-                                if self.params["pipe"]["num_inference_steps"] == 1:
-                                    self.params["scheduler"]["timesteps"] = 800
+                                        for items in self.transformer:
+                                            self.transformers[items].pop(each)
+                        elif "HYP" in self.lora_dict["class"]:
+                            if self.gen_dict["num_inference_steps"] == 1:
+                                self.algorithm = self.algorithms[7] #tcd FOR ONE STEP
+                                self.schedule["timestep_spacing"] = "trailing"
+                            if "CFG" in str(self.lora_dict["file"]).upper():
+                                if self.category == "STA-XL":
+                                    self.gen_dict["guidance_scale"] = 5
+                                elif self.category == "STA-15":
+                                    self.gen_dict["guidance_scale"] = 7.5                               
+                            if ("FLU" in self.lora_dict["class"]
+                            or "STA-3" in self.lora_dict["class"]):
+                                self.fuse["scale"]=0.125
+                            elif "STA-XL" in self.lora_dict["class"]:
+                                if self.gen_dict["num_inference_steps"] == 1:
+                                    self.schedule["timesteps"] = 800
                                 else:
-                                    self.params["pipe"]["algorithm"] = self.algorithms[5] #DDIM
-                                    self.params["scheduler"]["timestep_spacing"] = "trailing"
-                                    self.params["pipe"]["noise_eta"] = 1.0       
+                                    self.algorithm = self.algorithms[5] #DDIM
+                                    self.schedule["timestep_spacing"] = "trailing"
+                                    self.gen_dict["eta"] = 1.0
 
                 else :   #if no lora
-                    if ("LUM" in self.params["model"]["class"]
-                    or "STA-3" in self.params["model"]["class"]):
-                        self.params["scheduler"]["interpolation type"] = "Linear" #sgm_uniform/simple
-                        self.params["scheduler"]["timestep_spacing"] = "trailing" 
-                    if (self.params["model"]["class"] == "STA-15"
-                    or self.params["model"]["class"] == "STA-XL"
-                    or self.params["model"]["class"] == "STA3"):
-                        self.params["pipe"]["algorithm"] = self.algorithms[8] #AlignYourSteps
-                        if "STA-15" == self.params["model"]["class"]: 
-                            self.params["scheduler"]["model_ays"] = "StableDiffusionTimesteps"
-                        elif "STA-XL" == self.params["model"]["class"]:
-                            self.params["pipe"]["num_inference_steps"] = 10
-                            self.params["pipe"]["cfg"] = 5 
-                            self.params["scheduler"]["model_ays"] = "StableDiffusionXLTimesteps"
-                            self.params["pipe"]["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accels
-                        elif "STA-3" in self.params["model"]["class"]:
-                            self.params["scheduler"]["lu_lambdas"]= True
-                            self.params["scheduler"]["euler_at_final"] = True
-                            self.params["scheduler"]["model_ays"] = "StableDiffusion3Timesteps"
-                            self.params["pipe"]["algorithm"] = "AysSchedules"
-                            self.params["pipe"]["algorithm_type"]= self.solvers[4] # DPM
-                            self.params["scheduler"]["use_karras_sigmas"] = True 
-                    elif "PLA" in self.params["model"]["class"]:
-                        self.params["pipe"]["algorithm"] = self.algorithms[3] #EDMDPM
-                    elif ("FLU" in self.params["model"]["class"]
-                    or "AUR" in self.params["model"]["class"]):
-                        self.params["pipe"]["algorithm"] = self.algorithms[2] #EulerAncestral (Ancient Aliens)
+                    self.algorithm = self.algorithms[4]
+                    self.gen_dict["num_inference_steps"] = 20
+                    self.gen_dict["guidance_scale"] = 7
+                    self.schedule["use_karras_sigmas"] = True
+                    if ("LUM" in self.category
+                    or "STA-3" in self.category):
+                        self.schedule["interpolation type"] = "Linear", #sgm_uniform/simple
+                        self.schedule["timestep_spacing"] = "trailing", 
+                    if (self.category == "STA-15"
+                    or self.category == "STA-XL"
+                    or self.category == "STA3"):
+                        self.algorithm = self.algorithms[8] #AlignYourSteps
+                        if "STA-15" == self.category: 
+                            self.ays = "StableDiffusionTimesteps"
+                            self.schedule["timesteps"] = AysSchedules[self.ays]
+                        elif "STA-XL" == self.category:
+                            self.gen_dict["num_inference_steps"] = 10
+                            self.gen_dict["guidance_scale"] = 5 
+                            self.ays = "StableDiffusionXLTimesteps"
+                            self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accels
+                            self.gen_dict["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
 
-                self.params["compile"]["unet"] == True
-                self.params["compile"]["fullgraph"] = True
-                self.params["compile"]["mode"] = "reduce-overhead"  #if unet and possibly only on higher-end cards #[performance] unet only, compile the model for speed, slows first gen only 
+                        elif "STA-3" in self.category:
+                            self.ays = "StableDiffusion3Timesteps"
+                            self.gen_dict["num_inference_steps"] = 10
+                            self.gen_dict["guidance_scale"] = 4
+                    elif "PLA" in self.category:
+                        self.algorithm = self.algorithms[3] #EDMDPM
+                    elif ("FLU" in self.category
+                    or "AUR" in self.category):
+                        self.algorithm = self.algorithms[2] #EulerAncestral (Ancient Aliens)
 
-                if self.params["model"]["class"] == "STA-XL": 
-                    self.params["refiner"]["available"] = IndexManager().fetch_refiner()
-                    if self.params["refiner"]["available"] != None and self.params["refiner"]["available"] != "∅":
-                        self.params["refiner"]["use_refiner"] = False # refiner      
-                        self.params["refiner"]["high_noise_fra"] = 0.8 #end noise 
-                        self.params["refiner"]["denoising_end"] = self.params["pipe"]["refiner"]["high_noise_fra"]
-                        self.params["refiner"]["num_num_inference_steps"] = self.params["pipe"]["num_inference_steps"] #begin step
-                        self.params["refiner"]["denoising_start"] = self.params["pipe"]["refiner"]["high_noise_fra"] #begin noise
-                    else: 
-                        self.params["refiner"]["available"] = False
-            
-                return self.params
+                if self.category == "STA-XL": 
+                    if self.refiner["file"] != None and self.refiner["file"] != "∅":
+                        self.refiner["use_refiner"] = False, # refiner      
+                        self.refiner["high_noise_fra"] = 0.8, #end noise 
+                        self.refiner["denoising_end"] = self.refiner["high_noise_fra"]
+                        self.refiner["num_inference_steps"] = self.gen_dict["num_inference_steps"], #begin step
+                        self.refiner["denoising_start"] = self.refiner["high_noise_fra"], #begin noise
+           
+                self.gen_dict["output_type"] = "latent"
 
+                return self.pipe_dict
 
             

@@ -77,34 +77,65 @@
 #### SYNTAX
 ```
 
-        defaults = determine_tuning(self, full_path_to_model)           context
-                                                                        streaming
-        tuning dict :                                                   max_tokens
-                      model---------.                                   temperature
-                      vae----------. |                                  repeat_penalty
-                      lora--------.|||                                  top_p
-                      transformer. |||    .-transformer[ use_fast       top_k
-                  .---pipe        `file  |                              class
-                 | .--compile      size  |    .------------------model[ stage       
-                 || .-refiner      dtype'---'                           config
-                 ||| .scheduler    ||                  config
-                 ||||              ||                  upcast
-                 ||||              ||                  slice  
-                 ||||              | `------------vae[ tile       
-seed     ]pipe--' |||               `----------.                class          
-cfg               |||                           `---------lora[ fuse
-cache_jettison    || `-------------scheduler[ algorithm         scale         
-cpu_offload       ||                          lu_lambdas        unet_only
-sequential_offload| `--refiner[ available     euler_at_final
-max_batch         |           use_refiner     clip_sample
-noise_eta         |       denoising_start     timesteps            ##### 0-1000
-prompt            |   num_inference_steps     timestep_spacing     ##### str values
-system_prompt     |        high_noise_fra     interpolation_type
-strength          |         denoising_end     use_karras_sigmas
-dynamic_cfg       |                           use_exponential_sigmas
-file_prefix        `-compile [ unet           use_beta_sigmas
-inference_steps                fullgraph      rescale_betas_zero_snr
-config_path                    mode           set_alpha_to_one
+ perf_counter, totals, average, memory
+pipe
+    model path, tokenizer, text encoder, tokenizr2, text encodr2, tokenizer 3, text encoder 3
+
+expressions:
+subroutine
+
+clear_cache, device, dynamic guidance sequential offload,cpu offload, compile(reduce overhead, fullgraph),upcast_vae, vae_tile, vae_slice, file_prefix, output_type, compress_level, config_path, algorithm
+queue
+     prompt  embeddings, seed
+transformers
+    tokenizer, text encoder
+text_encoders
+    torch_dtype torch.float16 ,variant     fp16
+conditioning
+     prompt, padding="max_length", truncation=True, return_tensors='pt'
+lora
+    lora(path), weight_name (filename)
+scheduler
+    timestep spacing, rescale betas zero_snr, clip sample, set alpha to one,
+gen
+    output_type='latent', timesteps, num_inference_steps, cfg/callback on step end/callback on step end tensor inputs
+    embeds
+        prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds,negative_pooled_prompt_embeds
+vae
+   model, dtype, cache_dir
+   
+ self.subroutine, self.queue, self.transformers, self.conditioning, self.pipe_dict, self.lora_dict, self.fuse, self.schedule, self.gen_dict, self.vae_dict
+
+        defaults = determine_tuning(self, full_path_to_model)            
+                    tuning dict :                 system_prompt          
+                      llm------------.            temperature           
+                      model---------. |           repeat_penalty               
+num_inference_steps   vae----------. ||           max_tokens           
+cfg                   lora--------. |||           context
+output_type ]-.       transformer. ||||   .--llm[ top_p
+               `------gen         |||||  |        top_k
+                 .----[]          |||||  |                
+batch_limit   ]-' .---pipe        `file  | .-transformer[ prompt       class
+cache_jettison   | .--compile      size-' |.--------------------model[ stage 
+upcast           || .-refiner      dtype-'                             config
+compile          ||| .scheduler    ||                  config
+file_prefix      ||||              ||                  upcast
+use_fast_token   ||||              ||                  slice  
+streaming        ||||              | `------------vae[ tile       
+dynamic_cfg      ||||               `----------.                class          
+path             ||||                           `---------lora[ fuse
+                 ||| `-------------scheduler[ algorithm         scale         
+strength ]pipe--' ||                          lu_lambdas        unet_only
+noise_eta         | `--refiner[ available     euler_at_final
+cpu offload       |           use_refiner     clip_sample
+sequential_offload|       denoising_start     timesteps            ##### 0-1000
+manual_seed       |   num_inference_steps     timestep_spacing     ##### str 
+config_path       |        high_noise_fra     interpolation_type
+                  |         denoising_end     use_karras_sigmas
+                  |                           use_exponential_sigmas
+                   `-compile[ mode            use_beta_sigmas
+                              fullgraph       rescale_betas_zero_snr
+                                              set_alpha_to_one
                                   
                                               
 ```
