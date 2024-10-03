@@ -7,18 +7,25 @@ import gc
 import os
 from time import perf_counter_ns, perf_counter
 from sdbx.nodes.tuner import NodeTuner
-from diffusers import DiffusionPipeline, AutoPipelineForText2Image , AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, TCDScheduler, HeunDiscreteScheduler, UniPCMultistepScheduler, DEISMultistepScheduler
-from diffusers.schedulers import AysSchedules, FlowMatchEulerDiscreteScheduler, EDMDPMSolverMultistepScheduler, DPMSolverMultistepScheduler, LCMScheduler, LMSDiscreteScheduler
+from diffusers import AutoPipelineForText2Image, AutoencoderKL
+from diffusers.schedulers import *
+from diffusers.utils import logging as hf_logs
 from sdbx.config import config
+from sdbx.indexer import IndexManager
 from sdbx.nodes.helpers import seed_planter, soft_random
 import torch
+import accelerate
 from accelerate import Accelerator
 import peft
 import platform
 import datetime
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
+from transformers import AutoTokenizer, AutoModel, CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 class T2IPipe:
+    #do not put an __init__ in this class! only __call__ can be used. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
+    config_path = config.get_path("models.metadata")
+    log_level = hf_logs.FATAL
+
     def float_converter(self, old_index):
         float_chart = {
                 "F64": ["fp64", torch.float64],
@@ -38,27 +45,31 @@ class T2IPipe:
             if old_index == key:
                 return val[0], val[1]
             
-    def algorithm_converter(self, non_constant):
-        schedule_chart =  [
-            EulerDiscreteScheduler,               
-            EulerAncestralDiscreteScheduler,     
-            FlowMatchEulerDiscreteScheduler,      
-            EDMDPMSolverMultistepScheduler,    
-            DPMSolverMultistepScheduler,          
-            DDIMScheduler,                      
-            LCMScheduler,                      
-            TCDScheduler,                     
-            AysSchedules, 
-            HeunDiscreteScheduler,
-            UniPCMultistepScheduler,
-            LMSDiscreteScheduler,                
-            DEISMultistepScheduler,               
-        ]
-        for each in schedule_chart:
-            if non_constant == each:
-                return each
-    
-    def tc(self, clock, string): return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-4]} ] {string}")
+    def algorithm_converter(self, non_constant, exp):
+        hf_logs.set_verbosity(self.log_level)
+        self.non_constant = non_constant
+        self.exp = exp
+        self.schedule_chart = {
+            "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),           
+            "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),     
+            "EDMDPMSolverMultistepScheduler" : EDMDPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp), 
+            "DPMSolverMultistepScheduler" : DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),        
+            "DDIMScheduler" : DDIMScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "LCMScheduler" : LCMScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "TCDScheduler" : TCDScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "AysSchedules": AysSchedules,
+            "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),  
+            "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
+        }
+
+        #for key, val in self.schedule_chart.items():
+            #if self.non_constant == key:
+                #self.pipe.scheduler = val
+
+    def tc(self, clock, string): return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-2]} ] {string}")
 
     def set_device(self, device=None):
         if device==None:
@@ -76,7 +87,38 @@ class T2IPipe:
             "seed": seed,
             }])
         
-    def declare_encoders(self, transformer="stabilityai/stable-diffusion-xl-base-1.0"):
+    def declare_encoders(self, exp, transformer="stabilityai/stable-diffusion-xl-base-1.0"):
+        hf_logs.set_verbosity(self.log_level)
+        tformer, gen_dict, optimized, lora, fuse, schedule = exp
+        tformer_dict = {}
+        var, dtype = self.float_converter(tformer["variant"][next(iter(tformer["variant"]),0)])
+        tformer_dict.setdefault("variant",var)
+        tformer_dict.setdefault("torch_dtype", dtype)
+        tformer_dict.setdefault("num_hidden_layers",optimized["num_hidden_layers"])
+        # for each in tformer["variant"]:
+        #     var, dtype = self.float_converter(tformer["variant"][each])
+        #     self.expression.setdefault("variant", var)
+        #     self.expression.setdefault("torch_dtype", dtype)
+        #     self.expression.setdefault("num_hidden_layers",optimized["num_hidden_layers"][each])
+
+        #     self.symlnk_path = os.path.join(self.config_path,each) #autoencoder also wants specific filenames
+        #     self.symlnk_file = os.path.join(self.symlnk_path,"model.fp16.safetensors") if self.expression["variant"] == "fp16" else os.path.join(self.symlnk_path,"model.safetensors")
+
+        #     if os.path.isfile(self.symlnk_file): os.remove(self.symlnk_file)   
+            # os.symlink(tformer ["text_encoder"][each], self.symlnk_file) #note: no 'i' in 'symlnk'
+
+            # self.tokenizer[each] = AutoTokenizer.from_pretrained(
+            #     transformer,
+            #     subfolder='tokenizer',
+            # )
+
+            # self.text_encoder[each] = AutoModel.from_pretrained(
+            #     transformer,
+            #     subfolder='text_encoder',
+            #     #use_safetensors=True,
+            #     **self.expression,
+            # ).to(self.device)
+        hf_logs.set_verbosity(self.log_level)
         self.tokenizer = CLIPTokenizer.from_pretrained(
             transformer,
             subfolder='tokenizer',
@@ -86,27 +128,27 @@ class T2IPipe:
             transformer,
             subfolder='text_encoder',
             use_safetensors=True,
-            torch_dtype=torch.float16,
-            variant='fp16',
+            **tformer_dict,
         ).to(self.device)
-
+    
+        hf_logs.set_verbosity(self.log_level)
         self.tokenizer_2 = CLIPTokenizer.from_pretrained(
             transformer,
             subfolder='tokenizer_2',
         )
-
         self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
             transformer,
             subfolder='text_encoder_2',
             use_safetensors=True,
-            torch_dtype=torch.float16,
-            variant='fp16',
+            **tformer_dict,
         ).to(self.device)
 
+        
     def generate_embeddings(self, prompts, tokenizers, text_encoders):
         self.tc(self.clock, f"encoding prompt with device: {self.device}...")
-
         embeddings_list = []
+        #for prompt, tokenizer, text_encoder in zip(prompts, self.tokenizer.values(), self.text_encoder.values()):
+
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
             prompt,
@@ -139,6 +181,7 @@ class T2IPipe:
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
+
     def encode_prompt(self):
         with torch.no_grad():
             for generation in self.queue:
@@ -150,7 +193,7 @@ class T2IPipe:
 
     def cache_jettison(self, encoder=False, lora=False, unet=False, vae=False):
         self.tc(self.clock, f"empty cache...")
-        if encoder: del self.tokenizer, self.text_encoder, self.tokenizer_2, self.text_encoder_2
+        if encoder: del self.tokenizer, self.text_encoder,  self.tokenizer_2, self.text_encoder_2
         if lora: self.pipe.unload_lora_weights()
         if unet: del self.pipe.unet
         if vae: del self.pipe.vae
@@ -159,39 +202,38 @@ class T2IPipe:
         if self.device == "mps": torch.mps.empty_cache()
  
     def construct_pipe(self, exp, model="stabilityai/stable-diffusion-xl-base-1.0"):
-        self.tc(self.clock, f"precision set for: {exp["variant"]}, using {exp["torch_dtype"]}")
+        exp, custom_model = exp
         var, dtype = self.float_converter(exp["variant"])
         exp["variant"] = var
         exp.setdefault("torch_dtype", dtype)
+        self.tc(self.clock, f"precision set for: {exp["variant"]}, using {exp["torch_dtype"]}")
+        #symlnk_path = os.path.join(self.config_path,model["class"])
+        #checkpoint = os.path.basename(custom_model["file"])
+        #symlnk_path = model["file"].replace(checkpoint,"")
+        #symlink_config = os.path.join(symlnk_path,"config.json")
+        #symlnk_file = os.path.join(symlnk_path,"diffusion_pytorch_model.fp16.safetensors") if var == "fp16" else os.path.join(symlnk_path,"diffusion_pytorch_model.safetensors")
+        
         self.tc(self.clock, f"load model {model}...")
+        #thank if os.path.isfile(symlnk_file): os.remove(symlnk_file)
+        #os.symlink(checkpoint,symlnk_file) #note: no 'i' in 'symlnk'
         self.pipe = AutoPipelineForText2Image.from_pretrained(model, **exp).to(self.device)
 
-    def add_lora(self, lora="pcm_sdxl_normalcfg_16step_converted_fp16.safetensors", path="models.lora"):
-        lora_path = config.get_path(path)
-        self.tc(self.clock, f"set scheduler, lora = {os.path.join(lora_path, lora)}")  # lora2
-        lora = lora #lora needs to be explicitly declared
-        self.pipe.load_lora_weights(self,lora_path, weight_name=lora)
-
+    def add_lora(self, exp, opt, fuse):
+        lora = os.path.basename(exp)
+        lora_path = exp.replace(lora,"")
+        self.tc(self.clock, f"set lora to {os.path.join(lora_path, lora)}")  # lora2
+        self.pipe.load_lora_weights(lora_path, weight_name=lora)
+        if opt["fuse"]: set.pipe.fuse_lora(fuse) #add unet only possibility
    
-    def build_scheduler(self):
-        #self.schedule =  EulerDiscreteScheduler
-        self.scheduler_args = {  
-            }
-        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, **self.scheduler_args)
-
-    def offload(self, sequential=False, cpu=False, disk=False):
-        self.tc(self.clock, f"set offload as {cpu|disk} and sequential as {sequential} for {self.device} device") 
-        if self.add_loradevice=="cuda":
-            if sequential: self.pipe.enable_sequential_cpu_offload()
+    def offload_to(self, seq=False, cpu=False, disk=False):
+        self.tc(self.clock, f"set offload as {cpu|disk} and sequential as {seq} for {self.device} device") 
+        if self.device=="cuda":
+            if seq: self.pipe.enable_sequential_cpu_offload()
             if cpu: self.pipe.enable_model_cpu_offload() 
-            if disk: self.pipe.enable_disk_offload() 
+            #if disk: accelerate.disk_offload() 
 
-    #self.pipe.unet = torch.compile(self.pipe.unet, mode="reduce-overhead", fullgraph=True)
-
-    def add_dynamic_cfg(self):
-            self.tc(self.clock, "set dynamic cfg")
-            self.gen_args.setdefault("callback_on_step_end",self._dynamic_guidance)
-            self.gen_args.setdefault("callback_on_step_end_tensor_inputs",['prompt_embeds', 'add_text_embeds','add_time_ids'])
+    def compile_unet(self, exp):
+        self.pipe.unet = torch.compile(self.pipe.unet, **exp)
 
     def _dynamic_guidance(self, pipe, step_index, timestep, callback_key):
         if step_index == int(pipe.num_timesteps * 0.5):
@@ -201,12 +243,21 @@ class T2IPipe:
             pipe._guidance_scale = 0.0
         return callback_key
     
-    def diffuse_latent(self, dynamic_cfg=False):
-        self.gen_args = { 
-            "num_inference_steps": "16",
-            "guidance_scale": "5"
-        }
-        if dynamic_cfg: self.add_dynamic_cfg()
+    def add_dynamic_cfg(self):
+            self.tc(self.clock, "set dynamic cfg")
+            self.gen_dict.setdefault("callback_on_step_end",self._dynamic_guidance)
+            self.gen_dict.setdefault("callback_on_step_end_tensor_inputs",['prompt_embeds', 'add_text_embeds','add_time_ids'])
+
+    def diffuse_latent(self, exp):
+        tformer, self.gen_dict, opt, lora, fuse, schedule = exp
+        if opt["dynamic_cfg"]: self.add_dynamic_cfg()
+        if lora.get("file",0) != 0: self.add_lora(lora["file"], opt, fuse)
+        self.tc(self.clock, f"set scheduler")
+        #self.algorithm_converter(opt["algorithm"], schedule)
+        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config,**schedule)
+
+        if opt["seq"] or opt["cpu"] or opt["disk"]: self.offload_to(opt["seq"], opt["cpu"], opt["disk"])
+        if opt["compile_unet"]: self.compile_unet(opt["compile"])
 
         self.tc(self.clock, f"set generator") 
         generator = torch.Generator(device=self.device)
@@ -226,26 +277,21 @@ class T2IPipe:
                 pooled_prompt_embeds=generation['embeddings'][2],
                 negative_pooled_prompt_embeds=generation['embeddings'][3],
                 generator=generator,
-                output_type='latent',
-                **self.gen_args,
+                **self.gen_dict,
             ).images 
 
-    def decode_latent(self, autoencoder="flatpiecexlVAE_baseonA1579.safetensors", prefix="Shadowbox-", compress_level=4, vae_tile=False, vae_slice=False):
-        vae_path = config.get_path("models.image")
-        autoencoder = os.path.join(vae_path,autoencoder) #autoencoder wants full path and filename
-
-        vae_args = {}
-        vae_args["torch_dtype"]= torch.float16
-        vae_args["cache_dir"]="vae_"
-        if vae_tile: vae_args["enable_tiling"]= True
-        else: vae_args["disable_tiling"]=True
-        if vae_slice:vae_args["enable_slicing"]= True
-        else: vae_args["disable_slicing"]=True
+    def decode_latent(self, arg, autoencoder="flatpiecexlVAE_baseonA1579.safetensors"):
+        hf_logs.set_verbosity_warn()
+        opt, exp = arg
+        autoencoder = opt["vae"] #autoencoder wants full path and filename 
+        var, dtype = self.float_converter(exp["variant"])
+        exp["variant"] = var
+        exp.setdefault("torch_dtype", dtype)
 
         self.tc(self.clock, f"decoding using {autoencoder}...")
-        vae = AutoencoderKL.from_single_file(autoencoder,**vae_args).to(self.device)
+        vae = AutoencoderKL.from_single_file(autoencoder,**exp).to(self.device)
         self.pipe.vae=vae
-        self.pipe.upcast_vae()
+        if opt["upcast_vae"]: self.pipe.upcast_vae()
 
         with torch.no_grad():
             counter = [s.endswith('png') for s in os.listdir(config.get_path("output"))].count(True) # get existing images
@@ -263,7 +309,7 @@ class T2IPipe:
 
                 self.tc(self.clock, f"saving")     
                 counter += 1
-                filename = f"{prefix}-{counter}-batch-{i}.png"
+                filename = f"{opt["file_prefix"]}-{counter}-batch-{i}.png"
 
                 image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
 
@@ -274,7 +320,6 @@ class T2IPipe:
         images_average = round(sum(generation['total_time'] for generation in self.queue) / len(self.queue), 1)
         print('Average image time:', images_average, 'seconds')
 
-
         if self.device == "cuda":
             max_memory = round(torch.cuda.max_memory_allocated(device='cuda') * 1e-9, 2)
             print('Max. memory used:', max_memory, 'GB')
@@ -282,24 +327,45 @@ class T2IPipe:
         self.tc(self.clock, f" <-time total...")     
 
 
+#create_index = IndexManager().write_index()       # (defaults to config/index.json)
+
+#genesis node
 optimize = NodeTuner()
 optimize.determine_tuning("ponyFaetality_v11.safetensors")
+opt = optimize.opt_exp()
 insta = T2IPipe()
+insta.set_device()
+
+#loader node transformer class
+gen_exp = optimize.gen_exp()
+insta.declare_encoders(gen_exp)
+
+#prompt node
 prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
 seed = int(soft_random())
 insta.queue_manager(prompt,seed)
-insta.set_device()
-insta.declare_encoders()
+
+#enocde node
+conditioning = optimize.cond_exp()
 insta.encode_prompt()
-insta.cache_jettison(encoder=1)
-opt = optimize._pipe_exp()
-print(opt)
-insta.construct_pipe(opt)
-insta.build_scheduler()
-insta.offload()
-insta.add_lora()
-insta.diffuse_latent()
-insta.decode_latent()
+
+#cache ctrl node
+insta.cache_jettison(encoder=True)
+
+#t2i
+
+exp = optimize.pipe_exp()
+insta.construct_pipe(exp)
+insta.diffuse_latent(gen_exp)
+
+#cache ctrl node
+insta.cache_jettison(lora=True, unet=True)
+
+#vae node
+vae_exp = optimize.vae_exp()
+insta.decode_latent(vae_exp)
+
+#metrics node
 insta.metrics()
 
 

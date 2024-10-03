@@ -7,6 +7,7 @@ from collections import defaultdict
 from llama_cpp import Llama
 from sdbx import logger
 from sdbx import config
+from sdbx.config import config_source_location
 
 peek = config.get_default("tuning", "peek") # block and tensor values for identifying
 known = config.get_default("tuning", "known") # raw block & tensor data
@@ -423,7 +424,7 @@ class IndexManager:
         self.delete_flag = True
         for each in self.directories:
             self.path_name = config.get_path(f"models.{each}")
-            index_file = os.path.join(config.config_source_location, index_file)
+            index_file = os.path.join(config_source_location, index_file)
             for each in os.listdir(self.path_name):  # SCAN DIRECTORY           #todo - toggle directory scan
                 full_path = os.path.join(self.path_name, each)
                 if os.path.isfile(full_path):  # Check if it's a file
@@ -451,7 +452,7 @@ class IndexManager:
                     logger.debug(f"'Config file absent at write time: {index_file}.'{error_log}", exc_info=True)
                     self.delete_flag =False
                     pass
-            with open(os.path.join(config.config_source_location, index_file), "a", encoding="UTF-8") as index:
+            with open(os.path.join(config_source_location, index_file), "a", encoding="UTF-8") as index:
                 json.dump(self.all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
         else:
             log = "Empty model directory, or no data to write."

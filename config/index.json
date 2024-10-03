@@ -1,31 +1,17 @@
 {
     "DIF": {
-        "Illustrious-XL-v0.1.safetensors": {
-            "STA-XL": [
-                6938040760,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\Illustrious-XL-v0.1.safetensors",
+        "dmd2_sdxl_4step_unet_fp16.safetensors": {
+            "KOL-01": [
+                5135149736,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\dmd2_sdxl_4step_unet_fp16.safetensors",
                 "F16"
             ]
         },
-        "PixArt-Sigma-XL-2-2K-MS.safetensors": {
-            "PIX-SI": [
-                1262008531,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\PixArt-Sigma-XL-2-2K-MS.safetensors",
-                "F16"
-            ]
-        },
-        "RealitiesEdgeXLLIGHTNING_TURBOV7-civitai.safetensors": {
-            "STA-XL": [
-                6941318844,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\RealitiesEdgeXLLIGHTNING_TURBOV7-civitai.safetensors",
-                "F16"
-            ]
-        },
-        "forgottenmixTheNovelist_v10.safetensors": {
-            "STA-15": [
-                4244099040,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\forgottenmixTheNovelist_v10.safetensors",
-                "F16"
+        "dpo_sdxl_diffusion_pytorch_model.safetensors": {
+            "KOL-01": [
+                10270077736,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\dpo_sdxl_diffusion_pytorch_model.safetensors",
+                "F32"
             ]
         },
         "lumina_nsdiffusion_pytorch_model (1).safetensors": {
@@ -35,34 +21,6 @@
                 "BF16"
             ]
         },
-        "luminamodel .safetensors": {
-            "LUM-01": [
-                4776086176,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\luminamodel .safetensors",
-                "U8"
-            ]
-        },
-        "mobius-fp16.safetensors": {
-            "STA-XL": [
-                6938040400,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\mobius-fp16.safetensors",
-                "F16"
-            ]
-        },
-        "noosphere_v42.safetensors": {
-            "STA-15": [
-                2132626794,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\noosphere_v42.safetensors",
-                "F16"
-            ]
-        },
-        "pixartadiffusion_pytorch_model.safetensors": {
-            "PIX-AL": [
-                2447431856,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\pixartadiffusion_pytorch_model.safetensors",
-                "F32"
-            ]
-        },
         "ponyFaetality_v11.safetensors": {
             "STA-XL": [
                 6938040706,
@@ -70,38 +28,10 @@
                 "F16"
             ]
         },
-        "sd_xl_turbo_1.0 (1).safetensors": {
-            "STA-XL": [
-                13875761366,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\lora\\sd_xl_turbo_1.0 (1).safetensors",
-                "F32"
-            ]
-        },
-        "sd_xl_turbo_1.0.safetensors": {
-            "STA-XL": [
-                13875761366,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\lora\\sd_xl_turbo_1.0.safetensors",
-                "F32"
-            ]
-        },
-        "sdvn8Artxl_base.safetensors": {
-            "STA-XL": [
-                6938040682,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sdvn8Artxl_base.safetensors",
-                "F16"
-            ]
-        },
-        "sxzLuma_09XVAE.safetensors": {
-            "STA-15": [
-                4244098984,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sxzLuma_09XVAE.safetensors",
-                "F16"
-            ]
-        },
-        "tPonynai3_v55.safetensors": {
-            "STA-XL": [
-                6938040714,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\tPonynai3_v55.safetensors",
+        "spo_sdxl_diffusion_diffusion_pytorch_model.safetensors": {
+            "KOL-01": [
+                5135149760,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\spo_sdxl_diffusion_diffusion_pytorch_model.safetensors",
                 "F16"
             ]
         }
@@ -282,6 +212,13 @@
                 134621556,
                 "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\lora\\TCD_XL_pytorch_lora_weights.safetensors",
                 "F16"
+            ]
+        },
+        "dmd2_sdxl_4step_lora.safetensors": {
+            "DMD-STA-XL": [
+                787359616,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\dmd2_sdxl_4step_lora.safetensors",
+                "F32"
             ]
         },
         "dmd2_sdxl_4step_lora_fp16.safetensors": {
@@ -694,24 +631,10 @@
         }
     },
     "VAE": {
-        "PixArtXL21024msVae.safetensors": {
-            "PIX-SI": [
-                334643268,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\PixArtXL21024msVae.safetensors",
-                "F32"
-            ]
-        },
-        "ae.safetensors": {
-            "FLU-1": [
-                335304388,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\ae.safetensors",
-                "F32"
-            ]
-        },
-        "diffusion_pytorch_model.fp16.safetensors": {
+        "auraflow_vae.safetensors": {
             "KOL-01": [
                 167335342,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\diffusion_pytorch_model.fp16.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\auraflow_vae.safetensors",
                 "F16"
             ]
         },
@@ -720,76 +643,6 @@
                 167333134,
                 "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors",
                 "F16"
-            ]
-        },
-        "klF8Anime2VAE_klF8Anime2VAE.safetensors": {
-            "STA-XL": [
-                404581567,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\klF8Anime2VAE_klF8Anime2VAE.safetensors",
-                "F32"
-            ]
-        },
-        "klf8-ostrisd16.safetensors": {
-            "STA-15": [
-                114560782,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\klf8-ostrisd16.safetensors",
-                "F16"
-            ]
-        },
-        "kol_diffusion_pytorch_model (2).safetensors": {
-            "FLU-1": [
-                167666902,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\kol_diffusion_pytorch_model (2).safetensors",
-                "BF16"
-            ]
-        },
-        "kolors_vae.fp16.safetensors": {
-            "KOL-01": [
-                167335342,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\kolors_vae.fp16.safetensors",
-                "F16"
-            ]
-        },
-        "lastpiecexlVAE_baseonA0897.safetensors": {
-            "STA-XL": [
-                167333134,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\lastpiecexlVAE_baseonA0897.safetensors",
-                "F16"
-            ]
-        },
-        "sdxl.vae.safetensors": {
-            "STA-XL": [
-                334641162,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sdxl.vae.safetensors",
-                "I32"
-            ]
-        },
-        "sigma_vae.safetensors": {
-            "PIX-SI": [
-                334643238,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sigma_vae.safetensors",
-                "F32"
-            ]
-        },
-        "vae-ft-mse-840000-ema-pruned.safetensors": {
-            "STA-15": [
-                334641190,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\vae-ft-mse-840000-ema-pruned.safetensors",
-                "F32"
-            ]
-        },
-        "vega_diffusion_pytorch_model.fp16.safetensors": {
-            "SGM-VG": [
-                167335342,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\vega_diffusion_pytorch_model.fp16.safetensors",
-                "F16"
-            ]
-        },
-        "vega_diffusion_pytorch_model.safetensors": {
-            "PIX-SI": [
-                334643268,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\vega_diffusion_pytorch_model.safetensors",
-                "F32"
             ]
         }
     }
