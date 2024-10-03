@@ -1,13 +1,15 @@
+from sdbx import logger
+from sdbx import config
+from sdbx.config import config_source_location
+
 import os
 import json
 import struct
 from math import isclose
 from pathlib import Path
 from collections import defaultdict
+
 from llama_cpp import Llama
-from sdbx import logger
-from sdbx import config
-from sdbx.config import config_source_location
 
 peek = config.get_default("tuning", "peek") # block and tensor values for identifying
 known = config.get_default("tuning", "known") # raw block & tensor data
@@ -170,7 +172,6 @@ class EvalMeta:
                             print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 
     def data(self):
-
         if self.name_value != "": # check LLM
             self.tag = "c"
             self.key = ""
@@ -506,7 +507,7 @@ class IndexManager:
             for category, value in peek_index[search_item].items():
                 return each, category, value  # Return keys and corresponding value
         else:
-            return "∅", "∅","∅"
+            return "∅", "∅", "∅"
 
     #get compatible models from a specific model code
     def fetch_compatible(self, query): 

@@ -1,17 +1,21 @@
+from sdbx.nodes.types import *
+
+from sdbx import config
+from sdbx.compute import Inference, get_device
+
+from sdbx.nodes.helpers import soft_random
+from sdbx.nodes.tuner import NodeTuner
 
 import os
+
 import PIL
 from PIL import Image
 from llama_cpp import Llama
-from transformers import AutoModel, TensorType, DataType, Tensor
-from sdbx import config
-from sdbx.config import get_defaults
-from sdbx.nodes.types import *
-from sdbx.nodes.helpers import soft_random
-from sdbx.nodes.compute import Inference, get_device
-from sdbx.nodes.tuner import NodeTuner
+from transformers import AutoModel, TensorType # DataType, Tensor (?)
 
-system = get_defaults("spec","data") #needs to be set by system @ launch
+get_defaults = config.get_defaults
+
+system = get_defaults("spec", "data") #needs to be set by system @ launch
 spec = system["devices"]
 flash_attn = get_defaults("spec","flash-attention")
 algorithms = get_defaults("algorithms","schedulers")
@@ -34,19 +38,19 @@ def genesis_node(
 
 @node(name="Load Diffusion", display=True)
 def load_diffusion(
-    model: Literal[*diffusion_models.keys()] =  next(iter([*diffusion_models.keys()]),""),
+    model: Literal[*diffusion_models.keys()] = next(iter([*diffusion_models.keys()]), ""),
     # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
     device: Literal[*system] = next(iter(*system), "cpu"),
     precision: A[int, Dependent(on=next(iter(*spec["devices"]),""), when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
     verbose: bool = False,
-) ->  AutoModel:
+) -> AutoModel:
     #do model stuff
     return model
 
 @node(name="Load LoRA", display=True)
 def load_lora(
-    lora: Literal[*lora_models.keys()] = next(iter([*lora_models.keys()]),""),
+    lora: Literal[*lora_models.keys()] = next(iter([*lora_models.keys()]), ""),
     device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
 ) -> Llama:
     # Inference do_lora_stuff
@@ -54,7 +58,7 @@ def load_lora(
 
 @node(name="Load Vae", display=True)
 def load_vae(
-    vae: Literal[*vae_models.keys()] =  next(iter([*vae_models.keys()]),""),
+    vae: Literal[*vae_models.keys()] = next(iter([*vae_models.keys()]), ""),
     device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
     vae_slice: bool = False,
     vae_tile: bool = True,
@@ -81,7 +85,7 @@ def load_text_model(
 
 @node(name="Text Prompt", display=True)
 def text_prompt(
-    model:  Tensor | Llama,
+    model: Tensor | Llama,
     external_user_prompt: str = None,
     prompt: A[str, Dependent(on="external_user_prompt", when=None), Text(multiline=True, dynamic_prompts=True)] = "", #prompt default
     negative_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = None,

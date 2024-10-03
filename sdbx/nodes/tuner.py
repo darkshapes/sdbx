@@ -10,9 +10,9 @@ import psutil
 class NodeTuner:
     @cache        
     def determine_tuning(self, model):
-        self.spec = config.get_default("spec","data")
-        self.algorithms = list(config.get_default("algorithms","schedulers"))
-        self.solvers = list(config.get_default("algorithms","solvers"))
+        self.spec = config.get_default("spec", "data")
+        self.algorithms = list(config.get_default("algorithms", "schedulers"))
+        self.solvers = list(config.get_default("algorithms", "solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
         self.metadata_path = config.get_path("models.metadata")
         self.clip_skip = 2
