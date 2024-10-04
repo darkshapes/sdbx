@@ -49,7 +49,8 @@ class NodeTuner:
             self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
     @cache
     def pipe_exp(self):
-        self.pipe_dict["variant"] = list(self.fetch)[2]
+        if not self.oh_no[0]:self.pipe_dict["variant"] = list(self.fetch)[2]
+        else:self.pipe_dict["torch_dtype"] = "auto"
         self.pipe_dict["tokenizer"] = None
         self.pipe_dict["text_encoder"] = None
         self.pipe_dict["tokenizer_2"] = None
@@ -79,24 +80,24 @@ class NodeTuner:
 
         self.optimized["cache_jettison"] = self.oh_no[1]
         self.optimized["device"] = self.spec["devices"][0]
+        self.optimized["attn_implementation"]="flash_attention_2" if self.spec["flash_attention_2"] == True else 0
         self.optimized["dynamic_cfg"] = False
         self.optimized["seq"] = self.oh_no[1]
         self.optimized["cpu"] = self.oh_no[2]
         self.optimized["disk"] = self.oh_no[3]
         self.optimized["file_prefix"] = "Shadowbox-"
         self.optimized["fuse"] = False
-        self.optimized["compile_unet"] == False
+        self.optimized["compile_unet"] == self.spec["compile"]
         self.optimized["compile"]["fullgraph"] = True
         self.optimized["compile"]["mode"] = "reduce-overhead"       
         self.optimized["refiner"] = IndexManager().fetch_refiner()
-        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False #force vae to f32 by default, because the default vae is broken       
+        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
         skip = 12 - (self.clip_skip-1)
         self.optimized["num_hidden_layers"] = int(skip)
         return self.optimized
   
     @cache
     def cond_exp(self):
-        #self.queue["prompt"] = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
         self.conditioning["padding"] = "max_length"
         self.conditioning["truncation"] = True
         self.conditioning["return_tensors"] = 'pt'
@@ -107,12 +108,13 @@ class NodeTuner:
         # ensure value returned
         if self._vae != "∅":  
             self.optimized["vae"] = self._vae[0][1][1]
-            self.vae_dict["variant"] = self._vae[0][1][2]
-            self.vae_dict["cache_dir"] = "vae_"
+            if not self.oh_no[0]: self.vae_dict["variant"] = self._vae[0][1][2] 
+            else:self.vae_dict["torch_dtype"] = "auto"
             if self.oh_no[1]: self.vae_dict["enable_tiling"] = True
             else: self.vae_dict["disable_tiling"] = True  # [compatibility] tile vae input to lower memory
             if self.oh_no[1]: self.vae_dict["enable_slicing"]  = True
             else: self.vae_dict["disable_slicing"] = True # [compatibility] serialize vae to lower memory
+            self.vae_dict["cache_dir"] = "vae_"
 
             return self.optimized, self.vae_dict
         
@@ -124,13 +126,14 @@ class NodeTuner:
                 for each in self._tra:
                     #self.transformers["tokenizer][each] = self._tra[each][1]
                     self.transformers["text_encoder"][each] = self._tra[each][1]
-                    self.transformers["variant"][each] = self._tra[each][2]
+                    if not self.oh_no[0]:self.transformers["variant"][each] = self._tra[each][2] 
+                    else: self.transformers["torch_dtype"] = "auto"
 
         if next(iter(self._lora.items()),0) != 0: 
             self.lora_dict["file"] = next(iter(self._lora.items()),0)[1][1]
             self.lora_dict["class"] = next(iter(self._lora.items()),0)[0][1]
+            self.fuse["lora_scale"] = 1.0
             #get steps from filename if possible (yet to determine another reliable way)
-            #print(self.lora_dict["file"])
             try:
                 self.step_title = self.lora_dict["file"].lower()
                 self.step  = self.step_title.rindex("step")
@@ -161,7 +164,6 @@ class NodeTuner:
             #lora parameters
             # cfg disabled below this line
                 self.optimized["fuse"] = True
-                self.fuse["lora_scale"] = 1.0
                 self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
                 self.gen_dict["guidance_scale"] = 0
                 if "TCD" in self.lora_dict["class"]:
@@ -171,8 +173,8 @@ class NodeTuner:
                     self.gen_dict["strength"] = .99
                 elif "LIG" in self.lora_dict["class"]: #4 step model pref
                     self.optimized["scheduler"] = self.algorithms[0] #Euler sampler
-                    self.schedule["interpolation_type"] = "Linear", #sgm_uniform/simple
-                    self.schedule["timestep_spacing"] = "trailing",                         
+                    self.schedule["interpolation_type"] = "Linear" #sgm_uniform/simple
+                    self.schedule["timestep_spacing"] = "trailing"                        
                 elif "DMD" in self.lora_dict["class"]:
                     self.optimized["fuse"] = False
                     self.optimized["scheduler"] = self.algorithms[6] #LCM
@@ -198,6 +200,8 @@ class NodeTuner:
                     if self.gen_dict["num_inference_steps"] == 1:
                         self.optimized["scheduler"] = self.algorithms[7] #tcd FOR ONE STEP
                         self.schedule["timestep_spacing"] = "trailing"
+                        if "STA-XL" in self.lora_dict["class"]:
+                            self.schedule["timesteps"] = 800
                     if "CFG" in str(self.lora_dict["file"]).upper():
                         if self.category == "STA-XL":
                             self.gen_dict["guidance_scale"] = 5
@@ -206,13 +210,10 @@ class NodeTuner:
                     if ("FLU" in self.lora_dict["class"]
                     or "STA-3" in self.lora_dict["class"]):
                         self.fuse["lora_scale"]=0.125
-                    elif "STA-XL" in self.lora_dict["class"]:
-                        if self.gen_dict["num_inference_steps"] == 1:
-                            self.schedule["timesteps"] = 800
-                        else:
-                            self.optimized["scheduler"] = self.algorithms[5] #DDIM
-                            self.schedule["timestep_spacing"] = "trailing"
-                            self.gen_dict["eta"] = 1.0
+                    else:
+                        self.optimized["scheduler"] = self.algorithms[5] #DDIM
+                        self.schedule["timestep_spacing"] = "trailing"
+                        self.gen_dict["eta"] = 1.0
         else :   #if no lora
             self.optimized["scheduler"] = self.algorithms[4]
             self.gen_dict["num_inference_steps"] = 20
@@ -248,7 +249,6 @@ class NodeTuner:
 
         self.gen_dict["output_type"] = "latent"
         return  self.transformers, self.gen_dict, self.optimized, self.lora_dict, self.fuse, self.schedule 
-    
     @cache      
     def refiner_exp(self):
         if self.category == "STA-XL": 

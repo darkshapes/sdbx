@@ -33,6 +33,7 @@ The package index to torch built with CUDA.
 Observe the CUDA version is in this URL.
 """
 nvidia_torch_index = ("https://download.pytorch.org/whl/cu121", "https://download.pytorch.org/whl/nightly/cu124")
+nvidia_torch_index_win = ("https://download.pytorch.org/whl/cu121", "https://download.pytorch.org/whl/cu121")
 
 """
 The package index to torch built against CPU features.
@@ -117,6 +118,8 @@ def _is_linux_arm64():
 
 def dependencies(force_nightly: bool = False) -> List[str]:
     deps = ["torch", "torchvision", "torchaudio"]
+    system = platform.system().lower()
+
 
     # Check for an existing torch installation.
     try:
@@ -136,7 +139,11 @@ def dependencies(force_nightly: bool = False) -> List[str]:
 
     # prefer nvidia over AMD because AM5/iGPU systems will have a valid ROCm device
     if _is_nvidia() and not force_cpu:
-        index_urls = [nvidia_torch_index] + index_urls
+        if system=="windows": 
+            deps = [f"torch==2.3.0+cu121", "torchvision==0.18.0", "torchaudio==2.3.0+cu121"] + deps[3:]
+            index_urls = [nvidia_torch_index_win] + index_urls           
+        else:
+            index_urls = [nvidia_torch_index] + index_urls
     elif _is_amd() and not force_cpu:
         index_urls = [amd_torch_index] + index_urls
         deps += ["pytorch-triton-rocm"]
