@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sdbx"
 dynamic = ["version", "dependencies"]
-description = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
+description = "Modern AI node graph instrument."
 authors = [{ name = "darkshapes" }]
 requires-python = ">= 3.11"
 
@@ -16,6 +16,8 @@ core = [
     "diffusers",
     "transformers",
     "accelerate",
+    "peft",
+    "scipy",
 
     # Other machine learning libraries
     "llama-cpp-python",

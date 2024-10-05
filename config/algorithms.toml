@@ -25,7 +25,9 @@ schedulers = [
     #"example custom sampler",
 ]
 #arrange this order as you like
-lora_priority = ["LIG", "HYP", "TCD", "SPO", "PCM", "LCM", "DMD", "RT-", "FLA"]
+lora_priority = ["SPO", "HYP", "LIG", "FLA", "PCM", "LCM", "DMD", "RT-", "TCD"]
+step_priority = [2, 4, 8, 10, 12, 16, 1]
+
 
 #this order does not need to be changed
 solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver"]

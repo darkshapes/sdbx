@@ -77,56 +77,39 @@
 #### SYNTAX
 ```
 
- perf_counter, totals, average, memory
-pipe
-    model path, tokenizer, text encoder, tokenizr2, text encodr2, tokenizer 3, text encoder 3
-
-expressions:
-subroutine
-
-clear_cache, device, dynamic guidance sequential offload,cpu offload, compile(reduce overhead, fullgraph),upcast_vae, vae_tile, vae_slice, file_prefix, output_type, compress_level, config_path, algorithm
+optimized scheduler, fuse, compile
+model
 queue
-     prompt  embeddings, seed
 transformers
-    tokenizer, text encoder
-text_encoders
-    torch_dtype torch.float16 ,variant     fp16
 conditioning
-     prompt, padding="max_length", truncation=True, return_tensors='pt'
-lora
-    lora(path), weight_name (filename)
-scheduler
-    timestep spacing, rescale betas zero_snr, clip sample, set alpha to one,
-gen
-    output_type='latent', timesteps, num_inference_steps, cfg/callback on step end/callback on step end tensor inputs
-    embeds
-        prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds,negative_pooled_prompt_embeds
-vae
-   model, dtype, cache_dir
-   
- self.subroutine, self.queue, self.transformers, self.conditioning, self.pipe_dict, self.lora_dict, self.fuse, self.schedule, self.gen_dict, self.vae_dict
+gen_exp
+pipe_exp
+vae_exp
+lora_exp
+
 
         defaults = determine_tuning(self, full_path_to_model)            
-                    tuning dict :                 system_prompt          
-                      llm------------.            temperature           
-                      model---------. |           repeat_penalty               
-num_inference_steps   vae----------. ||           max_tokens           
-cfg                   lora--------. |||           context
-output_type ]-.       transformer. ||||   .--llm[ top_p
-               `------gen         |||||  |        top_k
-                 .----[]          |||||  |                
-batch_limit   ]-' .---pipe        `file  | .-transformer[ prompt       class
-cache_jettison   | .--compile      size-' |.--------------------model[ stage 
-upcast           || .-refiner      dtype-'                             config
-compile          ||| .scheduler    ||                  config
-file_prefix      ||||              ||                  upcast
-use_fast_token   ||||              ||                  slice  
-streaming        ||||              | `------------vae[ tile       
-dynamic_cfg      ||||               `----------.                class          
-path             ||||                           `---------lora[ fuse
+                    tuning dict :                       system_prompt          
+                      llm------------.                  temperature           
+                      model---------. |                 repeat_penalty               
+num_inference_steps   vae_dict-----. ||                 max_tokens           
+cfg                   lora_dict---. |||                 context
+output_type ]-.       transformer. ||||         .--llm[ top_p
+               `------gen_dict    |||||        |        top_k
+              --------queue       |||||        |
+                 .----[optimized] |||||        |                
+batch_limit   ]-' .---pipe        `file        | .-transformer[             class
+cache_jettison   | .--compile      variant     || .-----------------model[ stage 
+upcast           || .-refiner      torch_dtype-'''                         config
+compile          ||| .schedule    ||                  config
+file_prefix      |||| conditioning||                  upcast
+use_fast_token   |||||            ||                  slice  
+streaming        |||||             | `------------vae[ tile       
+dynamic_cfg      |||||              `----------.                class          
+path             ||||`--[                        `---------lora[ fuse
                  ||| `-------------scheduler[ algorithm         scale         
-strength ]pipe--' ||                          lu_lambdas        unet_only
-noise_eta         | `--refiner[ available     euler_at_final
+variant ]pipe--' |||                          lu_lambdas        unet_only
+torch_dtype       | `--refiner[ available     euler_at_final
 cpu offload       |           use_refiner     clip_sample
 sequential_offload|       denoising_start     timesteps            ##### 0-1000
 manual_seed       |   num_inference_steps     timestep_spacing     ##### str 

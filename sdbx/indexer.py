@@ -367,7 +367,7 @@ class ReadMeta:
                     self.meta = ""
                     pass
             else :
-                print(f"Unrecognized file format: {self.filename}")
+                print(f"Ignoring unrecognized model file format: {self.filename}")
                 pass
 
             return self.full_data
@@ -511,7 +511,6 @@ class IndexManager:
     #get compatible models from a specific model code
     def fetch_compatible(self, query): 
         self.clip_data = config.get_default("tuning", "clip_data") 
-        self.lora_priority = config.get_default("algorithms", "lora_priority") 
         self.vae_index = config.get_default("index", "VAE")
         self.tra_index = config.get_default("index", "TRA")
         self.lor_index = config.get_default("index", "LOR")
@@ -521,7 +520,6 @@ class IndexManager:
             "lor": self.lor_index
             }
         try:
-            lora_sorted = {}
             tra_sorted = {}
             self.tra_req = self._fetch_txt_enc_types(self.clip_data, query)
         except TypeError as error_log:
@@ -548,14 +546,8 @@ class IndexManager:
                 logger.debug(f"Error when returning encoder for {query} : {error_log}.", exc_info=True)
                 tra_sorted = {}
         vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
-        lora_match = self.filter_compatible(query, self.model_indexes["lor"])
-        lora_match = dict(lora_match)
-        j = 0
-        for each in self.lora_priority:
-            for key, val in lora_match.items():
-                if each in key[1]:
-                    lora_sorted[key] = val
-                    j += 1
+        lora_sorted = self.filter_compatible(query, self.model_indexes["lor"])
+        lora_sorted = dict(lora_sorted)
         if vae_sorted == []: 
             vae_sorted =str("∅")
             logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
