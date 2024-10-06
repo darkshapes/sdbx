@@ -121,21 +121,23 @@ class EvalMeta:
             self.sub_key = "250" #sdxl hook
 
     def process_lor(self):
-        for size, attributes in self.lora_peek.items():
-            if (
-                isclose(self.size, int(size),  rel_tol=self.lora_pct) or
-                isclose(self.size, int(size)*2, rel_tol=self.lora_pct) or
-                isclose(self.size, int(size)/2, rel_tol=self.lora_pct)
-            ):
-                for tensor_params, desc in attributes.items():
-                    if isclose(self.tensor_value, int(tensor_params), rel_tol=self.lora_pct):
-                        for each in next(iter([desc, 'not_found'])):
-                            if each.lower() in self.filename.lower():
-                                  self.tag = "l"
-                                  self.key = size
-                                  self.sub_key = tensor_params
-                                  self.value = each #lora hook                               
-                                      # found lora
+        if self.size != 0:
+            for size, attributes in self.lora_peek.items():
+                if (
+                    isclose(self.size, int(size),  rel_tol=self.lora_pct) or
+                    isclose(self.size, int(size)*2, rel_tol=self.lora_pct) or
+                    isclose(self.size, int(size)/2, rel_tol=self.lora_pct)
+                ):
+                    for tensor_params, desc in attributes.items():
+                        if isclose(self.tensor_value, int(tensor_params), rel_tol=self.lora_pct):
+                            for each in next(iter([desc, 'not_found'])):
+                                title = self.filename.upper()
+                                if each in title:
+                                    self.tag = "l"
+                                    self.key = size
+                                    self.sub_key = tensor_params
+                                    self.value = each #lora hook                               
+                                        # found lora
 
     def process_tra(self):
         for tensor_params, attributes in self.tra_peek.items():
@@ -225,9 +227,9 @@ class EvalMeta:
             logger.debug(f"'Not indexed. 'No eval error' should follow: '{self.extract}'.", exc_info=True)
             pass
         else:   #format [ model type code, filename, compatability code, file size, full file path]
-            if self.verbose is True: print(self.code, self.filename, self.size, self.path)
+            if self.verbose is True: print(self.code, self.lookup, self.filename, self.size, self.path)
             return self.code, (
-                self.filename, self.lookup,  self.size, self.path, 
+                self.filename, self.lookup, self.size, self.path, 
                 (self.context_length if self.context_length else self.dtype))
                             
 class ReadMeta:
@@ -248,7 +250,7 @@ class ReadMeta:
         self.model_tag = {  # measurements and metadata detected from the model ggml.model imatrix.chunks_count
             #NO TOUCH!! critical values
             "filename": "", #universal
-            "size": "", #file size in bytes
+            "size": 0, #file size in bytes
             "path": "",
             "dtype": "", #precision
             "torch_dtype": "",

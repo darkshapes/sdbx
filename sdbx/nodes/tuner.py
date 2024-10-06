@@ -1,4 +1,4 @@
-import os
+import numbers
 from sdbx.indexer import IndexManager
 from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
@@ -15,7 +15,6 @@ class NodeTuner:
         self.solvers = list(config.get_default("algorithms","solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
         self.metadata_path = config.get_path("models.metadata")
-        self.clip_skip = 2
         if self.fetch != "∅" and self.fetch != None:
 
             self.optimized = defaultdict(dict)
@@ -83,26 +82,20 @@ class NodeTuner:
         self.optimized["cpu"] = self.oh_no[2]
         self.optimized["disk"] = self.oh_no[3]
         self.optimized["file_prefix"] = "Shadowbox-"
-        self.optimized["fuse_lora_on"] = False
+        self.optimized["fuse_lora_on"] = True
         #self.optimized["fuse_pipe"] = True pipe.fuse_qkv_projections()
-        self.optimized["compile_transformer"] = self.spec["compile_transformer"]
-        #if self.spec["compile_unet"]: 
-        #    self.optimized["compile_unet"] = self.spec["compile_unet"]
-        #    self.optimized["sigmas"] = True
-        #    self.gen["return_dict"]=False
-        self.optimized["compile_vae"] = self.spec["compile_vae"]
-        self.optimized["compile"]["fullgraph"] = True
-        self.optimized["compile"]["mode"] = "reduce-overhead"
+        self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
+        if self.spec["dynamo"]:
+            self.optimized["sigmas"] = True #
+            self.optimized["dynamo"] = self.spec["dynamo"]
         self.optimized["refiner"] = IndexManager().fetch_refiner()
         self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
-        skip = 12 - (self.clip_skip-1)
-        self.optimized["num_hidden_layers"] = int(skip)
         return self.optimized
   
     @cache
     def cond_exp(self):
         self.conditioning["padding"] = "max_length"
-        self.conditioning["truncation"] = True
+        #self.conditioning["truncation"] = True
         self.conditioning["return_tensors"] = 'pt'
         return self.conditioning
 
@@ -130,6 +123,22 @@ class NodeTuner:
 
             return self.optimized, self.vae
     
+    def _get_step_from_filename(self, key, val):
+        try:
+            self.get_filename = key[0]
+            self.lower_filename = self.get_filename.lower()
+            self.step_num_index = self.lower_filename.rindex("step")
+        except ValueError as error_log:
+            logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
+            return 0
+        else:
+            if self.step_num_index is not None:
+                self.crop_steps = str(self.get_filename[self.step_num_index - 2:self.step_num_index])
+                self.steps_val = int(self.crop_steps) if self.crop_steps.isdigit() else int(self.crop_steps[1:])
+                return self.steps_val
+            else:
+                return 0
+
     def prioritize_loras(self):
         self.lora_unsorted = defaultdict(dict)
         self.lora_sorted = defaultdict(dict)
@@ -138,60 +147,58 @@ class NodeTuner:
         self.lora_priority = {}
         self.lora_priority = config.get_default("algorithms", "lora_priority")
         self.step_priority = config.get_default("algorithms", "step_priority") 
-        for item in self.lora_priority:
+        for items in self.lora_priority:
             for each in self.step_priority:
-                for key, val in self._lora.items():
-                    try:
-                        self.get_filename = key[0]
-                        self.lower_filename = self.get_filename.lower()
-                        self.step_num_index = self.lower_filename.rindex("step")
-                    except ValueError as error_log:
-                        logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
-                        continue  # skip to next iteration on error
+                if isinstance(each, numbers.Real):
+                    for key, val in self._lora.items():
+                        self.steps = self._get_step_from_filename(key, val)
+                        if self.steps == each:
+                            self.lora_unsorted[key] = self.steps
+
+                        if str(items).upper() in key[1].upper():
+                            self.lora_sorted[key] = val
+                            if self.lora_unsorted.get(key,None) != None:
+                                self.gen["num_inference_steps"] = self.lora_unsorted[key]
+                                return val[1], key[1]
+                            
+                                        
+                if next(iter(self.lora_sorted.items()), 0) != 0:
+                    each, item = next(iter(self.lora_sorted.items()),0)
+                    self.step_no = self._get_step_from_filename(each, item)
+                    if self.step_no != 0:
+                        self.gen["num_inference_steps"] = self.step_no
                     else:
-                        if self.step_num_index is not None:
-                            self.crop_steps = str(key[0][self.step_num_index - 2:self.step_num_index])
-                            self.steps = int(self.crop_steps) if self.crop_steps.isdigit() else int(self.crop_steps[1:])
-
-                            if str(item) in str(key[1]):
-                                self.lora_sorted[key[1]] = self.steps
-
-                            if self.steps == each:
-                                self.lora_unsorted[key[1]] = self.steps
-                                if self.lora_sorted.get(key[1],None) != None:
-                                    self.gen["num_inference_steps"] = each
-                                    return { key[1]: val }      
-
-        if next(iter(self.lora_sorted.items()), 0) != 0:
-            key, val = zip(**self.lora_sorted.items())
-            self.gen["num_inference_steps"] = val[0]
-            return {key[0]: val[0]}
-        
-        elif next(iter(self.lora_unsorted.items()), 0) != 0:
-            self.gen["num_inference_steps"] = 20
-            key, val = zip(**self.lora_unsorted.items())
-            return {key[0]: val[0]}         
-        else:
-            logger.debug(f"LoRA not found?", exc_info=True)
+                        self.gen["num_inference_steps"] = 20
+                    return item[1], each[1]
+            
+            if next(iter(self.lora_unsorted.items()), 0) != 0:
+                each, item = next(iter(self.lora_unsorted.items()),0)
+                if not isinstance(val(len(val)-1), numbers.Real):
+                    self.gen["num_inference_steps"] = 20
+                else: 
+                    self.gen["num_inference_steps"] = val(len(val)-1)
+                return each[1][1], each[0][1]  
+            else:
+                logger.debug(f"LoRA not found?", exc_info=True)
 
     @cache       
-    def gen_exp(self):
+    def gen_exp(self, skip):
+        self.skip = skip
         self.conditioning_list = ["tokenizer", "text_encoder", "tokenizer_2", "text_encoder_2","tokenizer_3", "text_encoder_3"]
         if self._tra != "∅" and self._tra != {}: 
-                i = 0
-                for each in self._tra:
-                    #self.transformers["tokenizer][each] = self._tra[each][1]
-                    self.transformers["text_encoder"][each] = self._tra[each][1]
-                    if not self.oh_no[0]:
-                        self.transformers["variant"][each] = self._tra[each][2] 
-                    else: 
-                        self.transformers["torch_dtype"] = "auto"
-                        self.transformers["low_cpu_mem_usage"][each] = self.oh_no[0]
+            for each in self._tra:
+                #self.transformers["tokenizer][each] = self._tra[each][1]
+                self.transformers["text_encoder"][each] = self._tra[each][1]
+                if not self.oh_no[0]:
+                    self.transformers["variant"][each] = self._tra[each][2] 
+                else: 
+                    self.transformers["torch_dtype"] = "auto"
+                    self.transformers["low_cpu_mem_usage"][each] = self.oh_no[0]
+                self.skip = 12 - (self.skip)
+            self.transformers["num_hidden_layers"] = int(self.skip)
 
         if next(iter(self._lora.items()),0) != 0:
-            self.lora_sorted = self.prioritize_loras()
-            self.optimized["lora"] = next(iter(self.lora_sorted.items()),0)[1][1]
-            self.optimized["lora_class"] = next(iter(self.lora_sorted.items()),0)[0]
+            self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
             # cfg enabled here
             if "PCM" in self.optimized["lora_class"]:
                 self.optimized["algorithm"] = self.algorithms[5] #DDIM
@@ -208,14 +215,11 @@ class NodeTuner:
             else:
             #lora parameters
             # cfg disabled below this line
-                self.optimized["fuse_lora_on"] = True
-                self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
                 self.gen["guidance_scale"] = 0
                 if "TCD" in self.optimized["lora_class"]:
-                    self.gen["num_inference_steps"] = 4
+                    self.gen["num_inference_steps"] = 8
                     self.optimized["algorithm"] = self.algorithms[7] #TCD sampler
                     self.gen["eta"] = 0.3
-                    self.gen["strength"] = .99
                 elif "LIG" in self.optimized["lora_class"]: #4 step model pref
                     self.optimized["algorithm"] = self.algorithms[0] #Euler sampler
                     self.optimized["scheduler"]["interpolation_type"] = "linear" #sgm_uniform/simple
@@ -243,9 +247,8 @@ class NodeTuner:
                                         logger.debug(f"No key for  {error_log}.", exc_info=True)
                 elif "HYP" in self.optimized["lora_class"]:
                     if self.gen["num_inference_steps"] == 1:
-                        self.optimized["algorithm"] = self.algorithms[7] #tcd FOR ONE STEP
-                        self.optimized["fuse_lora_on"] = True
-                        self.optimized["fuse_lora"]["lora_scale"]=1.0
+                        self.optimized["algorithm"] = self.algorithms[7] #TCD FOR ONE STEP
+                        self.optimized["fuse_lora"]["lora_scale"] = 1.0
                         self.gen["eta"] = 1.0
                         if "STA-XL" in self.optimized["lora_class"]: #unet only
                             self.optimized["scheduler"]["timesteps"] = 800
@@ -267,8 +270,8 @@ class NodeTuner:
             self.optimized["scheduler"]["use_karras_sigmas"] = True
             if ("LUM" in self.category
             or "STA-3" in self.category):
-                self.optimized["scheduler"]["interpolation type"] = "linear", #sgm_uniform/simple
-                self.optimized["scheduler"]["timestep_spacing"] = "trailing", 
+                self.optimized["scheduler"]["interpolation type"] = "linear" #sgm_uniform/simple
+                self.optimized["scheduler"]["timestep_spacing"] = "trailing"
             if (self.category == "STA-15"
             or self.category == "STA-XL"
             or self.category == "STA3"):
@@ -295,6 +298,7 @@ class NodeTuner:
 
         self.gen["output_type"] = "latent"
         self.gen["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
+        if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #euler
         return  self.transformers, self.gen, self.optimized
     
     @cache      
@@ -309,4 +313,11 @@ class NodeTuner:
 
         return self.refiner
 
+    @cache
+    def dynamo_exp(self):
+        dynamo= defaultdict(dict)
+        self.gen["return_dict"]= False
+        dynamo["compile"]["fullgraph"] = True
+        dynamo["compile"]["mode"] = "reduce-overhead" #switches to max-autotune if cuda device
+        return dynamo
             

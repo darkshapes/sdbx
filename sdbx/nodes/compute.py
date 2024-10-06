@@ -8,7 +8,6 @@ import os
 import torch
 import datetime
 from time import perf_counter_ns
-from diffusers import AutoPipelineForText2Image, AutoencoderKL
 from diffusers.schedulers import (
     EulerDiscreteScheduler,
     EulerAncestralDiscreteScheduler,
@@ -25,19 +24,21 @@ from diffusers.schedulers import (
     DEISMultistepScheduler,
      )
 from diffusers.utils import logging as df_log
+from diffusers import AutoPipelineForText2Image, AutoencoderKL
 from transformers import logging as tf_log
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 import accelerate
 from sdbx import logger
 from sdbx.nodes.tuner import NodeTuner
-#from sdbx.indexer import IndexManager
+# from sdbx.indexer import IndexManager
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter, soft_random
 
 
 class T2IPipe:
-    #do not put an __init__ in this class! only __call__ can be used. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
-    bug_off=False
+    # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
+
+    bug_off=True
     config_path = config.get_path("models.metadata")
 
 ############## TIMECODE
@@ -45,12 +46,12 @@ class T2IPipe:
 
 ############## STFU HUGGINGFACE
     def hf_log(self, on=False, fatal=False):
-        if on:
+        if on == True:
             tf_log.enable_default_handler()
             df_log.enable_default_handler()
             tf_log.set_verbosity_warning()
             df_log.set_verbosity_warning()
-        if fatal:
+        if fatal == True:
             TORCH_LOGS="-all"
             tf_log.disable_default_handler()
             df_log.disable_default_handler()
@@ -83,24 +84,25 @@ class T2IPipe:
 ############## SCHEDULER
     def algorithm_converter(self, non_constant, exp):
         self.non_constant = non_constant
-        self.exp = exp
+        self.algo_exp = exp
         self.schedule_chart = {
-            "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),           
-            "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),     
-            "EDMDPMSolverMultistepScheduler" : EDMDPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp), 
-            "DPMSolverMultistepScheduler" : DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),        
-            "DDIMScheduler" : DDIMScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "LCMScheduler" : LCMScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "TCDScheduler" : TCDScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),           
+            "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
+            "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),     
+            "EDMDPMSolverMultistepScheduler" : EDMDPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp), 
+            "DPMSolverMultistepScheduler" : DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),        
+            "DDIMScheduler" : DDIMScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
+            "LCMScheduler" : LCMScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
+            "TCDScheduler" : TCDScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
             "AysSchedules": AysSchedules,
-            "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),  
-            "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
+            "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
+            "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
+            "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),  
+            "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(self.pipe.scheduler.config,**self.algo_exp),
         }
         if self.non_constant in self.schedule_chart:
             self.pipe.scheduler = self.schedule_chart[self.non_constant]
+            self.tc(self.clock, f"{self.schedule_chart[self.non_constant]}")
             return self.pipe.scheduler
         else:
             try:
@@ -108,11 +110,8 @@ class T2IPipe:
             except ValueError as error_log:
                 logger.debug(f"Scheduler error {error_log}.", exc_info=True)
 
-
 ############## DEVICE
     def set_device(self, device=None):
-        self.clock = perf_counter_ns() # 00:00:00
-        self.tc(self.clock, " ")
         if device==None:
             if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
             else: self.device = "mps" if (torch.backends.mps.is_available() & torch.backends.mps.is_built()) else "cpu"# https://pytorch.org/docs/master/notes/mps.html
@@ -120,6 +119,8 @@ class T2IPipe:
 
 ############## QUEUE
     def queue_manager(self, prompt, seed):
+        self.clock = perf_counter_ns() # 00:00:00
+        self.tc(self.clock, " ")
         self.tc(self.clock, "determining device type...", self.bug_off)
         self.queue = []    
 
@@ -130,14 +131,15 @@ class T2IPipe:
         
 ############## ENCODERS
     def declare_encoders(self, exp, transformer="stabilityai/stable-diffusion-xl-base-1.0"):
-        tformer, gen, self.enc_opt = exp
-        tformer_dict = {}
-        if tformer.get("variant",0):
-            var, dtype = self.float_converter(tformer["variant"][next(iter(tformer["variant"]),0)])
-            tformer_dict.setdefault("variant",var)
-            tformer_dict.setdefault("torch_dtype", dtype)
-        tformer_dict.setdefault("num_hidden_layers",self.enc_opt["num_hidden_layers"])
-        if self.enc_opt.get("attn_implementation",0): tformer_dict.setdefault("attn_implementation", self.enc_opt["attn_implementation"])
+        self.tformer, self.gen, self.enc_opt = exp
+        self.tformer_dict = {}
+        if self.tformer.get("variant",0) != 0:
+            var, dtype = self.float_converter(self.tformer["variant"][next(iter(self.tformer["variant"]),0)])
+            self.tformer_dict.setdefault("variant",var)
+            self.tformer_dict.setdefault("torch_dtype", dtype)
+        if self.enc_opt.get("attn_implementation",0) != 0: 
+            self.tformer_dict.setdefault("attn_implementation", self.enc_opt["attn_implementation"])
+        self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)
 
         self.tokenizer = CLIPTokenizer.from_pretrained(
             transformer,
@@ -148,11 +150,12 @@ class T2IPipe:
             transformer,
             subfolder='text_encoder',
             use_safetensors=True,
-            **tformer_dict,
+            **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
       
-        if self.enc_opt.get("compile_transformer",0): self.compile_model(self.text_encoder, self.enc_opt["compile"])
+        if self.enc_opt.get("dynamo",0) != 0:
+            self.compile_model(self.text_encoder, self.enc_opt["compile"])
 
         self.tokenizer_2 = CLIPTokenizer.from_pretrained(
             transformer,
@@ -164,13 +167,15 @@ class T2IPipe:
             transformer,
             subfolder='text_encoder_2',
             use_safetensors=True,
-            **tformer_dict,
+            **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
-        if self.enc_opt.get("compile_transformer",0): self.compile_model(self.text_encoder_2, self.enc_opt["compile"])
+        if self.enc_opt.get("dynamo",0) != 0:
+            self.compile_model(self.text_encoder_2, self.enc_opt["compile"])
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, tokenizers, text_encoders, exp):
+        self.emb_exp = exp
         self.tc(self.clock, f"encoding prompt with device: {self.device}...", self.bug_off)
         embeddings_list = []
         #for prompt, tokenizer, text_encoder in zip(prompts, self.tokenizer.values(), self.text_encoder.values()):
@@ -178,7 +183,7 @@ class T2IPipe:
             cond_input = tokenizer(
             prompt,
             max_length=tokenizer.model_max_length,
-            **exp,
+            **self.emb_exp
         )
             prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
 
@@ -204,20 +209,20 @@ class T2IPipe:
 
 ############## PROMPT
     def encode_prompt(self, exp):
-        self.exp = exp
+        self.enc_exp = exp
         with torch.no_grad():
             for generation in self.queue:
                 generation['embeddings'] = self.generate_embeddings(
                     [generation['prompt'], generation['prompt']],
                     [self.tokenizer, self.tokenizer_2],
-                    [self.text_encoder, self.text_encoder_2], self.exp
+                    [self.text_encoder, self.text_encoder_2], self.enc_exp
                     )
 
 ############## CACHE MANAGEMENT
     def cache_jettison(self, encoder=False, lora=False, unet=False, vae=False):
         self.tc(self.clock, f"empty cache...", self.bug_off)
-        if encoder: del self.tokenizer, self.text_encoder,  self.tokenizer_2, self.text_encoder_2, self.exp
-        if lora: self.pipe.unload_lora_weights(), self.exp
+        if encoder: del self.tokenizer, self.text_encoder,  self.tokenizer_2, self.text_encoder_2
+        if lora: self.pipe.unload_lora_weights()
         if unet: del self.pipe.unet
         if vae: del self.pipe.vae
         gc.collect()
@@ -228,11 +233,11 @@ class T2IPipe:
 ############## PIPE
     def construct_pipe(self, exp, model="stabilityai/stable-diffusion-xl-base-1.0"):
         self.model = model
-        self.exp, custom_model = exp
-        if self.exp.get("variant",0):
-            var, dtype = self.float_converter(self.exp["variant"])
-            self.exp["variant"] = var
-            self.exp.setdefault("torch_dtype", dtype)
+        self.pipe_exp, custom_model = exp
+        if self.pipe_exp.get("variant",0):
+            var, dtype = self.float_converter(self.pipe_exp["variant"])
+            self.pipe_exp["variant"] = var
+            self.pipe_exp.setdefault("torch_dtype", dtype)
         self.tc(self.clock, f"precision set for: {var}, using {dtype}", self.bug_off)
 
         ###### going to need this code soon...
@@ -246,35 +251,35 @@ class T2IPipe:
         self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)
         #if os.path.isfile(symlnk_file): os.remove(symlnk_file)
         #os.symlink(checkpoint,symlnk_file) #note: no 'i' in 'symlnk'
-        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.exp).to(self.device)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_exp).to(self.device)
 
 
 ############## LORA
     def add_lora(self, exp, fuse, opt):
-        self.exp = exp
+        self.lora_exp = exp
         self.lora_opt = opt
-        lora = os.path.basename(self.exp)
-        lora_path = self.exp.replace(lora,"")
+        lora = os.path.basename(self.lora_exp)
+        lora_path = self.lora_exp.replace(lora,"")
         self.tc(self.clock, f"set lora to {lora}", self.bug_off)  # lora2
         self.pipe.load_lora_weights(lora_path, weight_name=lora)
-        if fuse: self.pipe.fuse_lora(**self.lora_opt) #add unet only possibility
+        if fuse: 
+            self.pipe.fuse_lora(**self.lora_opt) #add unet only possibility
+            self.tc(self.clock, f"fusing lora...", self.bug_off)
 
 ############## MEMORY OFFLOADING
     def offload_to(self, seq=False, cpu=False, disk=False):
         self.tc(self.clock, f"set offload as {cpu|disk} and sequential as {seq} for {self.device} device", self.bug_off) 
-        if self.device=="cuda":
-            if seq: self.pipe.enable_sequential_cpu_offload()
-            if cpu: self.pipe.enable_model_cpu_offload() 
-        if disk: accelerate.disk_offload() 
-
- ### cue lag spike
+        if "cuda" in self.device:
+            if seq == True: self.pipe.enable_sequential_cpu_offload()
+            if cpu == True: self.pipe.enable_model_cpu_offload() 
+        if disk == True: accelerate.disk_offload() 
 
 ############## COMPILE
     def compile_model(self, model, exp):
         self.model = model
         if "cuda" in self.device:
             exp.setdefault("mode","max-autotune")
-        self.model = torch.compile(self.model, **exp)
+        if False:self.model = torch.compile(self.model, **exp) #compile needs to be put in another routine
         return self.model
 
 ############## CFG CUTOFF
@@ -286,7 +291,6 @@ class T2IPipe:
             pipe._guidance_scale = 0.0
         return callback_key
     
-############## CFG CUTOFF CALLBACK
     def add_dynamic_cfg(self):
             self.tc(self.clock, "set dynamic cfg")
             self.gen_dict.setdefault("callback_on_step_end",self._dynamic_guidance)
@@ -294,20 +298,22 @@ class T2IPipe:
 
 ############## INFERENCE
     def diffuse_latent(self, exp):
-        tformer, self.gen_dict, self.gen_opt = exp
+        tformer, self.gen_dict, self.opt_exp = exp
         self.debugger(locals())
         self.tc(self.clock, f"set scheduler", self.bug_off)
-        self.pipe.scheduler = self.algorithm_converter(self.gen_opt["algorithm"], self.gen_opt["scheduluer"])
-   
-        
-        if self.gen_opt.get("lora",0): self.add_lora(self.gen_opt["lora"], self.gen_opt["fuse_lora_on"], self.gen_opt["fuse_lora"])
-        if self.gen_opt.get("dynamic_cfg",0): self.add_dynamic_cfg()
-        if self.gen_opt.get("compile_unet",0): self.compile_model(self.pipe.unet, self.gen_opt["compile"])
+        self.pipe.scheduler = self.algorithm_converter(self.opt_exp["algorithm"], self.opt_exp["scheduler"])
+        if self.opt_exp.get("dynamic_cfg",0) != 0: 
+            self.add_dynamic_cfg()
+
+        self.tc(self.clock, "activating device. this may take a moment...") ### cue lag spike
+        if self.opt_exp.get("lora",0) !=0:
+            self.add_lora(self.opt_exp["lora"], self.opt_exp["fuse_lora_on"], self.opt_exp["fuse_lora"])
+        if self.enc_opt.get("dynamo",0) != 0:
+            self.compile_model(self.pipe.unet, self.opt_exp["compile"])
 
         self.tc(self.clock, f"set generator", self.bug_off) 
         generator = torch.Generator(device=self.device)
-        self.tc(self.clock, "activating device. this may take a moment...")
-        if self.gen_opt.get("seq",0) or self.gen_opt.get("cpu",0) or self.gen_opt.get("disk",0): self.offload_to(self.gen_opt["seq"], self.gen_opt["cpu"], self.gen_opt["disk"])
+        if self.opt_exp.get("seq",0) !=0 or self.opt_exp.get("cpu",0) !=0 or self.opt_exp.get("disk",0) != 0: self.offload_to(self.opt_exp["seq"], self.opt_exp["cpu"], self.opt_exp["disk"])
 
         self.tc(self.clock, f"entering loop...")
         self.image_start = perf_counter_ns()
@@ -318,14 +324,14 @@ class T2IPipe:
             generator.manual_seed(generation['seed'])
             self.individual_start = perf_counter_ns()
             self.tc(self.clock, f"inference device: {self.device}....", self.bug_off)
-            self.tc(self.image_start, f"{i} of {len(self.queue)}", self.bug_off) 
+            #self.tc(self.image_start, f"{i} of {len(self.queue)}", self.bug_off) 
+            
             generation['latents'] = self.pipe(
                 prompt_embeds=generation['embeddings'][0],
                 negative_prompt_embeds =generation['embeddings'][1],
                 pooled_prompt_embeds=generation['embeddings'][2],
                 negative_pooled_prompt_embeds=generation['embeddings'][3],
-                generator=generator,
-                **self.gen_dict,
+                **self.gen_dict
             ).images
             self.individual_totals.append(self.individual_start)
 
@@ -333,18 +339,17 @@ class T2IPipe:
     def decode_latent(self, opt):
         self.vae_opt, self.vae_exp = opt
         self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
-        if self.vae_exp.get("variant",0):
+        if self.vae_exp.get("variant",0) != 0:
             var, dtype = self.float_converter(self.vae_exp["variant"])
             self.vae_exp["variant"] = var
             self.vae_exp.setdefault("torch_dtype", dtype)
-        file_prefix = self.vae_opt["file_prefix"] + self.vae_opt["lora_class"] + self.vae_opt["algorithm"]
+        file_prefix = f"{self.vae_opt['file_prefix']}-{self.vae_opt['lora_class']}-{self.vae_opt['algorithm']}"
         self.tc(self.clock, f"decode configured for {os.path.basename(self.autoencoder)}...", self.bug_off)
         self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
         self.pipe.vae = self.autoencoder
-        self.debugger(locals())
-        if self.vae_opt.get("upcast_vae",0): self.pipe.upcast_vae()
-        # if self.vae_opt.get("compile_vae",0): 
-        #    self.pipe.vae.decode = self.compile_model(self.pipe.vae.decode, self.vae_opt["compile"])
+        if self.vae_opt.get("upcast_vae",0) != 0: self.pipe.upcast_vae()
+        if self.enc_opt.get("dynamo",0) != 0:
+            self.pipe.vae.decode = self.compile_model(self.pipe.vae.decode, self.vae_opt["compile"])
         with torch.no_grad():
             counter = [s.endswith('png') for s in os.listdir(config.get_path("output"))].count(True) # get existing images
             self.tc(self.clock, f"decoding...")
@@ -366,11 +371,12 @@ class T2IPipe:
                 filename = f"{file_prefix}-{self.seed}-{counter}-batch-{i}.png"
 
                 image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,     
-
+                self.tc(self.clock, "")
+                        
 ############## MEASUREMENT SUMMARY
     def metrics(self):
 
-        if self.device == "cuda":
+        if "cuda" in self.device:
             max_memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
             self.tc(self.clock, f"Max. memory used: {max_memory} GB", self.bug_off)
         
@@ -416,21 +422,23 @@ class T2IPipe:
 
 #genesis node
 optimize = NodeTuner()
-optimize.determine_tuning("ponyFaetality_v11.safetensors")
-opt_exp = optimize.opt_exp()
 insta = T2IPipe()
-insta.set_device()
+optimize.determine_tuning("ponyFaetality_v11.safetensors")
+opt_exp = optimize.opt_exp() 
 
-#loader node transformer class
-gen_exp = optimize.gen_exp()
-insta.declare_encoders(gen_exp)
+#below is fed from genesis
 
 #prompt node
 prompt = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles owned by a vampire"
 seed = int(soft_random())
 insta.queue_manager(prompt,seed)
 
-#enocde node
+#loader node transformer class
+gen_exp = optimize.gen_exp(0)#clip skip
+insta.set_device()
+insta.declare_encoders(gen_exp)
+
+#enocder node
 cond_exp = optimize.cond_exp()
 insta.encode_prompt(cond_exp)
 
@@ -438,7 +446,6 @@ insta.encode_prompt(cond_exp)
 insta.cache_jettison(encoder=True)
 
 #t2i
-
 pipe_exp = optimize.pipe_exp()
 insta.construct_pipe(pipe_exp)
 insta.diffuse_latent(gen_exp)
@@ -452,6 +459,7 @@ insta.decode_latent(vae_exp)
 
 #cache ctrl node
 insta.cache_jettison(vae=True)
+
 #metrics node
 insta.metrics()
 

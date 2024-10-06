@@ -1,3 +1,6 @@
+# many special thank yous to doctorpangloss https://github.com/doctorpangloss/
+# author of the sophisticated https://github.com/hiddenswitch/ComfyUI
+
 #!/usr/bin/env python3
 # this script does a little housekeeping for your platform
 import os.path
@@ -140,7 +143,7 @@ def dependencies(force_nightly: bool = False) -> List[str]:
     # prefer nvidia over AMD because AM5/iGPU systems will have a valid ROCm device
     if _is_nvidia() and not force_cpu:
         if system=="windows": 
-            deps = [f"torch==2.3.0+cu121", "torchvision==0.18.0", "torchaudio==2.3.0+cu121"] + deps[3:]
+            deps = [f"torch==2.3.1+cu121", "torchvision", "torchaudio"] + deps[3:]
             index_urls = [nvidia_torch_index_win] + index_urls           
         else:
             index_urls = [nvidia_torch_index] + index_urls

@@ -24,9 +24,12 @@ schedulers = [
     "DEISMultistepScheduler",          # add any additional or custom samplers after this line
     #"example custom sampler",
 ]
-#arrange this order as you like
-lora_priority = ["SPO", "HYP", "LIG", "FLA", "PCM", "LCM", "DMD", "RT-", "TCD"]
-step_priority = [2, 4, 8, 10, 12, 16, 1]
+
+
+# #arrange this order as you like. default :  ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
+lora_priority = ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
+
+step_priority = [2, 4, 8, 10, 12, 16, 1] #default [2, 4, 8, 10, 12, 16, 1]
 
 
 #this order does not need to be changed
