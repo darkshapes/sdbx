@@ -1,38 +1,44 @@
 from sdbx.nodes.types import *
 
 from sdbx import config
-from sdbx.compute import Inference, get_device
+from sdbx.compute import Inference
+from sdbx.indexer import ModelType
 
 from sdbx.nodes.helpers import soft_random
 from sdbx.nodes.tuner import NodeTuner
 
 import os
 
+from typing import Any, Union
+
 import PIL
 from PIL import Image
 from llama_cpp import Llama
-from transformers import AutoModel, TensorType # DataType, Tensor (?)
+from transformers import AutoModel, TensorType as Tensor # DataType, Tensor (?)
 
-get_defaults = config.get_defaults
+DataType = Any
+Model = Union[Tensor, Llama]
 
-system = get_defaults("spec", "data") #needs to be set by system @ launch
-spec = system["devices"]
-flash_attn = get_defaults("spec","flash-attention")
-algorithms = get_defaults("algorithms","schedulers")
-algorithms = get_defaults("algorithms","solvers")
+spec = config.spec["data"] # needs to be set by system @ launch
+devices = spec["devices"]
+flash_attn = spec["flash-attention"]
+algorithms = config.get_default("algorithms", "schedulers")
+algorithms = config.get_default("algorithms", "solvers")
 
-llms = get_defaults("index","LLM")
-diffusion_models = get_defaults("index","DIF")
-lora_models = get_defaults("index","LOR")
-vae_models = get_defaults("index","VAE")
-transformers = get_defaults("index","TRA")
+llms                = config.model_indexer.index[ModelType.LANGUAGE.value]
+diffusion_models    = config.model_indexer.index[ModelType.DIFFUSION.value]
+lora_models         = config.model_indexer.index[ModelType.LORA.value]
+transformers        = config.model_indexer.index[ModelType.TRANSFORMER.value]
+vae_models          = config.model_indexer.index[ModelType.VAE.value]
+
 primary_models = {**llms, **diffusion_models}
 
 @node(name="Genesis Node", display=True)
 def genesis_node(
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     model: Literal[*primary_models.keys()] = next(iter([*primary_models.keys()]),""),
-) -> DataType:
+# ) -> DataType:
+) -> None:
     strand = NodeTuner().determine_tuning(model)
     return strand
 
@@ -40,8 +46,8 @@ def genesis_node(
 def load_diffusion(
     model: Literal[*diffusion_models.keys()] = next(iter([*diffusion_models.keys()]), ""),
     # safety: A[bool, Dependent(on="model_type", when="diffusion")] = False,
-    device: Literal[*system] = next(iter(*system), "cpu"),
-    precision: A[int, Dependent(on=next(iter(*spec["devices"]),""), when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
+    device: Literal[*spec] = next(iter(spec), "cpu"),
+    precision: A[int, Dependent(on=next(iter(devices), ""), when=(not "cpu")), Slider(min=16, max=64, step=16)] = 16,
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
     verbose: bool = False,
 ) -> AutoModel:
@@ -51,7 +57,7 @@ def load_diffusion(
 @node(name="Load LoRA", display=True)
 def load_lora(
     lora: Literal[*lora_models.keys()] = next(iter([*lora_models.keys()]), ""),
-    device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
+    device: Literal[*devices] = next(iter(devices), "cpu"),
 ) -> Llama:
     # Inference do_lora_stuff
     return lora
@@ -59,7 +65,7 @@ def load_lora(
 @node(name="Load Vae", display=True)
 def load_vae(
     vae: Literal[*vae_models.keys()] = next(iter([*vae_models.keys()]), ""),
-    device: Literal[*spec] = next(iter(*spec["devices"]), "cpu"),
+    device: Literal[*devices] = next(iter(devices), "cpu"),
     vae_slice: bool = False,
     vae_tile: bool = True,
     upcast: bool = False
@@ -71,36 +77,36 @@ def load_vae(
 def load_text_model(
     transformer: Literal[*llms.keys()] = next(iter([*llms.keys()]),""),
     batch: A[int, Numerical(min=0, max=512, step=1)] = 1,
-    device: Literal[*spec] = next(iter(*spec), "cpu"),
-    cpu_only: bool = (True if next(iter(*system), "cpu") == "cpu" else False), 
+    device: Literal[*devices] = next(iter(devices), "cpu"),
+    cpu_only: bool = (True if next(iter(spec), "cpu") == "cpu" else False), 
     gpu_layers: A[int, Dependent(on="cpu_only", when=False), Slider(min=-1, max=35, step=1)] = -1,
     flash_attention: bool = flash_attn, #autodetect
     threads: A[int, Slider(min=0, max=64, step=1)] = 8,
     max_context: A[int, Slider(min=0, max=32767, step=64),] = None, #let ollama do its thing
     verbose: bool = False,
     one_time_seed: bool = False,
-) -> Tensor | Llama:
+) -> Model:
     llama = Inference.gguf_load(transformer, threads, max_context, verbose)
     return llama
 
 @node(name="Text Prompt", display=True)
 def text_prompt(
-    model: Tensor | Llama,
+    model: Model,
     external_user_prompt: str = None,
     prompt: A[str, Dependent(on="external_user_prompt", when=None), Text(multiline=True, dynamic_prompts=True)] = "", #prompt default
     negative_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
-    system_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "", #system prompt default
+    spec_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "", #spec prompt default
     top_k: A[int, Slider(min=0, max=100)] = None,
     top_p: A[float, Slider(min=0, max=1, step=0.01, round=0.01)] = None,
     repeat_penalty: A[float, Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = None,
     temperature: A[float, Numerical(min=0.0, max=2.0, step=0.01, round=0.01),] = None,
     max_tokens: A[int, Numerical(min=0, max=2)] = None,
     streaming: bool = True,
-) ->  Tensor:
+) -> Tensor:
     if external_user_prompt:
         user_prompt = external_user_prompt
     # if none, don't pass values
-    request = Inference.llm_request(system_prompt, user_prompt, streaming=True)
+    request = Inference.llm_request(spec_prompt, user_prompt, streaming=True)
     return request
 
 @node(name="Text Input", display=True)
@@ -111,13 +117,13 @@ def text_input(
 
 @node(name="Image Prompt", display=True)
 def image_prompt(
-    text_encoder: Tensor | Llama,
-    text_encoder_2: Tensor | Llama = None,
-    text_encoder_3: Tensor | Llama = None,
-    lora: TensorType = None,
+    text_encoder: Model,
+    text_encoder_2: Model = None,
+    text_encoder_3: Model = None,
+    lora: Tensor = None,
     external_prompt: DataType = None,
     external_negative_prompt: DataType = None,
-    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "system prompt",
+    prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "spec prompt",
     seed: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = int(soft_random()),
     # type: ignore
     gpu_id: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=0, max=100)] = 0,
@@ -144,24 +150,24 @@ def image_prompt(
     
 @node(name="Lora Fuse", path=None, display=True)
 def lora_fuse(
-    model: Tensor | Llama,
+    model: Model,
     lora: Tensor = None,
-) -> Tensor | Llama:
+) -> Model:
     #do pipe fuse operation
     return model
 
 @node(name="Generate Image", path=None, display=True)
 def generate_image(
-    model: Tensor | Llama,
+    model: Model,
     encodings: Tensor,
     lora_1: Tensor = None,
     lora_2: Tensor = None,
-    scheduler: Literal[*algorithms.keys()] = next(iter([*algorithms.keys()]),""),
+    scheduler: Literal[*algorithms] = next(iter(algorithms), ""),
     inference_steps: A[int, Numerical(min=0, max=250, step=1)] = 8,
     guidance_scale: A[float, Numerical(min=0.00, max=50.00, step=0.01, round=".01")] = 5,
     dynamic_guidance: bool = False,
     compile_unet: bool = False,
-    device: Literal[*system] = next(iter(*system), "cpu"),
+    device: Literal[*spec] = next(iter(spec), "cpu"),
 ) -> Tensor:
     latent = Inference.run_inference(
         """queue""",

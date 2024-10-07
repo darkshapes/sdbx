@@ -240,26 +240,28 @@ class Config(BaseSettings):
 
         return {**root, **models}
     
+    def load_data(self, path):
+        _, ext = os.path.splitext(path)
+        loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
+        with open(path, mode) as f:
+            try:
+                fd = loader(f)
+            except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
+                raise SyntaxError(f"Couldn't read file {path}") from e
+        return fd
+    
     def get_default(self, name, prop):
         return self._defaults_dict[name][prop]
-    
+        
     @cached_property
     def _defaults_dict(self):
         d = {}
         glob_source = partial(glob, root_dir=config_source_location)
 
         for filename in glob_source("*.toml") + glob_source("*.json"):
-            filepath = Path(os.path.join(config_source_location, filename))
-            ext = filepath.suffix
-            loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
-            with open(filepath, mode) as f:
-                try:
-                    fd = loader(f)
-                except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
-                    raise SyntaxError(f"Couldn't read file {filepath}") from e
-
-            name = filepath.stem
-            d[name] = fd
+            fp = os.path.join(config_source_location, filename)
+            name, _ = os.path.splitext(filename)
+            d[name] = self.load_data(fp)
         
         return d
     
@@ -287,6 +289,12 @@ class Config(BaseSettings):
     def model_indexer(self):
         from sdbx.indexer import ModelIndexer
         return ModelIndexer()
+
+    @cached_property
+    def spec(self):
+        # generate spec somehow
+        # return self.load_data()
+        return self._defaults_dict["spec"]
 
 
 def parse() -> Config:

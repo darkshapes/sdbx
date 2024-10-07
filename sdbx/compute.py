@@ -5,367 +5,294 @@ Felixsans
 
 import gc
 import os
-from time import perf_counter_ns, perf_counter
-from sdbx.nodes.tuner import NodeTuner
-from diffusers import AutoPipelineForText2Image, AutoencoderKL
-from diffusers.schedulers import *
-from diffusers.utils import logging as hf_logs
-from sdbx.config import config
-from sdbx.indexer import IndexManager
-from sdbx.nodes.helpers import seed_planter, soft_random
+from time import perf_counter
+from collections import defaultdict
+from enum import Enum
+
+from sdbx import config
+from sdbx.config import cache
+from sdbx.nodes.helpers import seed_planter, soft_random, get_gpus
+
 import torch
-import accelerate
-from accelerate import Accelerator
-import peft
-import platform
-import datetime
-from transformers import AutoTokenizer, AutoModel, CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
+from transformers import AutoTokenizer, AutoModel
+from diffusers import AutoPipelineForText2Image, AutoencoderKL
+from diffusers.schedulers import AysSchedules, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, DPMSolverMultistepScheduler, DDIMScheduler, LCMScheduler, TCDScheduler, HeunDiscreteScheduler, UniPCMultistepScheduler, LMSDiscreteScheduler, DEISMultistepScheduler
 
-class T2IPipe:
-    #do not put an __init__ in this class! only __call__ can be used. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
-    config_path = config.get_path("models.metadata")
-    log_level = hf_logs.FATAL
+from pydantic import BaseModel, ValidationError
 
-    def float_converter(self, old_index):
-        float_chart = {
-                "F64": ["fp64", torch.float64],
-                "F32": ["fp32", torch.float32],
-                "F16": ["fp16", torch.float16],
-                "BF16": ["bf16", torch.bfloat16],
-                "F8_E4M3": ["fp8e4m3fn", torch.float8_e4m3fn],
-                "F8_E5M2": ["fp8e5m2", torch.float8_e5m2],
-                "I64": ["i64", torch.int64],
-                "I32": ["i32", torch.int32],
-                "I16": ["i16", torch.int16],
-                "I8": ["i8", torch.int8],
-                "U8": ["u8", torch.uint8],                                       
-                "NF4": ["nf4", "nf4"],
-        }
-        for key, val in float_chart.items():
-            if old_index == key:
-                return val[0], val[1]
-            
-    def algorithm_converter(self, non_constant, exp):
-        hf_logs.set_verbosity(self.log_level)
-        self.non_constant = non_constant
-        self.exp = exp
-        self.schedule_chart = {
-            "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),           
-            "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),     
-            "EDMDPMSolverMultistepScheduler" : EDMDPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp), 
-            "DPMSolverMultistepScheduler" : DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),        
-            "DDIMScheduler" : DDIMScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "LCMScheduler" : LCMScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "TCDScheduler" : TCDScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "AysSchedules": AysSchedules,
-            "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
-            "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(self.pipe.scheduler.config,**exp),  
-            "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(self.pipe.scheduler.config,**exp),
-        }
 
-        #for key, val in self.schedule_chart.items():
-            #if self.non_constant == key:
-                #self.pipe.scheduler = val
+# Define Enums for data types and schedulers
+class DataType(Enum):
+    FP64 = ("fp64", torch.float64)
+    FP32 = ("fp32", torch.float32)
+    FP16 = ("fp16", torch.float16)
+    BF16 = ("BF16", torch.bfloat16)
+    # Add other data types as needed
 
-    def tc(self, clock, string): return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-2]} ] {string}")
 
-    def set_device(self, device=None):
-        if device==None:
-            if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
-            else: self.device = "mps" if (torch.backends.mps.is_available() & torch.backends.mps.is_built()) else "cpu"# https://pytorch.org/docs/master/notes/mps.html
-        else: self.device = device      
+class SchedulerType(Enum):
+    EulerDiscreteScheduler = ("EulerDiscreteScheduler", EulerDiscreteScheduler)
+    EulerAncestralDiscreteScheduler = ("EulerAncestralDiscreteScheduler", EulerAncestralDiscreteScheduler)
+    DPMSolverMultistepScheduler = ("DPMSolverMultistepScheduler", DPMSolverMultistepScheduler)
+    DDIMScheduler = ("DDIMScheduler", DDIMScheduler)
+    LCMScheduler = ("LCMScheduler", LCMScheduler)
+    TCDScheduler = ("TCDScheduler", TCDScheduler)
+    HeunDiscreteScheduler = ("HeunDiscreteScheduler", HeunDiscreteScheduler)
+    UniPCMultistepScheduler = ("UniPCMultistepScheduler", UniPCMultistepScheduler)
+    LMSDiscreteScheduler = ("LMSDiscreteScheduler", LMSDiscreteScheduler)
+    DEISMultistepScheduler = ("DEISMultistepScheduler", DEISMultistepScheduler)
+    # Add other schedulers as needed
 
-    def queue_manager(self, prompt, seed):
-        self.clock = perf_counter_ns() 
-        self.tc(self.clock, "determining device type...")
-        self.queue = []    
 
-        self.queue.extend([{
-            "prompt": prompt,
-            "seed": seed,
-            }])
-        
-    def declare_encoders(self, exp, transformer="stabilityai/stable-diffusion-xl-base-1.0"):
-        hf_logs.set_verbosity(self.log_level)
-        tformer, gen_dict, optimized, lora, fuse, schedule = exp
-        tformer_dict = {}
-        var, dtype = self.float_converter(tformer["variant"][next(iter(tformer["variant"]),0)])
-        tformer_dict.setdefault("variant",var)
-        tformer_dict.setdefault("torch_dtype", dtype)
-        tformer_dict.setdefault("num_hidden_layers",optimized["num_hidden_layers"])
-        # for each in tformer["variant"]:
-        #     var, dtype = self.float_converter(tformer["variant"][each])
-        #     self.expression.setdefault("variant", var)
-        #     self.expression.setdefault("torch_dtype", dtype)
-        #     self.expression.setdefault("num_hidden_layers",optimized["num_hidden_layers"][each])
+class Inference:
+    def __init__(self):
+        self.config_path = config.get_path("models.metadata")
+        self.queue = []
 
-        #     self.symlnk_path = os.path.join(self.config_path,each) #autoencoder also wants specific filenames
-        #     self.symlnk_file = os.path.join(self.symlnk_path,"model.fp16.safetensors") if self.expression["variant"] == "fp16" else os.path.join(self.symlnk_path,"model.safetensors")
+    def float_converter(self, data_type_key):
+        try:
+            data_type_enum = DataType[data_type_key]
+            return data_type_enum.value  # Returns tuple (string, torch data type)
+        except KeyError:
+            raise ValueError(f"Invalid data type: {data_type_key}")
 
-        #     if os.path.isfile(self.symlnk_file): os.remove(self.symlnk_file)   
-            # os.symlink(tformer ["text_encoder"][each], self.symlnk_file) #note: no 'i' in 'symlnk'
+    def algorithm_converter(self, algorithm_name):
+        for scheduler in SchedulerType:
+            if scheduler.value[0] == algorithm_name:
+                return scheduler.value[1]
+        raise ValueError(f"Invalid scheduler name: {algorithm_name}")
 
-            # self.tokenizer[each] = AutoTokenizer.from_pretrained(
-            #     transformer,
-            #     subfolder='tokenizer',
-            # )
+    def declare_encoders(self, device, transformers):
+        self.device = device
+        self.tokenizers = {}
+        self.text_encoders = {}
+        self.transformers = transformers  # Should be a dict with relevant data
 
-            # self.text_encoder[each] = AutoModel.from_pretrained(
-            #     transformer,
-            #     subfolder='text_encoder',
-            #     #use_safetensors=True,
-            #     **self.expression,
-            # ).to(self.device)
-        hf_logs.set_verbosity(self.log_level)
-        self.tokenizer = CLIPTokenizer.from_pretrained(
-            transformer,
-            subfolder='tokenizer',
-        )
+        for class_name, transformer_data in self.transformers.items():
+            weights = transformer_data.get('path')  # Assuming transformer_data contains 'path' to weights
+            dtype_key = transformer_data.get('dtype_or_context_length', 'FP16')
+            variant, tensor_dtype = self.float_converter(dtype_key)
 
-        self.text_encoder = CLIPTextModel.from_pretrained(
-            transformer,
-            subfolder='text_encoder',
-            use_safetensors=True,
-            **tformer_dict,
-        ).to(self.device)
-    
-        hf_logs.set_verbosity(self.log_level)
-        self.tokenizer_2 = CLIPTokenizer.from_pretrained(
-            transformer,
-            subfolder='tokenizer_2',
-        )
-        self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-            transformer,
-            subfolder='text_encoder_2',
-            use_safetensors=True,
-            **tformer_dict,
-        ).to(self.device)
+            # Now, load the tokenizer and text encoder
+            self.tokenizers[class_name] = AutoTokenizer.from_pretrained(weights)
+            self.text_encoders[class_name] = AutoModel.from_pretrained(
+                weights,
+                torch_dtype=tensor_dtype,
+                variant=variant,
+            ).to(self.device)
 
-        
-    def generate_embeddings(self, prompts, tokenizers, text_encoders):
-        self.tc(self.clock, f"encoding prompt with device: {self.device}...")
+        return self.tokenizers, self.text_encoders
+
+    def _generate_embeddings(self, prompts, tokenizers, text_encoders):
         embeddings_list = []
-        #for prompt, tokenizer, text_encoder in zip(prompts, self.tokenizer.values(), self.text_encoder.values()):
+        self.prompts = prompts
+        self.tokenizers = tokenizers
+        self.text_encoders = text_encoders
 
-        for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
+        # Create instances of the models
+        for prompt, tokenizer, text_encoder in zip(self.prompts, self.tokenizers.values(), self.text_encoders.values()):
             cond_input = tokenizer(
-            prompt,
-            max_length=tokenizer.model_max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt',
-        )
+                prompt,
+                max_length=tokenizer.model_max_length,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt',
+            )
+            with torch.no_grad():
+                prompt_embed = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
+                embeddings_list.append(prompt_embed.hidden_states[-2])
 
-            prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
-
-            pooled_prompt_embeds = prompt_embeds[0]
-            embeddings_list.append(prompt_embeds.hidden_states[-2])
-
-            prompt_embeds = torch.concat(embeddings_list, dim=-1)
-
+        prompt_embeds = torch.cat(embeddings_list, dim=-1)
         negative_prompt_embeds = torch.zeros_like(prompt_embeds)
+        pooled_prompt_embeds = torch.zeros((prompt_embeds.shape[0], prompt_embeds.shape[-1]), device=prompt_embeds.device)
         negative_pooled_prompt_embeds = torch.zeros_like(pooled_prompt_embeds)
-
-        bs_embed, seq_len, _ = prompt_embeds.shape
-        prompt_embeds = prompt_embeds.repeat(1, 1, 1)
-        prompt_embeds = prompt_embeds.view(bs_embed * 1, seq_len, -1)
-
-        seq_len = negative_prompt_embeds.shape[1]
-        negative_prompt_embeds = negative_prompt_embeds.repeat(1, 1, 1)
-        negative_prompt_embeds = negative_prompt_embeds.view(1 * 1, seq_len, -1)
-
-        pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
-        negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
+    def encode_prompt(self, queue, tokenizers, text_encoders):
+        self.queue = queue
+        self.tokenizers = tokenizers
+        self.text_encoders = text_encoders
+        for generation in self.queue:
+            generation['embeddings'] = self._generate_embeddings(
+                [generation['prompt']],
+                self.tokenizers,
+                self.text_encoders
+            )
+        return self.queue
 
-    def encode_prompt(self):
-        with torch.no_grad():
-            for generation in self.queue:
-                generation['embeddings'] = self.generate_embeddings(
-                    [generation['prompt'], generation['prompt']],
-                    [self.tokenizer, self.tokenizer_2],
-                    [self.text_encoder, self.text_encoder_2],
-        )
+    def cache_jettison(self, device, pipe=None, lora=False, discard=True):
+        self.device = device
+        if pipe and lora:
+            pipe.unload_lora_weights()
+        if discard:
+            gc.collect()
+            if self.device == "cuda":
+                torch.cuda.empty_cache()
+            elif self.device == "mps":
+                torch.mps.empty_cache()
 
-    def cache_jettison(self, encoder=False, lora=False, unet=False, vae=False):
-        self.tc(self.clock, f"empty cache...")
-        if encoder: del self.tokenizer, self.text_encoder,  self.tokenizer_2, self.text_encoder_2
-        if lora: self.pipe.unload_lora_weights()
-        if unet: del self.pipe.unet
-        if vae: del self.pipe.vae
-        gc.collect()
-        if self.device == "cuda": torch.cuda.empty_cache()
-        if self.device == "mps": torch.mps.empty_cache()
- 
-    def construct_pipe(self, exp, model="stabilityai/stable-diffusion-xl-base-1.0"):
-        exp, custom_model = exp
-        var, dtype = self.float_converter(exp["variant"])
-        exp["variant"] = var
-        exp.setdefault("torch_dtype", dtype)
-        self.tc(self.clock, f"precision set for: {exp["variant"]}, using {exp["torch_dtype"]}")
-        #symlnk_path = os.path.join(self.config_path,model["class"])
-        #checkpoint = os.path.basename(custom_model["file"])
-        #symlnk_path = model["file"].replace(checkpoint,"")
-        #symlink_config = os.path.join(symlnk_path,"config.json")
-        #symlnk_file = os.path.join(symlnk_path,"diffusion_pytorch_model.fp16.safetensors") if var == "fp16" else os.path.join(symlnk_path,"diffusion_pytorch_model.safetensors")
-        
-        self.tc(self.clock, f"load model {model}...")
-        #thank if os.path.isfile(symlnk_file): os.remove(symlnk_file)
-        #os.symlink(checkpoint,symlnk_file) #note: no 'i' in 'symlnk'
-        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **exp).to(self.device)
+    def latent_diffusion(self, device, parameters):
+        self.device = device
+        self.parameters = parameters
 
-    def add_lora(self, exp, opt, fuse):
-        lora = os.path.basename(exp)
-        lora_path = exp.replace(lora,"")
-        self.tc(self.clock, f"set lora to {os.path.join(lora_path, lora)}")  # lora2
-        self.pipe.load_lora_weights(lora_path, weight_name=lora)
-        if opt["fuse"]: set.pipe.fuse_lora(fuse) #add unet only possibility
-   
-    def offload_to(self, seq=False, cpu=False, disk=False):
-        self.tc(self.clock, f"set offload as {cpu|disk} and sequential as {seq} for {self.device} device") 
-        if self.device=="cuda":
-            if seq: self.pipe.enable_sequential_cpu_offload()
-            if cpu: self.pipe.enable_model_cpu_offload() 
-            #if disk: accelerate.disk_offload() 
+        self.model = self.parameters.model["file"]
+        self.lora_dict = self.parameters.lora_dict
+        self.lora_name = os.path.basename(self.lora_dict.get('file', ''))
+        self.lora_path = os.path.dirname(self.lora_dict.get('file', ''))
+        variant, tensor_dtype = self.float_converter(self.parameters.model.get('dtype', 'FP16'))
+        self.use_low_cpu = self.parameters.optimized.get('cpu', False)
+        scheduler_name = self.parameters.optimized.get('scheduler', 'EulerDiscreteScheduler')
+        self.scheduler = self.algorithm_converter(scheduler_name)
 
-    def compile_unet(self, exp):
-        self.pipe.unet = torch.compile(self.pipe.unet, **exp)
+        self.pipe_args = {
+            "torch_dtype": tensor_dtype,
+            "low_cpu_mem_usage": self.use_low_cpu,
+            "variant": variant,
+            "tokenizer": None,
+            "text_encoder": None,
+            "tokenizer_2": None,
+            "text_encoder_2": None,
+        }
 
-    def _dynamic_guidance(self, pipe, step_index, timestep, callback_key):
-        if step_index == int(pipe.num_timesteps * 0.5):
-            callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
-            callback_key['add_text_embeds'] = callback_key['add_text_embeds'].chunk(2)[-1]
-            callback_key['add_time_ids'] = callback_key['add_time_ids'].chunk(2)[-1]
-            pipe._guidance_scale = 0.0
-        return callback_key
-    
-    def add_dynamic_cfg(self):
-            self.tc(self.clock, "set dynamic cfg")
-            self.gen_dict.setdefault("callback_on_step_end",self._dynamic_guidance)
-            self.gen_dict.setdefault("callback_on_step_end_tensor_inputs",['prompt_embeds', 'add_text_embeds','add_time_ids'])
+        self.pipe = AutoPipelineForText2Image.from_pretrained(self.model, **self.pipe_args).to(device)
+        self.scheduler_args = self.parameters.schedule
+        self.pipe.scheduler = self.scheduler.from_config(self.pipe.scheduler.config, **self.scheduler_args)
 
-    def diffuse_latent(self, exp):
-        tformer, self.gen_dict, opt, lora, fuse, schedule = exp
-        if opt["dynamic_cfg"]: self.add_dynamic_cfg()
-        if lora.get("file",0) != 0: self.add_lora(lora["file"], opt, fuse)
-        self.tc(self.clock, f"set scheduler")
-        #self.algorithm_converter(opt["algorithm"], schedule)
-        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config,**schedule)
+        if self.parameters.optimized.get('sequential_offload', False):
+            self.pipe.enable_sequential_cpu_offload()
+        if self.parameters.optimized.get('cpu_offload', False):
+            self.pipe.enable_model_cpu_offload()
 
-        if opt["seq"] or opt["cpu"] or opt["disk"]: self.offload_to(opt["seq"], opt["cpu"], opt["disk"])
-        if opt["compile_unet"]: self.compile_unet(opt["compile"])
+        if self.lora_dict.get('unet_only', False):
+            self.pipe.unet.load_attn_procs(self.lora_path, weight_name=self.lora_name)
+        else:
+            self.pipe.load_lora_weights(self.lora_path, weight_name=self.lora_name)
 
-        self.tc(self.clock, f"set generator") 
-        generator = torch.Generator(device=self.device)
+        if self.parameters.optimized.get('fuse', False):
+            self.pipe.fuse_lora(lora_scale=self.lora_dict.get('scale', 1.0))
 
-        self.tc(self.clock, f"begin queue loop...")
-        for i, generation in enumerate(self.queue, start=1):
+        self.generator = torch.Generator(device=self.device)
+        self.gen_args = {}
+        self.gen_args["output_type"] = 'latent'
 
-            self.tc(self.clock, f"planting seed {generation['seed']}...")
-            seed_planter(generation['seed'])
-            generator.manual_seed(generation['seed'])
+        if self.parameters.optimized.get('dynamic_cfg', False):
+            def dynamic_cfg(pipe, step_index, timestep, callback_val):
+                if step_index == int(pipe.num_timesteps * 0.5):
+                    callback_val['prompt_embeds'] = callback_val['prompt_embeds'].chunk(2)[-1]
+                    callback_val['add_text_embeds'] = callback_val['add_text_embeds'].chunk(2)[-1]
+                    callback_val['add_time_ids'] = callback_val['add_time_ids'].chunk(2)[-1]
+                    pipe._guidance_scale = 0.0
+                return callback_val
 
-            self.tc(self.clock, f"inference device: {self.device}....")
-            self.image_start = perf_counter()
+            self.gen_args["callback_on_step_end"] = dynamic_cfg
+            self.gen_args["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds', 'add_time_ids']
+
+        if self.parameters.optimized.get('compile_unet', False):
+            self.pipe.unet = torch.compile(
+                self.pipe.unet,
+                mode=self.parameters.optimized['compile'].get('mode', 'default'),
+                fullgraph=self.parameters.optimized['compile'].get('fullgraph', False)
+            )
+
+        for generation in self.queue:
+            seed_planter(self.parameters.optimized.get('seed', 42))
+            self.generator.manual_seed(generation['seed'])
+
             generation['latents'] = self.pipe(
                 prompt_embeds=generation['embeddings'][0],
-                negative_prompt_embeds =generation['embeddings'][1],
+                negative_prompt_embeds=generation['embeddings'][1],
                 pooled_prompt_embeds=generation['embeddings'][2],
                 negative_pooled_prompt_embeds=generation['embeddings'][3],
-                generator=generator,
-                **self.gen_dict,
-            ).images 
+                num_inference_steps=self.parameters.gen_dict.get('num_inference_steps', 20),
+                generator=self.generator,
+                **self.gen_args,
+            ).images
 
-    def decode_latent(self, arg, autoencoder="flatpiecexlVAE_baseonA1579.safetensors"):
-        hf_logs.set_verbosity_warn()
-        opt, exp = arg
-        autoencoder = opt["vae"] #autoencoder wants full path and filename 
-        var, dtype = self.float_converter(exp["variant"])
-        exp["variant"] = var
-        exp.setdefault("torch_dtype", dtype)
+        return self.queue
 
-        self.tc(self.clock, f"decoding using {autoencoder}...")
-        vae = AutoencoderKL.from_single_file(autoencoder,**exp).to(self.device)
-        self.pipe.vae=vae
-        if opt["upcast_vae"]: self.pipe.upcast_vae()
+    def decode_latent(self, parameters):
+        self.parameters = parameters
+        if self.parameters.optimized.get('upcast_vae', False):
+            self.pipe.upcast_vae()
+        if self.parameters.optimized.get('slice', False):
+            self.pipe.upcast_vae()
 
-        with torch.no_grad():
-            counter = [s.endswith('png') for s in os.listdir(config.get_path("output"))].count(True) # get existing images
-            for i, generation in enumerate(self.queue, start=1):
-                generation['total_time'] = perf_counter() - self.image_start
-                self.tc(self.image_start,"generation complete")
-                generation['latents'] = generation['latents'].to(next(iter(self.pipe.vae.post_quant_conv.parameters())).dtype)
+        self.autoencoder_path = self.parameters.optimized.get('vae', None)
+        if not self.autoencoder_path:
+            raise ValueError("VAE path not provided")
 
+        dtype = self.float_converter(self.parameters.vae_dict.get('dtype', 'FP16'))[1]
+        self.vae = AutoencoderKL.from_single_file(
+            self.autoencoder_path,
+            torch_dtype=dtype,
+            cache_dir="vae_"
+        ).to(self.device)
+
+        self.pipe.vae = self.vae
+        self.pipe.upcast_vae()
+
+        output_path = config.get_path("output")
+        counter = sum(1 for s in os.listdir(output_path) if s.endswith('png'))  # get existing images
+
+        for i, generation in enumerate(self.queue, start=1):
+            generation['latents'] = generation['latents'].to(next(self.pipe.vae.post_quant_conv.parameters()).dtype)
+
+            with torch.no_grad():
                 image = self.pipe.vae.decode(
                     generation['latents'] / self.pipe.vae.config.scaling_factor,
                     return_dict=False,
                 )[0]
 
-                image = self.pipe.image_processor.postprocess(image, output_type='pil')[0]
+            image = self.pipe.image_processor.postprocess(image, output_type='pil')[0]
+            counter += 1
+            filename = f"{self.parameters.optimized.get('file_prefix', 'output')}-{counter}-batch-{i}.png"
+            image.save(os.path.join(output_path, filename))
 
-                self.tc(self.clock, f"saving")     
-                counter += 1
-                filename = f"{opt["file_prefix"]}-{counter}-batch-{i}.png"
+        return self.queue
 
-                image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
+
+class QueueManager:
+    def __init__(self):
+        self.queue = []
+
+    def prompt(self, prompts_with_seeds):
+        self.queue = []
+        for prompt_text, seed in prompts_with_seeds:
+            self.queue.append({
+                'prompt': prompt_text,
+                'seed': seed,
+            })
+        self.embed_start = perf_counter()
+        return self.queue
 
     def metrics(self):
-        images_totals = ', '.join(map(lambda generation: str(round(generation['total_time'], 1)), self.queue))
-        print('Image time:', images_totals, 'seconds')
-
-        images_average = round(sum(generation['total_time'] for generation in self.queue) / len(self.queue), 1)
-        print('Average image time:', images_average, 'seconds')
-
-        if self.device == "cuda":
-            max_memory = round(torch.cuda.max_memory_allocated(device='cuda') * 1e-9, 2)
-            print('Max. memory used:', max_memory, 'GB')
-        
-        self.tc(self.clock, f" <-time total...")     
+        total_time = perf_counter() - self.embed_start
+        num_items = len(self.queue)
+        avg_time = total_time / num_items if num_items > 0 else 0
+        print(f'Total time: {total_time:.1f}s, Average time per item: {avg_time:.1f}s')
+        return self.queue
 
 
-#create_index = IndexManager().write_index()       # (defaults to config/index.json)
-
-#genesis node
-optimize = NodeTuner()
-optimize.determine_tuning("ponyFaetality_v11.safetensors")
-opt = optimize.opt_exp()
-insta = T2IPipe()
-insta.set_device()
-
-#loader node transformer class
-gen_exp = optimize.gen_exp()
-insta.declare_encoders(gen_exp)
-
-#prompt node
-prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
-seed = int(soft_random())
-insta.queue_manager(prompt,seed)
-
-#enocde node
-conditioning = optimize.cond_exp()
-insta.encode_prompt()
-
-#cache ctrl node
-insta.cache_jettison(encoder=True)
-
-#t2i
-
-exp = optimize.pipe_exp()
-insta.construct_pipe(exp)
-insta.diffuse_latent(gen_exp)
-
-#cache ctrl node
-insta.cache_jettison(lora=True, unet=True)
-
-#vae node
-vae_exp = optimize.vae_exp()
-insta.decode_latent(vae_exp)
-
-#metrics node
-insta.metrics()
-
-
+def test_process():
+    filename = "tPonynai3_v55.safetensors"
+    path = config.get_path("models.image")
+    device = "cuda"
+    print("Beginning inference")
+    print(os.path.join(path, filename))
+    node_tuner = NodeTuner()
+    node_tuner.determine_tuning(filename)
+    if node_tuner.fetch is not None:
+        seed = soft_random()
+        prompt_text = node_tuner.pipe_dict.get("prompt", "A default prompt")
+        prompts_with_seeds = [(prompt_text, seed)]
+        queue_manager = QueueManager()
+        active_queue = queue_manager.prompt(prompts_with_seeds)
+        inference_instance = Inference()
+        tokenizer, text_encoder = inference_instance.declare_encoders(device, node_tuner.transformers)
+        embeddings_queue = inference_instance.encode_prompt(active_queue, tokenizer, text_encoder)
+        inference_instance.cache_jettison(device, discard=node_tuner.optimized.get("cache_jettison", False))
+        inference_instance.latent_diffusion(device, node_tuner)
+        inference_instance.cache_jettison(device, discard=node_tuner.optimized.get("cache_jettison", False))
+        inference_instance.decode_latent(node_tuner)
+        queue_manager.metrics()
