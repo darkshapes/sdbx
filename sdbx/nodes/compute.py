@@ -24,16 +24,15 @@ from diffusers.schedulers import (
     DEISMultistepScheduler,
      )
 from diffusers.utils import logging as df_log
-from diffusers import AutoPipelineForText2Image, AutoencoderKL
+from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionXLPipeline, AutoPipelineForText2Image, 
 from transformers import logging as tf_log
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 import accelerate
 from sdbx import logger
 from sdbx.nodes.tuner import NodeTuner
-# from sdbx.indexer import IndexManager
+from sdbx.indexer import IndexManager
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter, soft_random
-
 
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
@@ -42,7 +41,9 @@ class T2IPipe:
     config_path = config.get_path("models.metadata")
 
 ############## TIMECODE
-    def tc(self, clock, string, debug=False): return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-2]} ] {string}") if not debug else print("", end="")
+    def tc(self, clock, string, debug=False): 
+        if not debug: 
+            return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-2]} ] {string}") 
 
 ############## STFU HUGGINGFACE
     def hf_log(self, on=False, fatal=False):
@@ -114,8 +115,10 @@ class T2IPipe:
     def set_device(self, device=None):
         if device==None:
             if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
-            else: self.device = "mps" if (torch.backends.mps.is_available() & torch.backends.mps.is_built()) else "cpu"# https://pytorch.org/docs/master/notes/mps.html
-        else: self.device = device
+            elif torch.xpu.is_available(): self.device= "xpu"
+            elif (torch.backends.mps.is_available() & torch.backends.mps.is_built()): self.device = "mps"
+            else: self.device = "cpu"# https://pytorch.org/docs/master/notes/mps.html
+        else: self.device = "cpu"
 
 ############## QUEUE
     def queue_manager(self, prompt, seed):
@@ -147,7 +150,7 @@ class T2IPipe:
         )
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder = CLIPTextModel.from_pretrained(
-            transformer,
+            "C:\\Users\\Public\\models\\metadata\\CLI-VL\\",
             subfolder='text_encoder',
             use_safetensors=True,
             **self.tformer_dict
@@ -164,7 +167,7 @@ class T2IPipe:
 
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-            transformer,
+            "C:\\Users\\Public\\models\\metadata\\CLI-VG\\",
             subfolder='text_encoder_2',
             use_safetensors=True,
             **self.tformer_dict
@@ -228,6 +231,7 @@ class T2IPipe:
         gc.collect()
         if self.device == "cuda": torch.cuda.empty_cache()
         if self.device == "mps": torch.mps.empty_cache()
+        if self.device == "xpu": torch.xpu.empty_cache()
  
 
 ############## PIPE
@@ -240,19 +244,8 @@ class T2IPipe:
             self.pipe_exp.setdefault("torch_dtype", dtype)
         self.tc(self.clock, f"precision set for: {var}, using {dtype}", self.bug_off)
 
-        ###### going to need this code soon...
-
-        #symlnk_path = os.path.join(self.config_path,model["class"])
-        #checkpoint = os.path.basename(custom_model["file"])
-        #symlnk_path = model["file"].replace(checkpoint,"")
-        #symlink_config = os.path.join(symlnk_path,"config.json")
-        #symlnk_file = os.path.join(symlnk_path,"diffusion_pytorch_model.fp16.safetensors") if var == "fp16" else os.path.join(symlnk_path,"diffusion_pytorch_model.safetensors")
-        
-        self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)
-        #if os.path.isfile(symlnk_file): os.remove(symlnk_file)
-        #os.symlink(checkpoint,symlnk_file) #note: no 'i' in 'symlnk'
+        self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)'
         self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_exp).to(self.device)
-
 
 ############## LORA
     def add_lora(self, exp, fuse, opt):
@@ -269,10 +262,10 @@ class T2IPipe:
 ############## MEMORY OFFLOADING
     def offload_to(self, seq=False, cpu=False, disk=False):
         self.tc(self.clock, f"set offload as {cpu|disk} and sequential as {seq} for {self.device} device", self.bug_off) 
-        if "cuda" in self.device:
+        if not "cpu" in self.device:
             if seq == True: self.pipe.enable_sequential_cpu_offload()
-            if cpu == True: self.pipe.enable_model_cpu_offload() 
-        if disk == True: accelerate.disk_offload() 
+            elif cpu == True: self.pipe.enable_model_cpu_offload() 
+        elif disk == True: accelerate.disk_offload() 
 
 ############## COMPILE
     def compile_model(self, model, exp):
@@ -299,7 +292,8 @@ class T2IPipe:
 ############## INFERENCE
     def diffuse_latent(self, exp):
         tformer, self.gen_dict, self.opt_exp = exp
-        self.debugger(locals())
+        if not self.bug_off: 
+            self.debugger(locals())
         self.tc(self.clock, f"set scheduler", self.bug_off)
         self.pipe.scheduler = self.algorithm_converter(self.opt_exp["algorithm"], self.opt_exp["scheduler"])
         if self.opt_exp.get("dynamic_cfg",0) != 0: 
@@ -333,7 +327,6 @@ class T2IPipe:
                 negative_pooled_prompt_embeds=generation['embeddings'][3],
                 **self.gen_dict
             ).images
-            self.individual_totals.append(self.individual_start)
 
 ############## AUTODECODE
     def decode_latent(self, opt):
@@ -347,7 +340,8 @@ class T2IPipe:
         self.tc(self.clock, f"decode configured for {os.path.basename(self.autoencoder)}...", self.bug_off)
         self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
         self.pipe.vae = self.autoencoder
-        if self.vae_opt.get("upcast_vae",0) != 0: self.pipe.upcast_vae()
+        if self.vae_opt.get("upcast_vae",0) != 0: 
+            self.pipe.upcast_vae()
         if self.enc_opt.get("dynamo",0) != 0:
             self.pipe.vae.decode = self.compile_model(self.pipe.vae.decode, self.vae_opt["compile"])
         with torch.no_grad():
@@ -377,13 +371,9 @@ class T2IPipe:
     def metrics(self):
 
         if "cuda" in self.device:
-            max_memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
-            self.tc(self.clock, f"Max. memory used: {max_memory} GB", self.bug_off)
+            memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
+            self.tc(self.clock, f"Memory used: {memory} GB")
         
-        if not self.bug_off:
-            for i,num in enumerate(self.individual_totals):
-                self.tc(self.individual_totals[i], f"image {i+1}")
-
 ############## DEBUG TOOLS
     def debugger(self, variables):
         var_list = [
@@ -423,7 +413,7 @@ class T2IPipe:
 #genesis node
 optimize = NodeTuner()
 insta = T2IPipe()
-optimize.determine_tuning("ponyFaetality_v11.safetensors")
+optimize.determine_tuning("ponyFaetality_v11.unet.safetensors")
 opt_exp = optimize.opt_exp() 
 
 #below is fed from genesis
@@ -434,14 +424,15 @@ seed = int(soft_random())
 insta.queue_manager(prompt,seed)
 
 #loader node transformer class
-gen_exp = optimize.gen_exp(0)#clip skip
+gen_exp = optimize.gen_exp(2)#clip skip
 insta.set_device()
+insta.cache_jettison()
 insta.declare_encoders(gen_exp)
 
 #enocder node
 cond_exp = optimize.cond_exp()
 insta.encode_prompt(cond_exp)
-
+insta.metrics()
 #cache ctrl node
 insta.cache_jettison(encoder=True)
 
@@ -449,7 +440,7 @@ insta.cache_jettison(encoder=True)
 pipe_exp = optimize.pipe_exp()
 insta.construct_pipe(pipe_exp)
 insta.diffuse_latent(gen_exp)
-
+insta.metrics()
 #cache ctrl node
 insta.cache_jettison(lora=True)
 

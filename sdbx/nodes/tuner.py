@@ -1,3 +1,4 @@
+import os
 import numbers
 from sdbx.indexer import IndexManager
 from sdbx import logger
@@ -5,7 +6,6 @@ from sdbx.config import config, Precision, cache, TensorDataType as D
 from sdbx.nodes.helpers import soft_random
 from collections import defaultdict
 from diffusers.schedulers import AysSchedules
-import psutil
 
 class NodeTuner:
     @cache        
@@ -41,22 +41,11 @@ class NodeTuner:
             self.model["file"] = list(self.fetch)[1]
             self.model["class"] = self.category
             self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
-    @cache
-    def pipe_exp(self):
-        self.pipe = defaultdict(dict)
-        if self.oh_no[0]: self.pipe["low_cpu_mem_usage"] = self.oh_no[0]
-        if not self.oh_no[0]:self.pipe["variant"] = list(self.fetch)[2]
-        else:self.pipe["torch_dtype"] = "auto"
-        self.pipe["tokenizer"] = None
-        self.pipe["text_encoder"] = None
-        self.pipe["tokenizer_2"] = None
-        self.pipe["text_encoder_2"] = None
-        if "STA-15" in self.category: self.pipe["safety_checker"] = None
-        return self.pipe, self.model
+
     
     @cache
     def opt_exp(self):
-        peak_gpu = self.spec["gpu_ram"] #accomodate list of graphics card ram
+        peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
         overhead =  list(self.fetch)[0]
         peak_cpu = self.spec["cpu_ram"]
         cpu_ceiling =  overhead/peak_cpu
@@ -82,20 +71,47 @@ class NodeTuner:
         self.optimized["cpu"] = self.oh_no[2]
         self.optimized["disk"] = self.oh_no[3]
         self.optimized["file_prefix"] = "Shadowbox-"
-        self.optimized["fuse_lora_on"] = True
-        #self.optimized["fuse_pipe"] = True pipe.fuse_qkv_projections()
+        self.optimized["refiner"] = IndexManager().fetch_refiner()
+        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
+        self.optimized["fuse_lora_on"] = False
+        #self.optimized["fuse_pipe"] = True #pipe.fuse_qkv_projections()
         self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
         if self.spec["dynamo"]:
             self.optimized["sigmas"] = True #
             self.optimized["dynamo"] = self.spec["dynamo"]
-        self.optimized["refiner"] = IndexManager().fetch_refiner()
-        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
         return self.optimized
   
     @cache
+    def pipe_exp(self):
+        self.pipe = defaultdict(dict)
+        if self.oh_no[0]: 
+            self.pipe["low_cpu_mem_usage"] = self.oh_no[2]
+
+        #local_dir = list(self.fetch)[1]
+        #local_dir = local_dir.replace(os.path.basename(list(self.fetch)[1]))
+        #self.pipe["local_dir"] = local_dir
+        #self.pipe["config"] =
+        #self.pipe["repo_id"] = "stabilityai/stable-diffusion-xl-base-1.0"
+        if self.spec["devices"][0] != "cpu":
+            if not self.oh_no[0]:
+                self.pipe["variant"] = list(self.fetch)[2] #model variant
+            else:
+                self.pipe["torch_dtype"] = "auto"
+        else: 
+            self.pipe["variant"] = "F32"
+        self.pipe["tokenizer"] = None
+        self.pipe["text_encoder"] = None
+        self.pipe["tokenizer_2"] = None
+        self.pipe["text_encoder_2"] = None
+        #self.pipe["device_map"] = None
+        if "STA-15" in self.category: 
+            self.pipe["safety_checker"] = None
+        return self.pipe, self.model
+
+    @cache
     def cond_exp(self):
         self.conditioning["padding"] = "max_length"
-        #self.conditioning["truncation"] = True
+        self.conditioning["truncation"] = True
         self.conditioning["return_tensors"] = 'pt'
         return self.conditioning
 
@@ -105,23 +121,27 @@ class NodeTuner:
         if self._vae != "∅":  
             self.vae = defaultdict(dict)
             self.optimized["vae"] = self._vae[0][1][1]
-            if not self.oh_no[0]: 
-                self.vae["variant"] = self._vae[0][1][2] 
-            else:
-                self.vae["torch_dtype"] = "auto"
-            
-            if self.oh_no[1]: 
-                self.vae["enable_tiling"] = True
-            else: 
-                self.vae["disable_tiling"] = True  # [compatibility] tile vae input to lower memory
-            
-            if self.oh_no[2]: 
-                self.vae["enable_slicing"]  = True
-            else: 
-                self.vae["disable_slicing"] = True # [compatibility] serialize vae to lower memory
-            self.vae["cache_dir"] = "vae_"
-
-            return self.optimized, self.vae
+            if self.spec["devices"][0] != "cpu":
+                if not self.oh_no[0]: 
+                    self.vae["variant"] = self._vae[0][1][2] 
+                else:
+                    self.vae["torch_dtype"] = "auto"
+            else: self.vae["variant"] = "F32"
+        else:
+            self.optimized["vae"] = self.model["file"]
+    
+        
+        if self.oh_no[1]: 
+            self.vae["enable_tiling"] = True
+        else: 
+            self.vae["disable_tiling"] = True  # [compatibility] tile vae input to lower memory
+        
+        if self.oh_no[2]: 
+            self.vae["enable_slicing"]  = True
+        else: 
+            self.vae["disable_slicing"] = True # [compatibility] serialize vae to lower memory
+        self.vae["cache_dir"] = "vae_"
+        return self.optimized, self.vae
     
     def _get_step_from_filename(self, key, val):
         try:
@@ -184,18 +204,22 @@ class NodeTuner:
     @cache       
     def gen_exp(self, skip):
         self.skip = skip
-        self.conditioning_list = ["tokenizer", "text_encoder", "tokenizer_2", "text_encoder_2","tokenizer_3", "text_encoder_3"]
         if self._tra != "∅" and self._tra != {}: 
             for each in self._tra:
-                #self.transformers["tokenizer][each] = self._tra[each][1]
-                self.transformers["text_encoder"][each] = self._tra[each][1]
-                if not self.oh_no[0]:
-                    self.transformers["variant"][each] = self._tra[each][2] 
-                else: 
-                    self.transformers["torch_dtype"] = "auto"
-                    self.transformers["low_cpu_mem_usage"][each] = self.oh_no[0]
-                self.skip = 12 - (self.skip)
+                # self.transformers["tokenizer"] = self._tra[each][1]
+
+                self.transformers["model"] = self._tra[each][1]
+                if self.spec["devices"][0] != "cpu":
+                    if not self.oh_no[0]:
+                        self.transformers["variant"][each] = self._tra[each][2]
+                    else: 
+                        self.transformers["torch_dtype"] = "auto"
+                        self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                else: self.transformers["variant"][each] = "F32"
+            self.skip = 12 - int(self.skip)
             self.transformers["num_hidden_layers"] = int(self.skip)
+            #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
+            #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
 
         if next(iter(self._lora.items()),0) != 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
@@ -206,7 +230,7 @@ class NodeTuner:
                 self.optimized["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
                 self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
                 self.optimized["scheduler"]["clip_sample"] = False
-                self.gen["guidance_scale"] = 5 if "normal" in str(self.optimized["lora"]).lower() else 3
+                self.gen["guidance_scale"] = 5 if "normal" in str(self.optimized["lora"]).lower() else 2
             elif "SPO" in self.optimized["lora_class"]:
                 if "STA-15" in self.optimized["lora_class"]:
                     self.gen["guidance_scale"] = 7.5
@@ -262,6 +286,7 @@ class NodeTuner:
                         or "STA-3" in self.optimized["lora_class"]):
                             self.optimized["fuse_lora"]["lora_scale"]=0.125
                         self.optimized["algorithm"] = self.algorithms[5] #DDIM
+                        self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
                         self.optimized["scheduler"]["timestep_spacing"] = "trailing"
         else :   #if no lora
             self.optimized["algorithm"] = self.algorithms[4]
@@ -283,7 +308,7 @@ class NodeTuner:
                     self.gen["num_inference_steps"] = 10
                     self.gen["guidance_scale"] = 5 
                     self.optimized["ays"] = "StableDiffusionXLTimesteps"
-                    self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accels
+                    self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accel
                     self.gen["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
 
                 elif "STA-3" in self.category:
