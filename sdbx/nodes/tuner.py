@@ -85,7 +85,7 @@ class NodeTuner:
     def pipe_exp(self):
         self.pipe = defaultdict(dict)
         if self.oh_no[0]: 
-            self.pipe["low_cpu_mem_usage"] = self.oh_no[2]
+            self.pipe["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
 
         #local_dir = list(self.fetch)[1]
         #local_dir = local_dir.replace(os.path.basename(list(self.fetch)[1]))
@@ -121,17 +121,21 @@ class NodeTuner:
         if self._vae != "∅":  
             self.vae = defaultdict(dict)
             self.optimized["vae"] = self._vae[0][1][1]
-            if self.spec["devices"][0] != "cpu":
-                if not self.oh_no[0]: 
-                    self.vae["variant"] = self._vae[0][1][2] 
-                else:
-                    self.vae["torch_dtype"] = "auto"
-            else: self.vae["variant"] = "F32"
+            if (self.optimized["upcast_vae"]
+            or self.spec["devices"][0] == "cpu"): 
+                self.vae["variant"] = "F32"
+            else:
+                if self.spec["devices"][0] != "cpu":
+                    if not self.oh_no[0]: 
+                        self.vae["variant"] = self._vae[0][1][2] 
+                    else:
+                        self.vae["torch_dtype"] = "auto"
         else:
             self.optimized["vae"] = self.model["file"]
+            self.vae["torch_dtype"] = "auto"
     
         
-        if self.oh_no[1]: 
+        if self.oh_no[2]: 
             self.vae["enable_tiling"] = True
         else: 
             self.vae["disable_tiling"] = True  # [compatibility] tile vae input to lower memory
@@ -205,9 +209,13 @@ class NodeTuner:
     def gen_exp(self, skip):
         self.skip = skip
         if self._tra != "∅" and self._tra != {}: 
+            self.skip = 12 - int(self.skip)
+            self.transformers["use_safetensors"] = True
+            self.transformers["num_hidden_layers"] = self.skip
             for each in self._tra:
                 # self.transformers["tokenizer"] = self._tra[each][1]
-
+                #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
+                #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
                 self.transformers["model"] = self._tra[each][1]
                 if self.spec["devices"][0] != "cpu":
                     if not self.oh_no[0]:
@@ -216,10 +224,13 @@ class NodeTuner:
                         self.transformers["torch_dtype"] = "auto"
                         self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
                 else: self.transformers["variant"][each] = "F32"
-            self.skip = 12 - int(self.skip)
-            self.transformers["num_hidden_layers"] = int(self.skip)
-            #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
-            #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
+
+        else:
+                self.transformers["model"] = self.model["file"]
+                self.transformers["variant"] = self.model["dtype"]
+                self.transformers["torch_dtype"] = "auto"
+                self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                self.pipe["variant"] = list(self.fetch)[2] #model variant              
 
         if next(iter(self._lora.items()),0) != 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
@@ -228,7 +239,7 @@ class NodeTuner:
                 self.optimized["algorithm"] = self.algorithms[5] #DDIM
                 self.optimized["scheduler"]["timestep_spacing"] = "trailing"
                 self.optimized["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
-                self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
+                #self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
                 self.optimized["scheduler"]["clip_sample"] = False
                 self.gen["guidance_scale"] = 5 if "normal" in str(self.optimized["lora"]).lower() else 2
             elif "SPO" in self.optimized["lora_class"]:
@@ -286,7 +297,7 @@ class NodeTuner:
                         or "STA-3" in self.optimized["lora_class"]):
                             self.optimized["fuse_lora"]["lora_scale"]=0.125
                         self.optimized["algorithm"] = self.algorithms[5] #DDIM
-                        self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
+                        #self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
                         self.optimized["scheduler"]["timestep_spacing"] = "trailing"
         else :   #if no lora
             self.optimized["algorithm"] = self.algorithms[4]

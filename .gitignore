@@ -170,3 +170,5 @@ cython_debug/
 .vscode/settings.json
 config/index.json
 config/spec.json
+.vscode/settings.json
+config/index.json

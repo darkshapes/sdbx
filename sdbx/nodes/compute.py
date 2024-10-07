@@ -24,7 +24,7 @@ from diffusers.schedulers import (
     DEISMultistepScheduler,
      )
 from diffusers.utils import logging as df_log
-from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionXLPipeline, AutoPipelineForText2Image, 
+from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionXLPipeline, AutoPipelineForText2Image
 from transformers import logging as tf_log
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 import accelerate
@@ -150,9 +150,8 @@ class T2IPipe:
         )
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder = CLIPTextModel.from_pretrained(
-            "C:\\Users\\Public\\models\\metadata\\CLI-VL\\",
+            transformer,
             subfolder='text_encoder',
-            use_safetensors=True,
             **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
@@ -167,9 +166,8 @@ class T2IPipe:
 
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-            "C:\\Users\\Public\\models\\metadata\\CLI-VG\\",
+            transformer,
             subfolder='text_encoder_2',
-            use_safetensors=True,
             **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
@@ -244,7 +242,7 @@ class T2IPipe:
             self.pipe_exp.setdefault("torch_dtype", dtype)
         self.tc(self.clock, f"precision set for: {var}, using {dtype}", self.bug_off)
 
-        self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)'
+        self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)
         self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_exp).to(self.device)
 
 ############## LORA
@@ -339,6 +337,7 @@ class T2IPipe:
         file_prefix = f"{self.vae_opt['file_prefix']}-{self.vae_opt['lora_class']}-{self.vae_opt['algorithm']}"
         self.tc(self.clock, f"decode configured for {os.path.basename(self.autoencoder)}...", self.bug_off)
         self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
+        self.debugger(locals())
         self.pipe.vae = self.autoencoder
         if self.vae_opt.get("upcast_vae",0) != 0: 
             self.pipe.upcast_vae()
@@ -375,6 +374,7 @@ class T2IPipe:
             self.tc(self.clock, f"Memory used: {memory} GB")
         
 ############## DEBUG TOOLS
+# pass using self.debugger(locals())
     def debugger(self, variables):
         var_list = [
         "__doc__",

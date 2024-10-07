@@ -3,7 +3,7 @@
         "Illustrious-XL-v0.1.safetensors": {
             "STA-XL": [
                 6938040760,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\Illustrious-XL-v0.1.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\Illustrious-XL-v0.1.safetensors",
                 "F16"
             ]
         },
@@ -77,10 +77,24 @@
                 "F16"
             ]
         },
+        "ponyFaetality_v11.unet.safetensors": {
+            "STA-XL": [
+                5135174448,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\ponyFaetality_v11.unet.safetensors",
+                "F16"
+            ]
+        },
         "sdvn8Artxl_base.safetensors": {
             "STA-XL": [
                 6938040682,
                 "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sdvn8Artxl_base.safetensors",
+                "F16"
+            ]
+        },
+        "sdxlUnstableDiffusers_nihilmania.safetensors": {
+            "STA-XL": [
+                6938067890,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\sdxlUnstableDiffusers_nihilmania.safetensors",
                 "F16"
             ]
         },
@@ -294,7 +308,7 @@
         "dmd2_sdxl_4step_lora.safetensors": {
             "DMD-STA-XL": [
                 787359616,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\dmd2_sdxl_4step_lora.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\lora\\dmd2_sdxl_4step_lora.safetensors",
                 "F32"
             ]
         },
