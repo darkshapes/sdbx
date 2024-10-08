@@ -413,11 +413,6 @@ class ModelIndexer:
             mt: self.index.get(mt.value, {}) for mt in [ModelType.VAE, ModelType.TRANSFORMER, ModelType.LORA]
         }
 
-        # Initialize empty dictionaries
-        lora_sorted = {}
-        tra_sorted = {}
-        vae_sorted = {}
-
         try:
             tra_req = self._fetch_txt_enc_types(clip_data, query)
             if tra_req is None:
@@ -437,14 +432,7 @@ class ModelIndexer:
             tra_sorted = None
 
         vae_sorted = self._filter_compatible(query, model_indexes[ModelType.VAE]) or None
-        lora_match = self._filter_compatible(query, model_indexes[ModelType.LORA]) or []
-
-        lora_sorted = {}
-        for priority in lora_priority:
-            for key, val in lora_match:
-                if priority in key[1]:
-                    lora_sorted[key] = val
-        lora_sorted = lora_sorted or None
+        lora_sorted = dict(self._filter_compatible(query, model_indexes[ModelType.LORA])) or None
 
         return vae_sorted, tra_sorted, lora_sorted
 
