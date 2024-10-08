@@ -10,30 +10,26 @@ from diffusers.schedulers import AysSchedules
 class NodeTuner:
     @cache        
     def determine_tuning(self, model):
-        self.spec = config.get_default("spec","data")
+        self.spec       = config.get_default("spec","data")
         self.algorithms = list(config.get_default("algorithms","schedulers"))
-        self.solvers = list(config.get_default("algorithms","solvers"))
+        self.solvers    = list(config.get_default("algorithms","solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
         self.metadata_path = config.get_path("models.metadata")
         if self.fetch != "∅" and self.fetch != None:
-
-            self.optimized = defaultdict(dict)
-            self.model = defaultdict(dict) 
-            self.queue = defaultdict(dict)
+            self.optimized    = defaultdict(dict)
+            self.model        = defaultdict(dict)
+            self.queue        = defaultdict(dict)
             self.transformers = defaultdict(dict)
             self.conditioning = defaultdict(dict)
-            self.schedule = defaultdict(dict)
-            self.gen = defaultdict(dict)
-
+            self.schedule     = defaultdict(dict)
+            self.gen          = defaultdict(dict)
         if self.sort == "LLM":
             """
             llm stuff
             """
-        
         elif (self.sort  == "VAE"
         or self.sort  == "TRA"
         or self.sort  == "LOR"):
-            
             """
             say less fam
             """
@@ -42,7 +38,6 @@ class NodeTuner:
             self.model["class"] = self.category
             self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
 
-    
     @cache
     def opt_exp(self):
         peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
@@ -51,7 +46,6 @@ class NodeTuner:
         cpu_ceiling =  overhead/peak_cpu
         gpu_ceiling = overhead/peak_gpu
         total_ceiling = overhead/(peak_cpu+peak_gpu)
-
         # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
         self.oh_no = [False, False, False, False,]
         if gpu_ceiling > 1: 
@@ -62,10 +56,8 @@ class NodeTuner:
                 self.oh_no[2] = True
         elif gpu_ceiling < .5:
             self.oh_no[0] = True
-
         self.optimized["cache_jettison"] = self.oh_no[1]
         self.optimized["device"] = self.spec["devices"][0]
-        if self.spec["flash_attention_2"] == True: self.optimized["attn_implementation"]="flash_attention_2"
         self.optimized["dynamic_cfg"] = False
         self.optimized["seq"] = self.oh_no[1]
         self.optimized["cpu"] = self.oh_no[2]
@@ -133,8 +125,6 @@ class NodeTuner:
         else:
             self.optimized["vae"] = self.model["file"]
             self.vae["torch_dtype"] = "auto"
-    
-        
         if self.oh_no[2]: 
             self.vae["enable_tiling"] = True
         else: 
@@ -184,7 +174,6 @@ class NodeTuner:
                             if self.lora_unsorted.get(key,None) != None:
                                 self.gen["num_inference_steps"] = self.lora_unsorted[key]
                                 return val[1], key[1]
-                            
                                         
                 if next(iter(self.lora_sorted.items()), 0) != 0:
                     each, item = next(iter(self.lora_sorted.items()),0)
@@ -201,7 +190,7 @@ class NodeTuner:
                     self.gen["num_inference_steps"] = 20
                 else: 
                     self.gen["num_inference_steps"] = val(len(val)-1)
-                return each[1][1], each[0][1]  
+                return each[1][1], each[0][1]
             else:
                 logger.debug(f"LoRA not found?", exc_info=True)
 
@@ -212,6 +201,8 @@ class NodeTuner:
             self.skip = 12 - int(self.skip)
             self.transformers["use_safetensors"] = True
             self.transformers["num_hidden_layers"] = self.skip
+            if self.spec["flash_attention_2"] == True: 
+                self.transformers["attn_implementation"]="flash_attention_2"
             for each in self._tra:
                 # self.transformers["tokenizer"] = self._tra[each][1]
                 #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
@@ -223,8 +214,8 @@ class NodeTuner:
                     else: 
                         self.transformers["torch_dtype"] = "auto"
                         self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
-                else: self.transformers["variant"][each] = "F32"
-
+                else: 
+                    self.transformers["variant"][each] = "F32"
         else:
                 self.transformers["model"] = self.model["file"]
                 self.transformers["variant"] = self.model["dtype"]
@@ -321,7 +312,6 @@ class NodeTuner:
                     self.optimized["ays"] = "StableDiffusionXLTimesteps"
                     self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accel
                     self.gen["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
-
                 elif "STA-3" in self.category:
                     self.ays = "StableDiffusion3Timesteps"
                     self.gen["num_inference_steps"] = 10
@@ -331,7 +321,6 @@ class NodeTuner:
             elif ("FLU" in self.category
             or "AUR" in self.category):
                 self.optimized["algorithm"] = self.algorithms[2] #EulerAncestralAliens
-
         self.gen["output_type"] = "latent"
         self.gen["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
         if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #euler
@@ -346,7 +335,6 @@ class NodeTuner:
             self.refiner["denoising_end"] = self.refiner["high_noise_fra"]
             self.refiner["num_inference_steps"] = self.gen["num_inference_steps"], #begin step
             self.refiner["denoising_start"] = self.refiner["high_noise_fra"], #begin noise
-
         return self.refiner
 
     @cache

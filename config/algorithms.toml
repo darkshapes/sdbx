@@ -27,7 +27,7 @@ schedulers = [
 
 
 # #arrange this order as you like. default :  ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
-lora_priority = ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
+lora_priority = ["TCD", "DMD", "HYP", "LIG", "SPO", "PCM", "LCM", "FLA"]
 
 step_priority = [2, 4, 8, 10, 12, 16, 1] #default [2, 4, 8, 10, 12, 16, 1]
 

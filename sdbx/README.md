@@ -1,13 +1,14 @@
 
 # API CODE
 
-#### CLASS Config
-#### IMPORT from sdbx.config import
-#### METHODS get_default, get_path_contents, get_path
-#### VARIABLES config_source_location
-#### PURPOSE find source directories and data
-### RETURNS a dict of keys, a dict of files, a path str
-#### SYNTAX
+## CLASS Config
+##### IMPORT from sdbx.config import
+##### METHODS get_default, get_path_contents, get_path
+##### VARIABLES config_source_location
+##### PURPOSE find source directories and data
+##### OUTPUT a dict of keys, a dict of files, a path 
+##### RETURN FORMAT: {key:}, 
+##### SYNTAX
 ```
         config.get_default(filename with no extension, key)               (!cannot find sub-keys on its own)
         config.get_path_contents("string_to_folder.string_to_sub_folder") (see config/config.json, config/directories.json)
@@ -15,25 +16,26 @@
         
         os.path.join(config_source_location,filename)
 ```
-### OUTPUT contents of a value for a key, file contents of a directory and sub directories, path to a file
+##### OUTPUT contents of a value for a key, file contents of a directory and sub directories, path to a file
 
-#### CLASS ReadMeta
-#### IMPORT from sdbx.indexer import ReadMeta
-#### METHODS data
-#### PURPOSE extract metadata from model files
-#### RETURNS a dict of block data & model measurements for a single model
-#### SYNTAX 
+## CLASS ReadMeta
+##### IMPORT from sdbx.indexer import ReadMeta
+##### METHODS data
+##### PURPOSE extract metadata from model files
+##### OUTPUT a dict of block data & model measurements for a single model 
+##### RETURN FORMAT: {model_tag: }, a dict of extracted metadata as integers and strings
+##### SYNTAX 
 ```
         metadata = ReadMeta(full_path_to_file).data()                 (see config/tuning.json)
 ```
-#### OUTPUT dict of int and str, a form filled model_tag[] 
 
-#### CLASS EvalMeta
-#### IMPORT from sdbx.indexer import EvalMeta
-#### METHODS, process_vae, process_vae_no_12, process_lora, process_tf, process_model 
-#### PURPOSE interpret metadata from model files
-#### RETURNS a dict that identifies a single model as a certain type 
-#### SYNTAX 
+## CLASS EvalMeta
+##### IMPORT from sdbx.indexer import EvalMeta
+##### METHODS, process_vae, process_vae_no_12, process_lora, process_tf, process_model 
+##### PURPOSE interpret metadata from model files
+##### OUTPUT list of strings that identifies a single model as a certain class
+##### RETURN FORMAT: [0:] tag code, [1:] file size, [2:] full path (see tuner.json)
+##### SYNTAX 
 ```
         index_code = EvalMeta(dict_metadata_from_ReadMeta).data()        (see config/tuning.json)
                         tag = item[0]                   (TRA, LOR, LLM, DIF, VAE)
@@ -41,14 +43,14 @@
                         compatability = item[1][1:2][0] (short code)
                         data = item[1][2:5]             (meta data dict)
 ```
-#### OUTPUT list of type str: 0: tag code, 1: file size, 2: full path (see tuner.json)
 
-#### CLASS IndexManager
-#### IMPORT from sdbx.indexer import IndexManager
-#### METHODS write_index, fetch_compatible
-#### PURPOSE manage model type lookups, search for compatibility data
-#### RETURNS a .json file of available models & info, a dict of models that work with another
-#### SYNTAX 
+## CLASS IndexManager
+##### IMPORT from sdbx.indexer import IndexManager
+##### METHODS write_index, fetch_compatible
+##### PURPOSE manage model type lookups, search for compatibility data
+##### OUTPUT a .json file of available model info, a dict of compatible models.
+##### RETURN FORMAT: { filename: { code: [size, path, dtype] } }
+##### SYNTAX 
 ```
 
         create_index = IndexManager().write_index(optional_filename)       # (defaults to config/index.json)
@@ -61,120 +63,139 @@
                 a,b,c[0][1] size
                 a,b,c[0][1][1:2] path
                 a,b,c[0][1][2:3] dtype
-        filter = parse_compatible(self, query, a/b/c)                      #(show only a type of result)
+        filter = parse_compatible(self, query, a/b/c)                      # (show only a type of result)
         fetch = IndexManager().fetch_refiner()                             # Just find STA-XR model only
                                                                            #    template func for controlnet,
                                                                            #    photomaker, other specialized models
 
 ```
-#### OUTPUT json file with model metadata, a set of dicts with all compatible models, a dict of model compatible codes
 
-#### CLASS NodeTuner
-#### IMPORT from sdbx.nodes.tuner import NodeTuner
-#### METHODS get_tuned_parameters, determine_tuning
-#### PURPOSE collect model defaults and apply to current node graph
-#### RETURNS a formatted dict of defaults, a dict of defaults
-#### SYNTAX
+## CLASS NodeTuner
+##### IMPORT from sdbx.nodes.tuner import NodeTuner
+##### METHODS get_tuned_parameters, determine_tuning
+##### PURPOSE collect model defaults and apply to current node graph
+##### OUTPUT a dict of defaults ready to be passed as arguments (save for optimized and model)
+##### RETURN FORMAT: { file: , variant: , torch_dtype, ... }
+##### SYNTAX
 ```
 
-optimized scheduler, fuse, compile
-model
-queue
-transformers
-conditioning
-gen_exp
-pipe_exp
-vae_exp
-lora_exp
+                        defaults = determine_tuning(self, full_path_to_model)  
+
+dictionary map:
+
+                                                                        system_prompt          
+  callback_on_step_end_tensor_inputs  llm-------------.                 temperature           
+  guidance_scale                      model----------. |                repeat_penalty               
+  num_inference_steps                 lora----------. ||                max_tokens           
+  cfg                                 vae----------. |||                context
+  output_type ]gen------------.       transformers. ||||        .--llm[ top_p
+  return_dict     padding      `------gen          |||||       |        top_k    cache_dir
+                  return_tensors ]----conditioning |||||       |                 num_hidden_layers
+                  truncation     .----pipe         |||||       | .-transformers[ low_cpu_mem_usage               
+                                | .---optimized   `file        ||                attn_implementation
+            torch_dtype         || .--compile     variant      ||                use_safetensors
+            variant             ||| .-refiner    torch_dtype==''                         
+seq         tokenizer   ] pipe-' ||| .scheduler      ||     `-----------------model[ class
+cpu         text_encoder         ||||                ||                  
+disk        safety_checker       ||||                | `------------lora[                    
+ays         low_cpu_mem_usage    ||||                |       
+device                           ||||                 `----------.                     cache_dir   
+refiner                          ||||                             `---------------vae[ enable_tiling
+sigmas                           ||| `-------------scheduler[ lu_lambdas               disable_tiling             
+dynamo           ]optimized-----' ||                          euler_at_final           enable_slicing
+upcast_vae                        | `--refiner[ available     clip_sample              disable_slicing
+cache_jettison                    |           use_refiner     timesteps
+file_prefix                       |       denoising_start     timestep_spacing          
+algorithm                         |   num_inference_steps     interpolation_type     
+dynamic_cfg                       |        high_noise_fra     use_exponential_sigmas
+fuse_lora_on                      |         denoising_end     use_karras_sigmas
+fuse_lora(lora_scale)             |                           set_alpha_to_one
+fuse_pipe                          `-compile[ mode            use_beta_sigmas
+fuse_unet_only                                fullgraph       rescale_betas_zero_snr
 
 
-        defaults = determine_tuning(self, full_path_to_model)            
-                    tuning dict :                       system_prompt          
-                      llm------------.                  temperature           
-                      model---------. |                 repeat_penalty               
-num_inference_steps   vae_dict-----. ||                 max_tokens           
-cfg                   lora_dict---. |||                 context
-output_type ]-.       transformer. ||||         .--llm[ top_p
-               `------gen_dict    |||||        |        top_k
-              --------queue       |||||        |
-                 .----[optimized] |||||        |                
-batch_limit   ]-' .---pipe        `file        | .-transformer[             class
-cache_jettison   | .--compile      variant     || .-----------------model[ stage 
-upcast           || .-refiner      torch_dtype-'''                         config
-compile          ||| .schedule    ||                  config
-file_prefix      |||| conditioning||                  upcast
-use_fast_token   |||||            ||                  slice  
-streaming        |||||             | `------------vae[ tile       
-dynamic_cfg      |||||              `----------.                class          
-path             ||||`--[                        `---------lora[ fuse
-                 ||| `-------------scheduler[ algorithm         scale         
-variant ]pipe--' |||                          lu_lambdas        unet_only
-torch_dtype       | `--refiner[ available     euler_at_final
-cpu offload       |           use_refiner     clip_sample
-sequential_offload|       denoising_start     timesteps            ##### 0-1000
-manual_seed       |   num_inference_steps     timestep_spacing     ##### str 
-config_path       |        high_noise_fra     interpolation_type
-                  |         denoising_end     use_karras_sigmas
-                  |                           use_exponential_sigmas
-                   `-compile[ mode            use_beta_sigmas
-                              fullgraph       rescale_betas_zero_snr
-                                              set_alpha_to_one
-                                  
-                                              
+add lora, vae, llm, to model 
+                                                                                                              
 ```
 
-#### Exception handling
-#### IMPORT from sdbx.config import logger
-#### SYNTAX
+## CLASS T2IPipe
+##### IMPORT from sdbx.nodes.compute import T2IPipe
+##### METHODS declare_encoders, generate_embeddings, encode_prompt, diffuse_latent, decode_latent
+##### PURPOSE run text efficiently and continuously through latent diffusion using three separate AI models
+##### OUTPUT a picture in `.png` format sent to the designated `output` folder
+##### SYNTAX
+```
+        txt2img = T2IPipe()
+        txt2img.declare_encoders(exp):                               (init text transformer models)
+                generate_embeddings(prompts, tokenizers, text_encoders, exp)  (configure embedding gen)
+                encode_prompt(exp)                                   (run prompt through process)
+                construct_pipe(exp)                                  (load main model pipe)
+                diffuse_latent(exp)                                  (noise & denoise sample on schedule)
+                decode_latent(exp)                                   (convert latent sample to image)
+```
+
+- spinoffs
+>hf_log, float_converter, algorithm_converter, set_device, queue_manager,
+
+- nodes
+>add_dynamic_cfg, _dynamic_guidance, add_lora, cache_jettison, offload_to, compile_model, metrics
+
+
+### Exception handling
+##### IMPORT from sdbx.config import logger
+##### METHODS debug, exception
+##### OUTPUT detailed error message in log or console
+##### SYNTAX
 ```
         logger.debug(self.path, error_log, , exc_info=True)                 (quiet log)
         logger.exception(self.path, error_log)                              (hard lockup/os freeze only)
 ```
-#### OUTPUT detailed error message in log or console
 
+## MODEL KEY
+ - DIF - Diffusion / LLM - Large Language Model / TRA - Text Transformer / LOR -LoRA / VAE - VariableAutoencoder
 
-#### Model Key
-AUR-03 Auraflow
-COM-XC Common Canvas XL C
-COM-XN Common Canvas XL NC
-FLU-1D Flux 1 Dev
-FLU-1S Flux 1 Schnell
-HUN-12 HunyuanDit 1.2
-KOL-01 Kolors 1
-LCM-PIX-AL Pixart Alpha LCM Merge
-LLM-AYA-23 Aya 23
-LLM-DEE-02-INS Deepseek Instruct
-LLM-DOL-25 Dolphin
-LLM-LLA-03 LLama3
-LLM-MIS-01 Mistral
-LLM-MIS-01-INS Mistral Instruct
-LLM-NEM-04-INS Nemotron Instruct
-LLM-OPE-12 OpenOrca
-LLM-PHI-35-INS Phi Instruct
-LLM-QWE-25-INS Qwen Instruct
-LLM-SOL-10-INS Solar Instruct
-LLM-STA-02 Starcoder
-LLM-STA-02-INS Starcoder 02 Instruct
-LLM-ZEP-01 Zephyr
-LORA-FLA-STA-XL Flash XL
-LORA-LCM-SSD-1B SSD 1B LCM
-LORA-LCM-STA-15 Stable Diffusion 1.5 LCM
-LUM-01 Lumina T2I
-LUM-NS Lumina Next SFT
-MIT-D1 Mitsua
-PIX-AL Pixart Alpha
-PIX-SI Pixart Sigma
-PLA-25 Playgroud 2.5
-SD1-TR Stable Diffusion 1.5 Turbo
-SDX-TR Stable Diffusion XL Turbo
-SEG-VG Segmind Vega
-SSD-1B SSD-1B
-SSD-1L SSD-1B LCM
-STA-15 Stable Diffusion 1.5
-STA-3D Stable Diffusion 3 Diffusers
-STA-3M Stable Diffusion 3 Medium
-STA-CA Stable Cascade
-STA-XL Stable Diffusion XL
-STA-XR Stable Diffusion XL Refiner
-TIN-SD Tiny Stable Diffusion 1.5
-WUR-01 Wuerstchen
+## CLASS KEY
+- AUR-03 Auraflow
+- COM-XC Common Canvas XL C
+- COM-XN Common Canvas XL NC
+- FLU-1D Flux 1 Dev
+- FLU-1S Flux 1 Schnell
+- HUN-12 HunyuanDit 1.2
+- KOL-01 Kolors 1 
+- LCM-PIX-AL Pixart Alpha LCM Merge 
+- LLM-AYA-23 Aya 23 
+- LLM-DEE-02-INS Deepseek Instruct 
+- LLM-DOL-25 Dolphin 
+- LLM-LLA-03 LLama3 
+- LLM-MIS-01 Mistral 
+- LLM-MIS-01-INS Mistral Instruct 
+- LLM-NEM-04-INS Nemotron Instruct 
+- LLM-OPE-12 OpenOrca 
+- LLM-PHI-35-INS Phi Instruct 
+- LLM-QWE-25-INS Qwen Instruct 
+- LLM-SOL-10-INS Solar Instruct 
+- LLM-STA-02 Starcoder 
+- LLM-STA-02-INS Starcoder 02 Instruct 
+- LLM-ZEP-01 Zephyr 
+- LORA-FLA-STA-XL Flash XL 
+- LORA-LCM-SSD-1B SSD 1B LCM 
+- LORA-LCM-STA-15 Stable Diffusion 1.5 LCM 
+- LUM-01 Lumina T2I 
+- LUM-NS Lumina Next SFT 
+- MIT-D1 Mitsua 
+- PIX-AL Pixart Alpha 
+- PIX-SI Pixart Sigma 
+- PLA-25 Playgroud 2.5 
+- SD1-TR Stable Diffusion 1.5 Turbo 
+- SDX-TR Stable Diffusion XL Turbo 
+- SEG-VG Segmind Vega 
+- SSD-1B SSD-1B 
+- SSD-1L SSD-1B LCM 
+- STA-15 Stable Diffusion 1.5 
+- STA-3D Stable Diffusion 3 Diffusers 
+- STA-3M Stable Diffusion 3 Medium 
+- STA-CA Stable Cascade 
+- STA-XL Stable Diffusion XL 
+- STA-XR Stable Diffusion XL Refiner 
+- TIN-SD Tiny Stable Diffusion 1.5 
+- WUR-01 Wuerstchen

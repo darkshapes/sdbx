@@ -8,7 +8,7 @@ from sdbx import config
 from sdbx.config import get_defaults
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import soft_random
-from sdbx.nodes.compute import Inference, get_device
+from sdbx.nodes.compute import T2IPipe
 from sdbx.nodes.tuner import NodeTuner
 
 system = get_defaults("spec","data") #needs to be set by system @ launch
@@ -24,12 +24,24 @@ vae_models = get_defaults("index","VAE")
 transformers = get_defaults("index","TRA")
 primary_models = {**llms, **diffusion_models}
 
+
 @node(name="Genesis Node", display=True)
 def genesis_node(
     user_prompt: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
     model: Literal[*primary_models.keys()] = next(iter([*primary_models.keys()]),""),
 ) -> DataType:
-    strand = NodeTuner().determine_tuning(model)
+    #genesis node
+    optimize = NodeTuner()
+    insta = T2IPipe()
+    insta.queue_manager(user_prompt,seed=int(soft_random(1e9)))
+    optimize.determine_tuning("ponyFaetality_v11.unet.safetensors")
+    strand = """"model code to make things here"""
+    opt_exp = optimize.opt_exp() 
+    vae_exp = optimize.vae_exp()
+    gen_exp = optimize.gen_exp(2)#clip skip
+    cond_exp = optimize.cond_exp()
+    pipe_exp = optimize.pipe_exp()
+
     return strand
 
 @node(name="Load Diffusion", display=True)
@@ -41,6 +53,7 @@ def load_diffusion(
     bfloat: A[bool, Dependent(on="precision", when="16")] = False,
     verbose: bool = False,
 ) ->  AutoModel:
+    insta.construct_pipe(pipe_exp)
     #do model stuff
     return model
 
@@ -77,6 +90,12 @@ def load_text_model(
     one_time_seed: bool = False,
 ) -> Tensor | Llama:
     llama = Inference.gguf_load(transformer, threads, max_context, verbose)
+
+    insta.set_device()
+    insta.declare_encoders(     )
+    insta.encode_prompt(    )
+    #cache ctrl node
+
     return llama
 
 @node(name="Text Prompt", display=True)
@@ -118,26 +137,14 @@ def image_prompt(
     # type: ignore
     gpu_id: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=0, max=100)] = 0,
 ) -> Llama:
-    queue = Inference.push_prompt(prompt, seed)
-    embeddings = Inference.start_encoding(queue, text_encoder, text_encoder_2)
+
+    #prompt node
+    prompt = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles owned by a vampire"
+    seed = int(soft_random())
+    insta.queue_manager(prompt,seed)
+
     return embeddings
 
-# @node(name="Image Input", display=True)
-# def image_input(
-#  image: format(len(os.listdir(config.get_path("input")))),
-# ) -> Image
-# return image
-
-# @node(name="Autoencode", display=True)
-# def autoencode(
-#     image: Image,
-#     vae: Tensor,
-#     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
-# ) -> Image:
-#     batch = Inference.autoencode(vae, latent, file_prefix)
-#     for image in range(batch):
-#         return image
-    
 @node(name="Lora Fuse", path=None, display=True)
 def lora_fuse(
     model: Tensor | Llama,
@@ -159,6 +166,9 @@ def generate_image(
     compile_unet: bool = False,
     device: Literal[*system] = next(iter(*system), "cpu"),
 ) -> Tensor:
+    #t2i
+    insta.diffuse_latent(gen_exp)
+
     latent = Inference.run_inference(
         """queue""",
         inference_steps,
@@ -177,6 +187,8 @@ def autodecode(
     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
 ) -> Image:
     batch = Inference.autodecode(vae, latent, file_prefix)
+    insta.decode_latent(vae_exp)
+
     for image in range(batch):
         return image
 
@@ -209,6 +221,28 @@ def llm_print( response: str) -> I[str]:
             print(delta['content'], end='')
             yield delta['content'], ''
 
+
+insta.metrics()
+insta.cache_jettison(vae=True)
+
+insta.set_device()
+    
+# @node(name="Image Input", display=True)
+# def image_input(
+#  image: format(len(os.listdir(config.get_path("input")))),
+# ) -> Image
+# return image
+
+# @node(name="Autoencode", display=True)
+# def autoencode(
+#     image: Image,
+#     vae: Tensor,
+#     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
+# ) -> Image:
+#     batch = Inference.autoencode(vae, latent, file_prefix)
+#     for image in range(batch):
+#         return image
+    
 #@node(name="Text Inversion")
 #def text_inversion(
 #    embeddings: next(other.keys(),"None")

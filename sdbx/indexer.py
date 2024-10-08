@@ -22,8 +22,8 @@ class EvalMeta:
     # LORA MODEL PCM, SPO, LCM, HYPER, ETC  performance boosts and various system improvements
     # to be added
     # S2T, A2T, VLLM, INPAINT, CONTROL NET, T2I, PHOTOMAKER, SAMS. WHEW
-
     # CRITERIA THRESHOLDS
+
     model_tensor_pct = 2e-3  # fine tunings
     model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
     vae_pct = 5e-3           # please do not disrupt
@@ -74,13 +74,13 @@ class EvalMeta:
         self.tokenizer = self.extract.get("tokenizer.chat_template", "")
         self.context_length = self.extract.get("context_length","")
 
-    def process_vae(self):
+    def process_vae(self): #run through all possible interpretations of this data
         if [32] == self.shape_value:
-            self.tag = "0"
-            self.key = '114560782'
+            self.tag = "0" #dict name
+            self.key = '114560782' #file size
             self.sub_key = '248' # sd1 hook
         elif [512] == self.shape_value:
-            self.tag = "0"
+            self.tag = "0" 
             self.key = "335304388"
             self.sub_key = "244" # flux hook
         elif self.sdxl_value == 12:
@@ -172,7 +172,6 @@ class EvalMeta:
                             print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 
     def data(self):
-
         if self.name_value != "": # check LLM
             self.tag = "c"
             self.key = ""
@@ -192,7 +191,7 @@ class EvalMeta:
 
         self.tag_dict = {}
         # 0 = vae_peek_0, 12 = vae_peek_12, v = vae_peek
-        # these are separated because file sizes are otherwise too similar
+        # these dicts are separated because the file sizes of the models are otherwise too similar
         # please do not disrupt
         if self.tag == "0" or self.tag == "12" or self.tag == "v":
             self.code = "VAE"
@@ -241,7 +240,6 @@ class ReadMeta:
         self.path = path  # the path of the file
         self.full_data, self.meta, self.count_dict = {}, {}, {}
         self.verbose = verbose
-
         # level of certainty, counts tensor block type matches
         ## please do not change these values
         ## they may be labelled incorrectly, ignore it
@@ -264,8 +262,6 @@ class ReadMeta:
             "block_count":"",
             "attention.head_count": "",
             "attention.head_count_kv": "",
-
-
         }
         self.occurrence_counts = defaultdict(int)
         self.filename = os.path.basename(self.path)  # the title of the file only
@@ -371,7 +367,6 @@ class ReadMeta:
             else :
                 print(f"Ignoring unrecognized model file format: {self.filename}")
                 pass
-
             return self.full_data
 
     def _search_dict(self, meta):
@@ -386,7 +381,7 @@ class ReadMeta:
                     prefix = self.model_tag["general.architecture"]
                     prefixless_key = key.replace(f"{prefix}.","")
                     if self.model_tag.get(prefixless_key, "not_found") != "not_found":
-                        self.model_tag[prefixless_key] = value  # drop it like its hot
+                        self.model_tag[prefixless_key] = value  # park it like its hot
         elif self.ext == ".safetensors" or self.ext == ".sft":
             for num in list(self.meta): # handle inevitable exceptions invisibly
                 #if self.verbose == True:
@@ -404,7 +399,6 @@ class ReadMeta:
                             if block in num:  # if value matches one of our key values
                                 self.occurrence_counts[model_type] += 1 # count matches
                                 self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0)  # pair match count to model type
-
         return self.meta
     
     def __repr__(self):
@@ -556,17 +550,14 @@ class IndexManager:
         if lora_sorted == []: 
             lora_sorted =str("∅")
             logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
-
         return vae_sorted, tra_sorted, lora_sorted
 
-    def fetch_refiner(self):
+    def fetch_refiner(self): # what it says on the tin
         self.dif_index = config.get_default("index", "DIF")
         for key, value in self.dif_index.items():
             if key == "STA-XR":
                 return value
         return "∅"
-
-        
 
     #within a dict of models of the same type, match model code & sort by file size
     def filter_compatible(self, query, index):
@@ -584,3 +575,5 @@ class IndexManager:
             return "∅"
     
 
+create_index = IndexManager().write_index()       # defaults to config/index.json
+                                                  # may in future be adjustable somehow...
