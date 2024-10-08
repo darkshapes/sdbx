@@ -120,7 +120,7 @@ def image_prompt(
     gpu_id: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=0, max=100)] = 0,
 ) -> Llama:
     #return embeddings
-
+    """ """
 # @node(name="Image Input", display=True)
 # def image_input(
 #  image: format(len(os.listdir(config.get_path("input")))),
@@ -158,7 +158,7 @@ def generate_image(
     compile_unet: bool = False,
     device: Literal[*system] = next(iter(*system), "cpu"),
 ) -> Tensor:
-
+    """"""
     #return latent
 
 @node(name="Autodecode", display=True)
@@ -167,7 +167,7 @@ def autodecode(
     vae: Tensor,
     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
 ) -> Image:
-    
+    """"""
    
         #return image
 
