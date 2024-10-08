@@ -2,20 +2,24 @@ import os
 import numbers
 from sdbx.indexer import IndexManager
 from sdbx import logger
-from sdbx.config import config, Precision, cache, TensorDataType as D
-from sdbx.nodes.helpers import soft_random
+from sdbx.config import config, cache
 from collections import defaultdict
 from diffusers.schedulers import AysSchedules
 
 class NodeTuner:
-    @cache        
-    def determine_tuning(self, model):
-        self.spec       = config.get_default("spec","data")
-        self.algorithms = list(config.get_default("algorithms","schedulers"))
-        self.solvers    = list(config.get_default("algorithms","solvers"))
+    def __init__(self):
+        self.spec       = config.get_default("spec", "data")
+        self.algorithms = list(config.get_default("algorithms", "schedulers"))
+        self.solvers    = list(config.get_default("algorithms", "solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
         self.metadata_path = config.get_path("models.metadata")
-        if self.fetch != "∅" and self.fetch != None:
+
+    @cache
+    def determine_tuning(self, model):
+        self.sort, self.category, self.fetch = config.model_index.fetch_id(model)
+
+        if self.fetch is not None:
+            # Initialize dictionaries
             self.optimized    = defaultdict(dict)
             self.model        = defaultdict(dict)
             self.queue        = defaultdict(dict)
@@ -23,52 +27,50 @@ class NodeTuner:
             self.conditioning = defaultdict(dict)
             self.schedule     = defaultdict(dict)
             self.gen          = defaultdict(dict)
-        if self.sort == "LLM":
-            """
-            llm stuff
-            """
-        elif (self.sort  == "VAE"
-        or self.sort  == "TRA"
-        or self.sort  == "LOR"):
-            """
-            say less fam
-            """
+            
+            if self.sort == ModelType.LANGUAGE.value:
+                """  process llm stuff here"""
+            elif self.sort in [ModelType.VAE.value, ModelType.TRANSFORMER.value, ModelType.LORA.value]:
+"                Handle VAE, TRA, LOR types"
+            else:
+                self.model["file"] = list(self.fetch)[1]
+                self.model["class"] = self.category
+                self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
         else:
-            self.model["file"] = list(self.fetch)[1]
-            self.model["class"] = self.category
-            self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
+            """ handle case where system cannot populate sort dict here"""
 
     @cache
     def opt_exp(self):
-        peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
-        overhead =  list(self.fetch)[0]
+        peak_gpu = self.spec["gpu_ram"] # Accommodate list of graphics card ram
+        overhead =  self.fetch[0]
         peak_cpu = self.spec["cpu_ram"]
-        cpu_ceiling =  overhead/peak_cpu
-        gpu_ceiling = overhead/peak_gpu
-        total_ceiling = overhead/(peak_cpu+peak_gpu)
-        # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
+        cpu_ceiling =  overhead / peak_cpu
+        gpu_ceiling = overhead / peak_gpu
+        total_ceiling = overhead / (peak_cpu + peak_gpu)
+        # Size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
         self.oh_no = [False, False, False, False,]
         if gpu_ceiling > 1: 
-            self.oh_no[1] = True #look for quant, load_in_4bit=True/load_in_8bit=True
+            self.oh_no[1] = True #todo : add search for quantized models, load_in_4bit=True/load_in_8bit=True
             if total_ceiling > 1:
                 self.oh_no[3] = True
             elif cpu_ceiling > 1:
                 self.oh_no[2] = True
-        elif gpu_ceiling < .5:
+        elif gpu_ceiling < 0.5:
             self.oh_no[0] = True
+            
         self.optimized["cache_jettison"] = self.oh_no[1]
-        self.optimized["device"] = self.spec["devices"][0]
-        self.optimized["dynamic_cfg"] = False
-        self.optimized["seq"] = self.oh_no[1]
-        self.optimized["cpu"] = self.oh_no[2]
-        self.optimized["disk"] = self.oh_no[3]
-        self.optimized["file_prefix"] = "Shadowbox-"
-        self.optimized["refiner"] = IndexManager().fetch_refiner()
-        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
-        self.optimized["fuse_lora_on"] = False
-        #self.optimized["fuse_pipe"] = True #pipe.fuse_qkv_projections()
+        self.optimized["device"]         = self.spec["devices"][0]
+        self.optimized["dynamic_cfg"]    = False
+        self.optimized["seq"]            = self.oh_no[1]
+        self.optimized["cpu"]            = self.oh_no[2]
+        self.optimized["disk"]           = self.oh_no[3]
+        self.optimized["file_prefix"]    = "Shadowbox-"
+        self.optimized["refiner"]        = IndexManager().fetch_refiner()
+        self.optimized["upcast_vae"]     = True if self.category == "STA-XL" else False # f32, fp16 broken by default
+        self.optimized["fuse_lora_on"]   = False
+        #self.optimized["fuse_pipe"]     = True #pipe.fuse_qkv_projections()
         self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
-        if self.spec["dynamo"]:
+        if self.spec["dynamo"]: 
             self.optimized["sigmas"] = True #
             self.optimized["dynamo"] = self.spec["dynamo"]
         return self.optimized
@@ -110,9 +112,9 @@ class NodeTuner:
     @cache
     def vae_exp(self):
         # ensure value returned
-        if self._vae != "∅":  
+        if self._vae:  
             self.vae = defaultdict(dict)
-            self.optimized["vae"] = self._vae[0][1][1]
+            self.optimized["vae"] = self._vae[0][1][1]  # Path to VAE model
             if (self.optimized["upcast_vae"]
             or self.spec["devices"][0] == "cpu"): 
                 self.vae["variant"] = "F32"
@@ -195,15 +197,15 @@ class NodeTuner:
                 logger.debug(f"LoRA not found?", exc_info=True)
 
     @cache       
-    def gen_exp(self, skip):
+    def gen_exp(self, skip=2):
         self.skip = skip
-        if self._tra != "∅" and self._tra != {}: 
+        if self._tra: 
             self.skip = 12 - int(self.skip)
             self.transformers["use_safetensors"] = True
             self.transformers["num_hidden_layers"] = self.skip
             if self.spec["flash_attention_2"] == True: 
                 self.transformers["attn_implementation"]="flash_attention_2"
-            for each in self._tra:
+            for (filename, code), dtype in self._tra:
                 # self.transformers["tokenizer"] = self._tra[each][1]
                 #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
                 #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
@@ -223,7 +225,7 @@ class NodeTuner:
                 self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
                 self.pipe["variant"] = list(self.fetch)[2] #model variant              
 
-        if next(iter(self._lora.items()),0) != 0:
+         if self._lora and len(self._lora) > 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
             # cfg enabled here
             if "PCM" in self.optimized["lora_class"]:
@@ -295,20 +297,17 @@ class NodeTuner:
             self.gen["num_inference_steps"] = 20
             self.gen["guidance_scale"] = 7
             self.optimized["scheduler"]["use_karras_sigmas"] = True
-            if ("LUM" in self.category
-            or "STA-3" in self.category):
+            if "LUM" in self.category or "STA-3" in self.category:
                 self.optimized["scheduler"]["interpolation type"] = "linear" #sgm_uniform/simple
                 self.optimized["scheduler"]["timestep_spacing"] = "trailing"
-            if (self.category == "STA-15"
-            or self.category == "STA-XL"
-            or self.category == "STA3"):
+            if self.category in ["STA-15", "STA-XL", "STA3"]:
                 self.optimized["algorithm"] = self.algorithms[8] #AlignYourSteps
                 if "STA-15" == self.category: 
                     self.optimized["ays"] = "StableDiffusionTimesteps"
-                    self.optimized["scheduler"]["timesteps"] = AysSchedules[self.ays]
+                    self.schedule["timesteps"] = AysSchedules[self.ays]
                 elif "STA-XL" == self.category:
-                    self.gen["num_inference_steps"] = 10
-                    self.gen["guidance_scale"] = 5 
+                    self.gen_dict["num_inference_steps"] = 10
+                    self.gen_dict["guidance_scale"] = 5 
                     self.optimized["ays"] = "StableDiffusionXLTimesteps"
                     self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accel
                     self.gen["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
@@ -318,8 +317,7 @@ class NodeTuner:
                     self.gen["guidance_scale"] = 4
             elif "PLA" in self.category:
                 self.optimized["algorithm"] = self.algorithms[3] #EDMDPM
-            elif ("FLU" in self.category
-            or "AUR" in self.category):
+            elif "FLU" in self.category or "AUR" in self.category:
                 self.optimized["algorithm"] = self.algorithms[2] #EulerAncestralAliens
         self.gen["output_type"] = "latent"
         self.gen["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
