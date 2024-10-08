@@ -1,11 +1,3 @@
-from sdbx.nodes.types import *
-
-from sdbx import config
-from sdbx.compute import Inference
-from sdbx.indexer import ModelType
-
-from sdbx.nodes.helpers import soft_random
-from sdbx.nodes.tuner import NodeTuner
 
 import os
 
@@ -16,9 +8,12 @@ from PIL import Image
 from llama_cpp import Llama
 
 from sdbx import config
-from sdbx.config import get_defaults
 from sdbx.nodes.types import *
+from sdbx.compute import Inference
+from sdbx.indexer import ModelType
 from sdbx.nodes.helpers import soft_random
+from sdbx.nodes.tuner import NodeTuner
+
 from sdbx.nodes.compute import T2IPipe
 from sdbx.nodes.tuner import NodeTuner
 from transformers import AutoModel, TensorType as Tensor
@@ -26,18 +21,16 @@ from transformers import AutoModel, TensorType as Tensor
 DataType = Any
 Model = Union[Tensor, Llama]
 
-spec = config.spec["data"] # needs to be set by system @ launch
-devices = spec["devices"]
-flash_attn = spec["flash-attention"]
-algorithms = config.get_default("algorithms", "schedulers")
-algorithms = config.get_default("algorithms", "solvers")
-
-
-llms                = config.model_indexer.index[ModelType.LANGUAGE.value]
-diffusion_models    = config.model_indexer.index[ModelType.DIFFUSION.value]
-lora_models         = config.model_indexer.index[ModelType.LORA.value]
-transformers        = config.model_indexer.index[ModelType.TRANSFORMER.value]
-vae_models          = config.model_indexer.index[ModelType.VAE.value]
+spec             = config.spec["data"] # needs to be set by system @ launch
+devices          = spec["devices"]
+flash_attn       = spec["flash-attention"]
+algorithms       = config.get_default("algorithms", "schedulers")
+algorithms       = config.get_default("algorithms", "solvers")
+llms             = config.model_indexer.index[ModelType.LANGUAGE.value]
+diffusion_models = config.model_indexer.index[ModelType.DIFFUSION.value]
+lora_models      = config.model_indexer.index[ModelType.LORA.value]
+transformers     = config.model_indexer.index[ModelType.TRANSFORMER.value]
+vae_models       = config.model_indexer.index[ModelType.VAE.value]
 
 primary_models = {**llms, **diffusion_models}
 
@@ -49,13 +42,13 @@ def genesis_node(
 ) -> None:
     #genesis node
     optimize = NodeTuner()
-    insta = T2IPipe()
+    insta    = T2IPipe()
     insta.queue_manager(user_prompt,seed=int(soft_random(1e9)))
     optimize.determine_tuning("ponyFaetality_v11.unet.safetensors")
-    strand = """"model code to make things here"""
-    opt_exp = optimize.opt_exp() 
-    vae_exp = optimize.vae_exp()
-    gen_exp = optimize.gen_exp(2)#clip skip
+    strand = """"model code to workflows things here"""
+    opt_exp  = optimize.opt_exp()
+    vae_exp  = optimize.vae_exp()
+    gen_exp  = optimize.gen_exp(2)#clip skip
     cond_exp = optimize.cond_exp()
     pipe_exp = optimize.pipe_exp()
 

@@ -4,14 +4,13 @@ from sdbx.indexer import IndexManager
 from sdbx import logger
 from sdbx.config import config, cache
 from collections import defaultdict
-from diffusers.schedulers import AysSchedules
+from diffusers.schedulers.scheduling_utils import AysSchedules
 
 class NodeTuner:
-    def __init__(self):
+    def __init__(self, model):
         self.spec       = config.get_default("spec", "data")
         self.algorithms = list(config.get_default("algorithms", "schedulers"))
         self.solvers    = list(config.get_default("algorithms", "solvers"))
-        self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
         self.metadata_path = config.get_path("models.metadata")
 
     @cache
@@ -29,15 +28,15 @@ class NodeTuner:
             self.gen          = defaultdict(dict)
             
             if self.sort == ModelType.LANGUAGE.value:
-                """  process llm stuff here"""
+                """  """ # todo: Process llm stuff here 
             elif self.sort in [ModelType.VAE.value, ModelType.TRANSFORMER.value, ModelType.LORA.value]:
-"                Handle VAE, TRA, LOR types"
+                "Handle VAE, TRA, LOR types"
             else:
                 self.model["file"] = list(self.fetch)[1]
                 self.model["class"] = self.category
                 self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
         else:
-            """ handle case where system cannot populate sort dict here"""
+            """ """ # todo: Handle case where system cannot populate sort dict here
 
     @cache
     def opt_exp(self):
@@ -225,7 +224,7 @@ class NodeTuner:
                 self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
                 self.pipe["variant"] = list(self.fetch)[2] #model variant              
 
-         if self._lora and len(self._lora) > 0:
+        if self._lora and len(self._lora) > 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
             # cfg enabled here
             if "PCM" in self.optimized["lora_class"]:
