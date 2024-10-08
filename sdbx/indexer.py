@@ -24,13 +24,13 @@ class EvalMeta:
     # S2T, A2T, VLLM, INPAINT, CONTROL NET, T2I, PHOTOMAKER, SAMS. WHEW
 
     # CRITERIA THRESHOLDS
-    model_tensor_pct = 2e-3  # fine tunings
-    model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
-    vae_pct = 5e-3           # please do not disrupt
-    vae_xl_pct = 1e-8
-    tra_pct = 1e-4
-    tra_leeway = 0.03
-    lora_pct = 0.05
+    MODEL_TENSOR_PCT = 2e-3 # fine tunings
+    MODEL_BLOCK_PCT = 1e-4  # % of relative closeness to a known checkpoint value
+    VAE_PCT = 5e-3 # please do not disrupt
+    VAE_XL_PCT = 1e-8
+    TRA_PCT = 1e-4
+    TRA_TENSOR_PCT = 0.03
+    LORA_PCT = 0.05
 
     model_peek = peek['model_peek']
     vae_peek_12 = peek['vae_peek_12']
@@ -76,98 +76,79 @@ class EvalMeta:
 
     def process_vae(self):
         if [32] == self.shape_value:
-            self.tag = "0"
-            self.key = '114560782'
-            self.sub_key = '248' # sd1 hook
+            self.tks("0", '114560782', '248') #sd1
+
         elif [512] == self.shape_value:
-            self.tag = "0"
-            self.key = "335304388"
-            self.sub_key = "244" # flux hook
+            self.tks("0", "335304388", "244") #flux
+
         elif self.sdxl_value == 12:
             if self.mmdit_value == 4:
-                self.tag = "0"
-                self.key = "167335342"
-                self.sub_key = "248"  # auraflow
-            elif (isclose(self.size, 167335343, rel_tol=self.vae_xl_pct)
-            or isclose(self.size, 167666902, rel_tol=self.vae_xl_pct)):
-                if "vega" in self.filename.lower():
-                    self.tag = '12'
-                    self.key = '167335344'
-                    self.sub_key = '248'  #vega
-                else:
-                    self.tag = "0"
-                    self.key = "167335343"
-                    self.sub_key = "248"  #kolors
+                self.tks("0", "167335342", "248") # auraflow
+
+            elif (isclose(self.size, 167335343, rel_tol=self.VAE_XL_PCT)
+            or isclose(self.size, 167666902, rel_tol=self.VAE_XL_PCT)):
+                self.tks(
+                    '12' if "vega" in self.filename.lower() else "0", 
+                    '167335344' if "vega" in self.filename.lower() else "167335343", 
+                    "248"
+                ) #vega
             else:
-                self.tag = "12"
-                self.key = "334643238"
-                self.sub_key = "248" #pixart
+                self.tks("12", "334643238", "248") #pixart
         elif self.mmdit_value == 8:
-            if isclose(self.size, 404581567, rel_tol=self.vae_xl_pct):
-                self.tag = "0"
-                self.key = "404581567"
-                self.sub_key = "304" #sd1 hook
+            if isclose(self.size, 404581567, rel_tol=self.VAE_XL_PCT):
+                 self.tks("0", "404581567", "304") #sd1 hook
             else:
-                self.tag = "v"
-                self.key = "167333134"
-                self.sub_key = "248" #sdxl hook
-        elif isclose(self.size, 334641190, rel_tol=self.vae_xl_pct):
-            self.tag = "v"
-            self.key = "334641190"
-            self.sub_key = "250" #sd1 hook
+                self.tks("v", "167333134", "248") #sdxl hook
+        elif isclose(self.size, 334641190, rel_tol=self.VAE_XL_PCT):
+            self.tks("v", "334641190", "250") #sd1 hook
         else:
-            self.tag = "v"
-            self.key = "334641162"
-            self.sub_key = "250" #sdxl hook
+            self.tks("v", "334641162", "250") #sdxl hook
+
+    def tks(self, tag, key, sub_key):
+        self.tag = tag
+        self.key = key
+        self.sub_key = sub_key
 
     def process_lor(self):
         if self.size != 0:
             for size, attributes in self.lora_peek.items():
                 if (
-                    isclose(self.size, int(size),  rel_tol=self.lora_pct) or
-                    isclose(self.size, int(size)*2, rel_tol=self.lora_pct) or
-                    isclose(self.size, int(size)/2, rel_tol=self.lora_pct)
+                    isclose(self.size, int(size),  rel_tol=self.LORA_PCT) or
+                    isclose(self.size, int(size)*2, rel_tol=self.LORA_PCT) or
+                    isclose(self.size, int(size)/2, rel_tol=self.LORA_PCT)
                 ):
                     for tensor_params, desc in attributes.items():
-                        if isclose(self.tensor_value, int(tensor_params), rel_tol=self.lora_pct):
+                        if isclose(self.tensor_value, int(tensor_params), rel_tol=self.LORA_PCT):
                             for each in next(iter([desc, 'not_found'])):
                                 title = self.filename.upper()
                                 if each in title:
-                                    self.tag = "l"
-                                    self.key = size
-                                    self.sub_key = tensor_params
+                                    self.tks("l", size, tensor_params)
                                     self.value = each #lora hook                               
                                         # found lora
 
     def process_tra(self):
         for tensor_params, attributes in self.tra_peek.items():
-            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.tra_leeway):
+            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.TRA_TENSOR_PCT):
                 for shape, name in attributes.items():
-                    if isclose(self.transformer_value, name[0], rel_tol=self.tra_pct):
-                            self.tag = "t"
-                            self.key = tensor_params
-                            self.sub_key = shape # found transformer
+                    if isclose(self.transformer_value, name[0], rel_tol=self.TRA_PCT):
+                            self.tks("t",tensor_params,shape) # found transformer
 
     def process_model(self):
         for tensor_params, attributes, in self.model_peek.items():
-            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.model_tensor_pct):
+            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.MODEL_TENSOR_PCT):
                 for shape, name in attributes.items():
                     num = self.shape_value[0:1]
                     if num:
-                        if (isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
-                        or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                            self.tag = "m"
-                            self.key = tensor_params
-                            self.sub_key = shape #found model
+                        if (isclose(int(num[0]), int(shape), rel_tol=self.MODEL_BLOCK_PCT)
+                        or isclose(self.diffuser_value, name[0], rel_tol=self.MODEL_BLOCK_PCT)
+                        or isclose(self.mmdit_value, name[0], rel_tol=self.MODEL_BLOCK_PCT)
+                        or isclose(self.flux_value, name[0], rel_tol=self.MODEL_BLOCK_PCT)
+                        or isclose(self.diff_lora_value, name[0], rel_tol=self.MODEL_BLOCK_PCT)
+                        or isclose(self.hunyuan, name[0], rel_tol=self.MODEL_BLOCK_PCT)):
+                            self.tks("m", tensor_params, shape) #found model
                     else:
                         logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
-                        self.tag = "m"
-                        self.key = tensor_params
-                        self.sub_key = shape               ######################################DEBUG
+                        self.tks("m", tensor_params, shape)               ######################################DEBUG
                         if self.verbose is True: 
                             print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 

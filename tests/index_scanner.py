@@ -23,7 +23,7 @@ except:
     """
 
 if not os.path.isdir(name_check) or os.path.isdir(root_check) :
-    name_path = input("Enter patith to file (ie: 'folder_name', or just 'models'):")
+    name_path = input("Enter path to file (ie: 'folder_name', or just 'models'):")
     try:
         path_name = config.get_path(f"models.{name_path}")
     except KeyError:

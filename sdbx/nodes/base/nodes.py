@@ -7,7 +7,7 @@ from transformers import AutoModel, TensorType
 from sdbx import config
 from sdbx.nodes.types import *
 from sdbx.nodes.helpers import soft_random
-from sdbx.nodes.compute import Inference, get_device
+from sdbx.nodes.compute import T2IPipe, set_device
 from sdbx.nodes.tuner import NodeTuner
 
 
@@ -32,7 +32,7 @@ def genesis_node(
     model: Literal[*primary_models.keys()] = next(iter([*primary_models.keys()]),""),
 ) -> DataType:
     strand = NodeTuner().determine_tuning(model)
-    return strand
+    return strand   
 
 @node(name="Load Diffusion", display=True)
 def load_diffusion(
@@ -78,8 +78,7 @@ def load_text_model(
     verbose: bool = False,
     one_time_seed: bool = False,
 ) -> Tensor | Llama:
-    llama = Inference.gguf_load(transformer, threads, max_context, verbose)
-    return llama
+    return Llama
 
 @node(name="Text Prompt", display=True)
 def text_prompt(
@@ -98,8 +97,8 @@ def text_prompt(
     if external_user_prompt:
         user_prompt = external_user_prompt
     # if none, don't pass values
-    request = Inference.llm_request(system_prompt, user_prompt, streaming=True)
-    return request
+    #request = llm_request(system_prompt, user_prompt, streaming=True)
+    #return request
 
 @node(name="Text Input", display=True)
 def text_input(
@@ -120,9 +119,7 @@ def image_prompt(
     # type: ignore
     gpu_id: A[int, Dependent(on="device", when=(not "cpu")), Slider(min=0, max=100)] = 0,
 ) -> Llama:
-    queue = Inference.push_prompt(prompt, seed)
-    embeddings = Inference.start_encoding(queue, text_encoder, text_encoder_2)
-    return embeddings
+    #return embeddings
 
 # @node(name="Image Input", display=True)
 # def image_input(
@@ -161,16 +158,8 @@ def generate_image(
     compile_unet: bool = False,
     device: Literal[*system] = next(iter(*system), "cpu"),
 ) -> Tensor:
-    latent = Inference.run_inference(
-        """queue""",
-        inference_steps,
-        guidance_scale,
-        dynamic_guidance,
-        scheduler,
-        device
-    )
-    Inference.clear_memory_cache()
-    return latent
+
+    #return latent
 
 @node(name="Autodecode", display=True)
 def autodecode(
@@ -178,9 +167,9 @@ def autodecode(
     vae: Tensor,
     file_prefix: A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox-",
 ) -> Image:
-    batch = Inference.autodecode(vae, latent, file_prefix)
-    for image in range(batch):
-        return image
+    
+   
+        #return image
 
 @node(name="Save / Preview Image", display=True)
 def save_preview_img(

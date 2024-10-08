@@ -408,7 +408,7 @@ class T2IPipe:
             if each not in var_list:
                 print(f"{each} = {variables[each]}")
   
-# create_index = IndexManager().write_index()       # (defaults to config/index.json)
+#create_index = IndexManager().write_index()       # (defaults to config/index.json)
 
 #genesis node
 optimize = NodeTuner()

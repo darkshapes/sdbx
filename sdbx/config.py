@@ -202,29 +202,29 @@ class Config(BaseSettings):
 
         return [format_path(p, g) for g in glob(f"**.{extension}", root_dir=p, recursive=True)]
     
-    def get_path_tree(self, name, extension="", path_name=True, file_callback=(lambda e: e), _searching=None):
+    def get_path_tree(self, name, extension="", path_name=True, file_callback=lambda e: e, visited=None):
         p = self.get_path(name) if path_name else name
-        _searching = _searching or ""
-        tree = []
+        visited = visited or set()
 
-        recurse_tree = partial(self.get_path_tree, name=p, path_name=False, file_callback=file_callback)
-
-        with os.scandir(os.path.join(p, _searching)) as it:
-            for entry in it:
-                if not entry.is_dir() and not entry.name.endswith(extension):
+        def recurse(path):
+            entries = []
+            for entry in os.scandir(path):
+                fp = os.path.join(path, entry.name)
+                rp = os.path.realpath(fp)
+                if rp in visited:
                     continue
-                current = os.path.join(_searching, entry.name)
-                full = os.path.join(p, current)
-                tree.append({
-                    "id": current,
+                visited.add(rp)
+                info = {
+                    "id": fp,
                     "name": entry.name,
-                    **(
-                        file_callback(full) if entry.is_file() else  # If it's a file, load contents as graph
-                        { "children": recurse_tree(_searching=current) }  # If it's a directory, recurse
-                    )
-                })
-        
-        return tree
+                }
+                if entry.is_dir(follow_symlinks=True):
+                    entries.append({ **info, "children": recurse(fp) })
+                elif entry.is_file(follow_symlinks=True) and (not extension or entry.name.endswith(extension)):
+                    entries.append({ **info, **file_callback(fp) })
+            return entries
+
+        return recurse(p)
 
     @cached_property
     def _path_dict(self):

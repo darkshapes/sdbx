@@ -1,5 +1,6 @@
 import os
 import numbers
+
 from sdbx.indexer import IndexManager
 from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
@@ -48,9 +49,9 @@ class NodeTuner:
         peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
         overhead =  list(self.fetch)[0]
         peak_cpu = self.spec["cpu_ram"]
-        cpu_ceiling =  overhead/peak_cpu
-        gpu_ceiling = overhead/peak_gpu
-        total_ceiling = overhead/(peak_cpu+peak_gpu)
+        cpu_ceiling =  overhead / peak_cpu
+        gpu_ceiling = overhead / peak_gpu
+        total_ceiling = overhead / (peak_cpu + peak_gpu)
 
         # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
         self.oh_no = [False, False, False, False,]
@@ -64,17 +65,17 @@ class NodeTuner:
             self.oh_no[0] = True
 
         self.optimized["cache_jettison"] = self.oh_no[1]
-        self.optimized["device"] = self.spec["devices"][0]
+        self.optimized["device"]         = self.spec["devices"][0]
         if self.spec["flash_attention_2"] == True: self.optimized["attn_implementation"]="flash_attention_2"
-        self.optimized["dynamic_cfg"] = False
-        self.optimized["seq"] = self.oh_no[1]
-        self.optimized["cpu"] = self.oh_no[2]
-        self.optimized["disk"] = self.oh_no[3]
-        self.optimized["file_prefix"] = "Shadowbox-"
-        self.optimized["refiner"] = IndexManager().fetch_refiner()
-        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
-        self.optimized["fuse_lora_on"] = False
-        #self.optimized["fuse_pipe"] = True #pipe.fuse_qkv_projections()
+        self.optimized["dynamic_cfg"]    = False
+        self.optimized["seq"]            = self.oh_no[1]
+        self.optimized["cpu"]            = self.oh_no[2]
+        self.optimized["disk"]           = self.oh_no[3]
+        self.optimized["file_prefix"]    = "Shadowbox-"
+        self.optimized["refiner"]        = IndexManager().fetch_refiner()
+        self.optimized["upcast_vae"]     = True if self.category == "STA-XL" else False # f32, fp16 broken by default
+        self.optimized["fuse_lora_on"]   = False
+        #self.optimized["fuse_pipe"]     = True #pipe.fuse_qkv_projections()
         self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
         if self.spec["dynamo"]:
             self.optimized["sigmas"] = True #
