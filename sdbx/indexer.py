@@ -140,11 +140,11 @@ class EvalMeta:
                 size_int = int(size)
                 if any(isclose(self.size, size_int * factor, rel_tol=LORA_PCT) for factor in [1, 2, 0.5]):
                     for tensor_params, desc in attributes.items():
-                    if isclose(self.tensor_params, int(tensor_params), rel_tol=LORA_PCT):
-                        if any(desc_item.lower() in self.filename.lower() for desc_item in desc):
-                            self.set_key("l", size, tensor_params)
-                            self.value = desc_item
-                            return
+                        if isclose(self.tensor_params, int(tensor_params), rel_tol=LORA_PCT):
+                            if any(desc_item.lower() in self.filename.lower() for desc_item in desc):
+                                self.set_key("l", size, tensor_params)
+                                self.value = desc_item
+                                return
 
     def process_tra(self):
         for tensor_params, attributes in tra_peek.items():
@@ -300,16 +300,16 @@ class ReadMeta:
     def data(self):
         if self.ext in [".pt", ".pth", ".ckpt"]:  # process closer to load
                 """""" # todo: add parsing of pytorch type data, likley by torch load
-            elif self.ext == ".bin":  # 
-                self.meta = ""
-                """""" # todo: parse bin metadata(path) using ...???
-            elif self.ext in [".safetensors", ".sft", ""]:
-                self.meta = self._parse_safetensors_metadata()
-            elif self.ext == ".gguf":
-                self.meta = self._parse_gguf_metadata()
-            else :
-                logger.debug(f"Unrecognized file format: '{self.filename}'", exc_info=True)
-            return self.full_data
+        elif self.ext == ".bin":  # 
+            self.meta = ""
+            """""" # todo: parse bin metadata(path) using ...???
+        elif self.ext in [".safetensors", ".sft", ""]:
+            self.meta = self._parse_safetensors_metadata()
+        elif self.ext == ".gguf":
+            self.meta = self._parse_gguf_metadata()
+        else :
+            logger.debug(f"Unrecognized file format: '{self.filename}'", exc_info=True)
+        return self.full_data
 
     def _search_dict(self, meta):
         self.meta = meta

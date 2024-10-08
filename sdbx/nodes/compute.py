@@ -29,7 +29,6 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 import accelerate
 from sdbx import logger
 from sdbx.nodes.tuner import NodeTuner
-from sdbx.indexer import IndexManager
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter, soft_random
 
@@ -386,7 +385,7 @@ class T2IPipe: # __call__? NO __init__! ONLY __call__. https://huggingface.co/do
             if each not in var_list:
                 print(f"{each} = {variables[each]}")
   
-# create_index = IndexManager().write_index()       # (defaults to config/index.json)
+# create_index = config.model_indexer().write_index()       # (defaults to config/index.json)
 
 #genesis node
 optimize = NodeTuner()

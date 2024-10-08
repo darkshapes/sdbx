@@ -1,13 +1,12 @@
-import os
 import numbers
-from sdbx.indexer import IndexManager
 from sdbx import logger
+from sdbx.indexer import ModelType
 from sdbx.config import config, cache
 from collections import defaultdict
 from diffusers.schedulers.scheduling_utils import AysSchedules
 
 class NodeTuner:
-    def __init__(self, model):
+    def __init__(self):
         self.spec       = config.get_default("spec", "data")
         self.algorithms = list(config.get_default("algorithms", "schedulers"))
         self.solvers    = list(config.get_default("algorithms", "solvers"))
@@ -15,7 +14,7 @@ class NodeTuner:
 
     @cache
     def determine_tuning(self, model):
-        self.sort, self.category, self.fetch = config.model_index.fetch_id(model)
+        self.sort, self.category, self.fetch = config.model_indexer.fetch_id(model)
 
         if self.fetch is not None:
             # Initialize dictionaries
@@ -34,7 +33,7 @@ class NodeTuner:
             else:
                 self.model["file"] = list(self.fetch)[1]
                 self.model["class"] = self.category
-                self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
+                self._vae, self._tra, self._lora = config.model_indexer.fetch_compatible(self.category)
         else:
             """ """ # todo: Handle case where system cannot populate sort dict here
 
@@ -64,7 +63,7 @@ class NodeTuner:
         self.optimized["cpu"]            = self.oh_no[2]
         self.optimized["disk"]           = self.oh_no[3]
         self.optimized["file_prefix"]    = "Shadowbox-"
-        self.optimized["refiner"]        = IndexManager().fetch_refiner()
+        self.optimized["refiner"]        = config.model_indexer.fetch_refiner()
         self.optimized["upcast_vae"]     = True if self.category == "STA-XL" else False # f32, fp16 broken by default
         self.optimized["fuse_lora_on"]   = False
         #self.optimized["fuse_pipe"]     = True #pipe.fuse_qkv_projections()

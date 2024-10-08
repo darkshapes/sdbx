@@ -1,12 +1,9 @@
 
 import os
-
 from typing import Any, Union
-
 import PIL
 from PIL import Image
 from llama_cpp import Llama
-
 from sdbx import config
 from sdbx.nodes.types import *
 from sdbx.compute import Inference

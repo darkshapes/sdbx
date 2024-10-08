@@ -3,10 +3,10 @@
 
 ## CLASS Config
 ##### IMPORT from sdbx.config import
-##### METHODS get_default, get_path_contents, get_path
+##### METHODS get_default, get_path_contents, get_path, model_indexer
 ##### VARIABLES config_source_location
 ##### PURPOSE find source directories and data
-##### OUTPUT a dict of keys, a dict of files, a path 
+##### OUTPUT a dict of keys, a dict of files, a path to a file
 ##### RETURN FORMAT: {key:}, 
 ##### SYNTAX
 ```
@@ -16,7 +16,9 @@
         
         os.path.join(config_source_location,filename)
 ```
-##### OUTPUT contents of a value for a key, file contents of a directory and sub directories, path to a file
+from sdbx.config import model_indexer
+from sdbx.indexer import ModelType
+
 
 ## CLASS ReadMeta
 ##### IMPORT from sdbx.indexer import ReadMeta
@@ -53,7 +55,7 @@
 ##### SYNTAX 
 ```
 
-        create_index = IndexManager().write_index(optional_filename)       # (defaults to config/index.json)
+        create_index = config.model_indexer.write_index(optional_filename)       # (defaults to config/index.json)
         fetch = IndexManager().fetch_id(query_as_string)                   # (single id search, first candidate only)
         a,b,c = IndexManager().fetch_compatible(fetch)                     # (automated all type search)
         ## using next(iter(___)):
