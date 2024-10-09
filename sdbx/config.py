@@ -285,10 +285,10 @@ class Config(BaseSettings):
         from sdbx.executor import Executor
         return Executor(self.node_manager)
     
-    @cached_property
-    def model_indexer(self):
-        from sdbx.indexer import ModelIndexer
-        return ModelIndexer()
+    # @cached_property
+    # def model_indexer(self):
+    #     from sdbx.indexer import ModelIndexer
+    #     return ModelIndexer()
 
     @cached_property
     def spec(self):

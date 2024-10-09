@@ -1,269 +1,359 @@
 import os
+import numbers
+from sdbx.indexer import IndexManager
+from sdbx import logger
+from sdbx.config import config, Precision, cache, TensorDataType as D
+from sdbx.nodes.helpers import soft_random
 from collections import defaultdict
-
-import psutil
 from diffusers.schedulers import AysSchedules
 
-from sdbx import config, logger
-from sdbx.config import Precision, TensorDataType as D, cache
-from sdbx.nodes.helpers import soft_random
-
-
 class NodeTuner:
-    def __init__(self):
-        self.spec = config.get_default("spec", "data")
-        self.algorithms = list(config.get_default("algorithms", "schedulers"))
-        self.solvers = list(config.get_default("algorithms", "solvers"))
-        self.metadata_path = config.get_path("models.metadata")
-        self.clip_skip = 2
-
-    @cache
+    @cache        
     def determine_tuning(self, model):
-        self.sort, self.category, self.fetch = config.model_index.fetch_id(model)
+        self.spec = config.get_default("spec","data")
+        self.algorithms = list(config.get_default("algorithms","schedulers"))
+        self.solvers = list(config.get_default("algorithms","solvers"))
+        self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
+        self.metadata_path = config.get_path("models.metadata")
+        if self.fetch != "∅" and self.fetch != None:
 
-        if self.fetch is not None:
-            # Initialize dictionaries
             self.optimized = defaultdict(dict)
-            self.model = defaultdict(dict)
+            self.model = defaultdict(dict) 
             self.queue = defaultdict(dict)
-            self.pipe_dict = defaultdict(dict)
             self.transformers = defaultdict(dict)
             self.conditioning = defaultdict(dict)
-            self.lora_dict = defaultdict(dict)
-            self.fuse = defaultdict(dict)
             self.schedule = defaultdict(dict)
-            self.gen_dict = defaultdict(dict)
-            self.refiner = defaultdict(dict)
-            self.vae_dict = defaultdict(dict)
+            self.gen = defaultdict(dict)
 
-            if self.sort == ModelType.LANGUAGE.value:
-                # LLM-specific tuning
-                pass
+        if self.sort == "LLM":
+            """
+            llm stuff
+            """
+        
+        elif (self.sort  == "VAE"
+        or self.sort  == "TRA"
+        or self.sort  == "LOR"):
+            
+            """
+            say less fam
+            """
+        else:
+            self.model["file"] = list(self.fetch)[1]
+            self.model["class"] = self.category
+            self._vae, self._tra, self._lora = IndexManager().fetch_compatible(self.category)
 
-            elif self.sort in [ModelType.VAE.value, ModelType.TRANSFORMER.value, ModelType.LORA.value]:
-                # Handle VAE, TRA, LOR types
-                pass
-
-            else:
-                # Default case for other model types
-                self.model["file"] = self.fetch[1]
-                self.model["class"] = self.category
-                self._vae, self._tra, self._lora = config.model_index.fetch_compatible(self.category)
-
-    @cache
-    def pipe_exp(self):
-        self.pipe_dict["variant"] = self.fetch[2]  # dtype_or_context_length
-        self.pipe_dict["tokenizer"] = None
-        self.pipe_dict["text_encoder"] = None
-        self.pipe_dict["tokenizer_2"] = None
-        self.pipe_dict["text_encoder_2"] = None
-        if "STA-15" in self.category:
-            self.pipe_dict["safety_checker"] = None
-        return self.pipe_dict, self.model
-
+    
     @cache
     def opt_exp(self):
-        peak_gpu = self.spec["gpu_ram"]  # Accommodate list of graphics card RAM
-        overhead = self.fetch[0]  # size
+        peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
+        overhead =  list(self.fetch)[0]
         peak_cpu = self.spec["cpu_ram"]
-        cpu_ceiling = overhead / peak_cpu
-        gpu_ceiling = overhead / peak_gpu
-        total_ceiling = overhead / (peak_cpu + peak_gpu)
+        cpu_ceiling =  overhead/peak_cpu
+        gpu_ceiling = overhead/peak_gpu
+        total_ceiling = overhead/(peak_cpu+peak_gpu)
 
-        # Overhead condition numbers
-        self.oh_no = [False, False, False, False]
-        if gpu_ceiling > 1:
-            self.oh_no[1] = True  # Consider quantization, load_in_4bit=True/load_in_8bit=True
+        # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
+        self.oh_no = [False, False, False, False,]
+        if gpu_ceiling > 1: 
+            self.oh_no[1] = True #look for quant, load_in_4bit=True/load_in_8bit=True
             if total_ceiling > 1:
                 self.oh_no[3] = True
             elif cpu_ceiling > 1:
                 self.oh_no[2] = True
-        elif gpu_ceiling < 0.5:
+        elif gpu_ceiling < .5:
             self.oh_no[0] = True
 
         self.optimized["cache_jettison"] = self.oh_no[1]
         self.optimized["device"] = self.spec["devices"][0]
+        if self.spec["flash_attention_2"] == True: self.optimized["attn_implementation"]="flash_attention_2"
         self.optimized["dynamic_cfg"] = False
         self.optimized["seq"] = self.oh_no[1]
         self.optimized["cpu"] = self.oh_no[2]
         self.optimized["disk"] = self.oh_no[3]
         self.optimized["file_prefix"] = "Shadowbox-"
-        self.optimized["fuse"] = False
-        self.optimized["compile_unet"] = False
-        self.optimized["compile"] = {"fullgraph": True, "mode": "reduce-overhead"}
-        self.refiner = config.model_index.fetch_refiner()
-        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False
-        skip = 12 - (self.clip_skip - 1)
-        self.optimized["num_hidden_layers"] = int(skip)
+        self.optimized["refiner"] = IndexManager().fetch_refiner()
+        self.optimized["upcast_vae"] = True if self.category == "STA-XL" else False # f32, fp16 broken by default
+        self.optimized["fuse_lora_on"] = False
+        #self.optimized["fuse_pipe"] = True #pipe.fuse_qkv_projections()
+        self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
+        if self.spec["dynamo"]:
+            self.optimized["sigmas"] = True #
+            self.optimized["dynamo"] = self.spec["dynamo"]
         return self.optimized
+  
+    @cache
+    def pipe_exp(self):
+        self.pipe = defaultdict(dict)
+        if self.oh_no[0]: 
+            self.pipe["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
+
+        #local_dir = list(self.fetch)[1]
+        #local_dir = local_dir.replace(os.path.basename(list(self.fetch)[1]))
+        #self.pipe["local_dir"] = local_dir
+        #self.pipe["config"] =
+        #self.pipe["repo_id"] = "stabilityai/stable-diffusion-xl-base-1.0"
+        if self.spec["devices"][0] != "cpu":
+            if not self.oh_no[0]:
+                self.pipe["variant"] = list(self.fetch)[2] #model variant
+            else:
+                self.pipe["torch_dtype"] = "auto"
+        else: 
+            self.pipe["variant"] = "F32"
+        self.pipe["tokenizer"] = None
+        self.pipe["text_encoder"] = None
+        self.pipe["tokenizer_2"] = None
+        self.pipe["text_encoder_2"] = None
+        #self.pipe["device_map"] = None
+        if "STA-15" in self.category: 
+            self.pipe["safety_checker"] = None
+        return self.pipe, self.model
 
     @cache
     def cond_exp(self):
-        # Example prompt (commented out)
-        # self.queue["prompt"] = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
         self.conditioning["padding"] = "max_length"
         self.conditioning["truncation"] = True
         self.conditioning["return_tensors"] = 'pt'
-        self.num = 2
+        return self.conditioning
 
     @cache
     def vae_exp(self):
-        # Ensure value returned
-        if self._vae:
-            self.optimized["vae"] = self._vae[0][1][1]  # Path to VAE model
-            self.vae_dict["variant"] = self._vae[0][1][2]
-            self.vae_dict["cache_dir"] = "vae_"
-            if self.oh_no[1]:
-                self.vae_dict["enable_tiling"] = True
-                self.vae_dict["enable_slicing"] = True
+        # ensure value returned
+        if self._vae != "∅":  
+            self.vae = defaultdict(dict)
+            self.optimized["vae"] = self._vae[0][1][1]
+            if (self.optimized["upcast_vae"]
+            or self.spec["devices"][0] == "cpu"): 
+                self.vae["variant"] = "F32"
             else:
-                self.vae_dict["disable_tiling"] = True
-                self.vae_dict["disable_slicing"] = True
-            return self.optimized, self.vae_dict
-
-    @cache
-    def gen_exp(self):
-        self.conditioning_list = ["tokenizer", "text_encoder", "tokenizer_2", "text_encoder_2", "tokenizer_3", "text_encoder_3"]
-        if self._tra:
-            for (filename, code), value in self._tra:
-                # Assuming value is [size, path, dtype_or_context_length]
-                self.transformers["text_encoder"][code] = value[1]  # Path
-                self.transformers["variant"][code] = value[2]  # dtype_or_context_length
-
-        if self._lora and len(self._lora) > 0:
-            (filename, code), value = self._lora[0]
-            self.lora_dict["file"] = value[1]  # Path
-            self.lora_dict["class"] = code
-
-            # Get steps from filename if possible
-            try:
-                self.step_title = os.path.basename(self.lora_dict["file"]).lower()
-                self.step_index = self.step_title.rindex("step")
-            except ValueError as error_log:
-                logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
-                self.gen_dict["num_inference_steps"] = 20
-            else:
-                if self.step_index is not None:
-                    self.isteps_str = self.step_title[self.step_index - 2:self.step_index]
-                    if self.isteps_str.isdigit():
-                        self.gen_dict["num_inference_steps"] = int(self.isteps_str)
+                if self.spec["devices"][0] != "cpu":
+                    if not self.oh_no[0]: 
+                        self.vae["variant"] = self._vae[0][1][2] 
                     else:
-                        self.gen_dict["num_inference_steps"] = int(self.isteps_str[1:])
-                else:
-                    self.gen_dict["num_inference_steps"] = 20
-
-            # CFG enabled here
-            if "PCM" in self.lora_dict["class"]:
-                self.optimized["scheduler"] = self.algorithms[5]  # DDIM
-                self.schedule["timestep_spacing"] = "trailing"
-                self.schedule["set_alpha_to_one"] = False  # PCM False
-                self.schedule["rescale_betas_zero_snr"] = True  # DDIM True
-                self.schedule["clip_sample"] = False
-                if "normal" in self.lora_dict["file"].lower():
-                    self.gen_dict["guidance_scale"] = 5
-                else:
-                    self.gen_dict["guidance_scale"] = 3
-            elif "SPO" in self.lora_dict["class"]:
-                if "STA-15" in self.lora_dict["class"]:
-                    self.gen_dict["guidance_scale"] = 7.5
-                elif "STA-XL" in self.lora_dict["class"]:
-                    self.gen_dict["guidance_scale"] = 5
+                        self.vae["torch_dtype"] = "auto"
+        else:
+            self.optimized["vae"] = self.model["file"]
+            self.vae["torch_dtype"] = "auto"
+    
+        
+        if self.oh_no[2]: 
+            self.vae["enable_tiling"] = True
+        else: 
+            self.vae["disable_tiling"] = True  # [compatibility] tile vae input to lower memory
+        
+        if self.oh_no[2]: 
+            self.vae["enable_slicing"]  = True
+        else: 
+            self.vae["disable_slicing"] = True # [compatibility] serialize vae to lower memory
+        self.vae["cache_dir"] = "vae_"
+        return self.optimized, self.vae
+    
+    def _get_step_from_filename(self, key, val):
+        try:
+            self.get_filename = key[0]
+            self.lower_filename = self.get_filename.lower()
+            self.step_num_index = self.lower_filename.rindex("step")
+        except ValueError as error_log:
+            logger.debug(f"LoRA not named with steps {error_log}.", exc_info=True)
+            return 0
+        else:
+            if self.step_num_index is not None:
+                self.crop_steps = str(self.get_filename[self.step_num_index - 2:self.step_num_index])
+                self.steps_val = int(self.crop_steps) if self.crop_steps.isdigit() else int(self.crop_steps[1:])
+                return self.steps_val
             else:
-                # LoRA parameters
-                # CFG disabled below this line
-                self.optimized["fuse"] = True
-                self.fuse["lora_scale"] = 1.0
-                self.optimized["fuse_unet_only"] = False  # ToDo: Add conditions where this is useful
-                self.gen_dict["guidance_scale"] = 0
-                if "TCD" in self.lora_dict["class"]:
-                    self.gen_dict["num_inference_steps"] = 4
-                    self.optimized["scheduler"] = self.algorithms[7]  # TCD sampler
-                    self.gen_dict["eta"] = 0.3
-                    self.gen_dict["strength"] = 0.99
-                elif "LIG" in self.lora_dict["class"]:  # 4-step model preference
-                    self.optimized["scheduler"] = self.algorithms[0]  # Euler sampler
-                    self.schedule["interpolation_type"] = "Linear"  # sgm_uniform/simple
-                    self.schedule["timestep_spacing"] = "trailing"
-                elif "DMD" in self.lora_dict["class"]:
-                    self.optimized["fuse"] = False
-                    self.optimized["scheduler"] = self.algorithms[6]  # LCM
-                    self.schedule["timesteps"] = [999, 749, 499, 249]
-                    self.schedule["use_beta_sigmas"] = True
-                elif "LCM" in self.lora_dict["class"] or "RT" in self.lora_dict["class"]:
-                    self.optimized["scheduler"] = self.algorithms[6]  # LCM
-                    self.gen_dict["num_inference_steps"] = 4
-                elif "FLA" in self.lora_dict["class"]:
-                    self.optimized["scheduler"] = self.algorithms[6]  # LCM
-                    self.gen_dict["num_inference_steps"] = 4
-                    self.schedule["timestep_spacing"] = "trailing"
-                    if "STA-3" in self.lora_dict["class"]:
-                        self.optimized["scheduler"] = self.algorithms[9]  # LCM
-                        for each in self.transformers.get("file", {}).keys():
-                            if "t5" in each.lower():
-                                for items in self.transformers:
+                return 0
+
+    def prioritize_loras(self):
+        self.lora_unsorted = defaultdict(dict)
+        self.lora_sorted = defaultdict(dict)
+        self.lora = defaultdict(dict)
+        self.step_priority = {}
+        self.lora_priority = {}
+        self.lora_priority = config.get_default("algorithms", "lora_priority")
+        self.step_priority = config.get_default("algorithms", "step_priority") 
+        for items in self.lora_priority:
+            for each in self.step_priority:
+                if isinstance(each, numbers.Real):
+                    for key, val in self._lora.items():
+                        self.steps = self._get_step_from_filename(key, val)
+                        if self.steps == each:
+                            self.lora_unsorted[key] = self.steps
+
+                        if str(items).upper() in key[1].upper():
+                            self.lora_sorted[key] = val
+                            if self.lora_unsorted.get(key,None) != None:
+                                self.gen["num_inference_steps"] = self.lora_unsorted[key]
+                                return val[1], key[1]
+                            
+                                        
+                if next(iter(self.lora_sorted.items()), 0) != 0:
+                    each, item = next(iter(self.lora_sorted.items()),0)
+                    self.step_no = self._get_step_from_filename(each, item)
+                    if self.step_no != 0:
+                        self.gen["num_inference_steps"] = self.step_no
+                    else:
+                        self.gen["num_inference_steps"] = 20
+                    return item[1], each[1]
+            
+            if next(iter(self.lora_unsorted.items()), 0) != 0:
+                each, item = next(iter(self.lora_unsorted.items()),0)
+                if not isinstance(val(len(val)-1), numbers.Real):
+                    self.gen["num_inference_steps"] = 20
+                else: 
+                    self.gen["num_inference_steps"] = val(len(val)-1)
+                return each[1][1], each[0][1]  
+            else:
+                logger.debug(f"LoRA not found?", exc_info=True)
+
+    @cache       
+    def gen_exp(self, skip):
+        self.skip = skip
+        if self._tra != "∅" and self._tra != {}: 
+            self.skip = 12 - int(self.skip)
+            self.transformers["use_safetensors"] = True
+            self.transformers["num_hidden_layers"] = self.skip
+            for each in self._tra:
+                # self.transformers["tokenizer"] = self._tra[each][1]
+                #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
+                #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
+                self.transformers["model"] = self._tra[each][1]
+                if self.spec["devices"][0] != "cpu":
+                    if not self.oh_no[0]:
+                        self.transformers["variant"][each] = self._tra[each][2]
+                    else: 
+                        self.transformers["torch_dtype"] = "auto"
+                        self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                else: self.transformers["variant"][each] = "F32"
+
+        else:
+                self.transformers["model"] = self.model["file"]
+                self.transformers["variant"] = self.model["dtype"]
+                self.transformers["torch_dtype"] = "auto"
+                self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                self.pipe["variant"] = list(self.fetch)[2] #model variant              
+
+        if next(iter(self._lora.items()),0) != 0:
+            self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
+            # cfg enabled here
+            if "PCM" in self.optimized["lora_class"]:
+                self.optimized["algorithm"] = self.algorithms[5] #DDIM
+                self.optimized["scheduler"]["timestep_spacing"] = "trailing"
+                self.optimized["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
+                #self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
+                self.optimized["scheduler"]["clip_sample"] = False
+                self.gen["guidance_scale"] = 5 if "normal" in str(self.optimized["lora"]).lower() else 2
+            elif "SPO" in self.optimized["lora_class"]:
+                if "STA-15" in self.optimized["lora_class"]:
+                    self.gen["guidance_scale"] = 7.5
+                elif "STA-XL" in self.optimized["lora_class"]:
+                    self.gen["guidance_scale"] = 5
+            else:
+            #lora parameters
+            # cfg disabled below this line
+                self.gen["guidance_scale"] = 0
+                if "TCD" in self.optimized["lora_class"]:
+                    self.gen["num_inference_steps"] = 8
+                    self.optimized["algorithm"] = self.algorithms[7] #TCD sampler
+                    self.gen["eta"] = 0.3
+                elif "LIG" in self.optimized["lora_class"]: #4 step model pref
+                    self.optimized["algorithm"] = self.algorithms[0] #Euler sampler
+                    self.optimized["scheduler"]["interpolation_type"] = "linear" #sgm_uniform/simple
+                    self.optimized["scheduler"]["timestep_spacing"] = "trailing"                        
+                elif "DMD" in self.optimized["lora_class"]:
+                    self.optimized["fuse_lora_on"] = False
+                    self.optimized["algorithm"] = self.algorithms[6] #LCM
+                    self.optimized["scheduler"]["timesteps"] = [999, 749, 499, 249]
+                    self.optimized["scheduler"]["use_beta_sigmas"] = True         
+                elif "LCM" in self.optimized["lora_class"] or "RT" in self.optimized["lora_class"]:
+                    self.optimized["algorithm"] = self.algorithms[6] #LCM
+                    self.gen["num_inference_steps"] = 4
+                elif "FLA" in self.optimized["lora_class"]:
+                    self.optimized["algorithm"] = self.algorithms[6] #LCM
+                    self.gen["num_inference_steps"] = 4
+                    self.optimized["scheduler"]["timestep_spacing"] = "trailing"
+                    if "STA-3" in self.optimized["lora_class"]:
+                        self.optimized["algorithm"] = self.algorithms[9] #LCM
+                        for each in self.transformers["file"].lower():
+                            if "t5" in each:
+                                for items in self.transformer:
                                     try:
                                         self.transformers[items].pop(each)
                                     except KeyError as error_log:
-                                        logger.debug(f"No key for {error_log}.", exc_info=True)
-                elif "HYP" in self.lora_dict["class"]:
-                    if self.gen_dict.get("num_inference_steps") == 1:
-                        self.optimized["scheduler"] = self.algorithms[7]  # TCD for one step
-                        self.schedule["timestep_spacing"] = "trailing"
-                    if "CFG" in self.lora_dict["file"].upper():
-                        if self.category == "STA-XL":
-                            self.gen_dict["guidance_scale"] = 5
-                        elif self.category == "STA-15":
-                            self.gen_dict["guidance_scale"] = 7.5
-                    if "FLU" in self.lora_dict["class"] or "STA-3" in self.lora_dict["class"]:
-                        self.fuse["lora_scale"] = 0.125
-                    elif "STA-XL" in self.lora_dict["class"]:
-                        if self.gen_dict.get("num_inference_steps") == 1:
-                            self.schedule["timesteps"] = 800
-                        else:
-                            self.optimized["scheduler"] = self.algorithms[5]  # DDIM
-                            self.schedule["timestep_spacing"] = "trailing"
-                            self.gen_dict["eta"] = 1.0
-        else:
-            # If no LoRA
-            self.optimized["scheduler"] = self.algorithms[4]
-            self.gen_dict["num_inference_steps"] = 20
-            self.gen_dict["guidance_scale"] = 7
-            self.schedule["use_karras_sigmas"] = True
-            if "LUM" in self.category or "STA-3" in self.category:
-                self.schedule["interpolation type"] = "Linear"
-                self.schedule["timestep_spacing"] = "trailing"
-            if self.category in ["STA-15", "STA-XL", "STA3"]:
-                self.optimized["scheduler"] = self.algorithms[8]  # AlignYourSteps
-                if self.category == "STA-15":
+                                        logger.debug(f"No key for  {error_log}.", exc_info=True)
+                elif "HYP" in self.optimized["lora_class"]:
+                    if self.gen["num_inference_steps"] == 1:
+                        self.optimized["algorithm"] = self.algorithms[7] #TCD FOR ONE STEP
+                        self.optimized["fuse_lora"]["lora_scale"] = 1.0
+                        self.gen["eta"] = 1.0
+                        if "STA-XL" in self.optimized["lora_class"]: #unet only
+                            self.optimized["scheduler"]["timesteps"] = 800
+                    else:
+                        if "CFG" in str(self.optimized["lora"]).upper():
+                            if self.category == "STA-XL":
+                                self.gen["guidance_scale"] = 5
+                            elif self.category == "STA-15":
+                                self.gen["guidance_scale"] = 7.5                               
+                        if ("FLU" in self.optimized["lora_class"]
+                        or "STA-3" in self.optimized["lora_class"]):
+                            self.optimized["fuse_lora"]["lora_scale"]=0.125
+                        self.optimized["algorithm"] = self.algorithms[5] #DDIM
+                        #self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
+                        self.optimized["scheduler"]["timestep_spacing"] = "trailing"
+        else :   #if no lora
+            self.optimized["algorithm"] = self.algorithms[4]
+            self.gen["num_inference_steps"] = 20
+            self.gen["guidance_scale"] = 7
+            self.optimized["scheduler"]["use_karras_sigmas"] = True
+            if ("LUM" in self.category
+            or "STA-3" in self.category):
+                self.optimized["scheduler"]["interpolation type"] = "linear" #sgm_uniform/simple
+                self.optimized["scheduler"]["timestep_spacing"] = "trailing"
+            if (self.category == "STA-15"
+            or self.category == "STA-XL"
+            or self.category == "STA3"):
+                self.optimized["algorithm"] = self.algorithms[8] #AlignYourSteps
+                if "STA-15" == self.category: 
                     self.optimized["ays"] = "StableDiffusionTimesteps"
-                    self.schedule["timesteps"] = AysSchedules[self.optimized["ays"]]
-                elif self.category == "STA-XL":
-                    self.gen_dict["num_inference_steps"] = 10
-                    self.gen_dict["guidance_scale"] = 5
+                    self.optimized["scheduler"]["timesteps"] = AysSchedules[self.ays]
+                elif "STA-XL" == self.category:
+                    self.gen["num_inference_steps"] = 10
+                    self.gen["guidance_scale"] = 5 
                     self.optimized["ays"] = "StableDiffusionXLTimesteps"
-                    self.optimized["dynamic_cfg"] = True  # Half CFG @ 50-75%. XL only, no LoRA accelerators
-                    self.gen_dict["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds', 'add_time_ids']
-                elif self.category == "STA-3":
-                    self.optimized["ays"] = "StableDiffusion3Timesteps"
-                    self.gen_dict["num_inference_steps"] = 10
-                    self.gen_dict["guidance_scale"] = 4
-            elif "PLA" in self.category:
-                self.gen_dict["schedule"] = self.algorithms[3]  # EDMDPM
-            elif "FLU" in self.category or "AUR" in self.category:
-                self.optimized["scheduler"] = self.algorithms[2]  # EulerAncestralAliens
+                    self.optimized["dynamic_cfg"] = True # half cfg @ 50-75%. xl only.no lora accel
+                    self.gen["callback_on_step_end_tensor_inputs"]=['prompt_embeds', 'add_text_embeds','add_time_ids']
 
-        self.gen_dict["output_type"] = "latent"
-        return self.transformers, self.gen_dict, self.optimized, self.lora_dict, self.fuse, self.schedule
+                elif "STA-3" in self.category:
+                    self.ays = "StableDiffusion3Timesteps"
+                    self.gen["num_inference_steps"] = 10
+                    self.gen["guidance_scale"] = 4
+            elif "PLA" in self.category:
+                self.optimized["algorithm"] = self.algorithms[3] #EDMDPM
+            elif ("FLU" in self.category
+            or "AUR" in self.category):
+                self.optimized["algorithm"] = self.algorithms[2] #EulerAncestralAliens
+
+        self.gen["output_type"] = "latent"
+        self.gen["low_cpu_mem_usage"] = self.spec["low_cpu_mem_usage"]
+        if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #euler
+        return  self.transformers, self.gen, self.optimized
+    
+    @cache      
+    def refiner_exp(self):
+        self.refiner = defaultdict(dict)
+        if self.optimized["refiner"] != None and self.optimized["refiner"] != "∅":
+            self.refiner["use_refiner"] = False, # refiner      
+            self.refiner["high_noise_fra"] = 0.8, #end noise 
+            self.refiner["denoising_end"] = self.refiner["high_noise_fra"]
+            self.refiner["num_inference_steps"] = self.gen["num_inference_steps"], #begin step
+            self.refiner["denoising_start"] = self.refiner["high_noise_fra"], #begin noise
+
+        return self.refiner
 
     @cache
-    def refiner_exp(self):
-        if self.category == "STA-XL":
-            if self.refiner and self.refiner != "∅":
-                self.refiner["use_refiner"] = False  # Refiner
-                self.refiner["high_noise_fra"] = 0.8  # End noise
-                self.refiner["denoising_end"] = self.refiner["high_noise_fra"]
-                self.refiner["num_inference_steps"] = self.gen_dict["num_inference_steps"]  # Begin step
-                self.refiner["denoising_start"] = self.refiner["high_noise_fra"]  # Begin noise
-                return self.refiner
-
-        return self.pipe_dict
+    def dynamo_exp(self):
+        dynamo= defaultdict(dict)
+        self.gen["return_dict"]= False
+        dynamo["compile"]["fullgraph"] = True
+        dynamo["compile"]["mode"] = "reduce-overhead" #switches to max-autotune if cuda device
+        return dynamo
+            
