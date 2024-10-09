@@ -1,6 +1,7 @@
 import os
 import json
 import struct
+from enum import Enum
 from math import isclose
 from pathlib import Path
 from collections import defaultdict
@@ -231,182 +232,137 @@ class EvalMeta:
             return self.code, (
                 self.filename, self.lookup, self.size, self.path, 
                 (self.context_length if self.context_length else self.dtype))
-                            
+                                                 
 class ReadMeta:
-    # ReadMeta.data(filename,full_path_including_filename)
-    # scan the header of a tensor file and discover its secrets
-    # return a dict of juicy info
+    """
+    Reads metadata from model files and extracts useful information.
+    """
 
-    def __init__(self, path, verbose=False):
-        self.path = path  # the path of the file
-        self.full_data, self.meta, self.count_dict = {}, {}, {}
-        self.verbose = verbose
+    def __init__(self, path):
+        self.path = path
+        self.full_data = {}
+        self.meta = {}
+        self.count_dict = {}
 
-        # level of certainty, counts tensor block type matches
-        ## please do not change these values
-        ## they may be labelled incorrectly, ignore it
         self.known = known
 
-        self.model_tag = {  # measurements and metadata detected from the model ggml.model imatrix.chunks_count
-            #NO TOUCH!! critical values
-            "filename": "", #universal
-            "size": 0, #file size in bytes
+        self.model_tag = {
+            "filename": "",
+            "size": 0,
             "path": "",
-            "dtype": "", #precision
+            "dtype": "",
             "torch_dtype": "",
-            "tensor_params": 0, #tensor count
-            "shape": "", #largest first dimension of tensors
-            "data_offsets": "", #universal
-            "general.name": "", # llm tags
+            "tensor_params": 0,
+            "shape": "",
+            "data_offsets": "",
+            "general.name": "",
             "general.architecture": "",
             "tokenizer.chat_template": "",
-            "context_length": "", #length of messages
-            "block_count":"",
+            "context_length": "",
+            "block_count": "",
             "attention.head_count": "",
             "attention.head_count_kv": "",
-
-
         }
         self.occurrence_counts = defaultdict(int)
-        self.filename = os.path.basename(self.path)  # the title of the file only
+        self.filename = os.path.basename(self.path)
         self.ext = Path(self.filename).suffix.lower()
 
-        if not os.path.exists(self.path):  # be sure it exists, then proceed
-            logger.debug(f"'[Not found '{self.filename}'''.", exc_info=True)
-            raise RuntimeError(f"Not found: {self.filename}")
-
+        if not os.path.exists(self.path):
+            logger.debug(f"File not found: '{self.filename}'.", exc_info=True)
+            raise FileNotFoundError(f"File not found: {self.filename}")
         else:
             self.model_tag["filename"] = self.filename
-            self.model_tag["extension"] = self.ext.replace(".","")
+            self.model_tag["extension"] = self.ext.replace(".", "")
             self.model_tag["path"] = self.path
             self.model_tag["size"] = os.path.getsize(self.path)
 
     def _parse_safetensors_metadata(self):
         try:
-            with open(self.path, "rb") as json_file:
-                """
-                try opening file
-                """
-        except:
-            log = f"Could not open file {self.path}"
+            with open(self.path, "rb") as file:
+                """ try opening file """
+        except Exception as log:
+            logger.debug(f"Error reading safetensors metadata from '{self.path}': {log}", exc_info=True)
             logger.debug(log, exc_info=True)
             print(log)
         else:
-            with open(self.path, "rb") as json_file:
-                header = struct.unpack("<Q", json_file.read(8))[0]
+            with open(self.path, "rb") as file:
+                header = struct.unpack("<Q", file.read(8))[0]
                 try:
-                    return json.loads(json_file.read(header), object_hook=self._search_dict)
+                    return json.loads(file.read(header), object_hook=self._search_dict)
                 except:
                     log = f"Path not found'{self.path}'''."
                     logger.debug(log, exc_info=True)
-                    print(log)
             
     def _parse_gguf_metadata(self):
         try:
-            with open(self.path, "rb") as llama_file:
-                """
-                try opening file
-                """
-        except:
-            log = f"Could not open file {self.path}"
-            logger.debug(log, exc_info=True)
-            print(log)
-        else:
-            with open(self.path, "rb") as llama_file:
-                magic = llama_file.read(4)
+            with open(self.path, "rb") as file:
+                magic = file.read(4)
                 if magic != b"GGUF":
-                    print(f"{magic} vs. b'GGUF'. wrong magic #") # uh uh uh. you didn't say the magic word
-                else:
-                    llama_ver = struct.unpack("<I", llama_file.read(4))[0]
-                    if llama_ver < 2:
-                        print(f"{llama_ver} / needs GGUF v2+ ")
-                    else:
-                        try:
-                            parser = Llama(model_path=self.path,vocab_only=True,verbose=False)
-                            self.meta = parser.metadata
-                            return self._search_dict(self.meta)
-                        except ValueError as error_log:
-                            logger.debug(f"'[Failed load '{self.path}''{error_log}'.", exc_info=True)
-                            print(f'Llama angry! Unrecognized model : {self.filename}')
-                            pass
-                        except OSError as error_log:
-                            logger.debug(f"'[Failed access '{self.path}''{error_log}'.", exc_info=True)
-                            print(f'Llama angry! OS prevented open on:  {self.filename}')
-                            pass
-                        except:
-                            logger.exception(Exception)
-                            logger.debug(f"'[Failed unpack '{self.path}''{error_log}'.", exc_info=True)
-                            return print(f"Sorry... Error loading ._. : {self.filename}")
+                    logger.debug(f"Invalid GGUF magic number in '{self.path}'")
+                    return
+                version = struct.unpack("<I", file.read(4))[0]
+                if version < 2:
+                    logger.debug(f"Unsupported GGUF version {version} in '{self.path}'")
+                    return
+            parser = Llama(model_path=self.path, vocab_only=True, verbose=False)
+            self.meta = parser.metadata
+            self._search_dict(self.meta)
+        except Exception as e:
+            logger.debug(f"Error parsing GGUF metadata from '{self.path}': {e}", exc_info=True)
+    
+    def _parse_metadata(self):
+        self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
+        self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
+        for k, v in self.full_data.items(): 
+            logger.debug(f"{k}: {v}")
+        self.count_dict.clear()
+        self.model_tag.clear()
+        self.meta = {}
 
     def data(self):
-            if self.ext == ".pt" or self.ext == ".pth" or self.ext == ".ckpt":  # process closer to load
-                pass
-            elif self.ext == ".safetensors" or self.ext == "":
-                self.occurrence_counts.clear()
-                self.full_data.clear()
-                self.meta = self._parse_safetensors_metadata()
-                self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
-                self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                if self.verbose:
-                    for k, v in self.full_data.items():  # uncomment to view model properties
-                        print(k, v)              ######################################DEBUG
-                self.count_dict.clear()
-                self.model_tag.clear()
-                self.meta = ""
-            elif self.ext == ".gguf":
-                self.occurrence_counts.clear()
-                self.full_data.clear()
-                self.meta = self._parse_gguf_metadata()
-                self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
-                self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-                if self.verbose:
-                    for k, v in self.full_data.items():  # uncomment to view model properties
-                        print(k, v)              ######################################DEBUG
-                self.count_dict.clear()
-                self.model_tag.clear()
-                self.meta = ""
-            elif self.ext == ".bin":  # placeholder - parse bin metadata(path) using ...???
-                    self.meta = ""
-                    pass
-            else :
-                print(f"Ignoring unrecognized model file format: {self.filename}")
-                pass
-
-            return self.full_data
+        if self.ext in [".pt", ".pth", ".ckpt"]:
+            # Placeholder for future implementation
+            pass
+        elif self.ext in [".safetensors", ".sft", ""]:
+            self._parse_safetensors_metadata()
+            self._parse_metadata()
+        elif self.ext == ".gguf":
+            self._parse_gguf_metadata()
+            self._parse_metadata()
+        else:
+            logger.debug(f"Unrecognized file format: '{self.filename}'", exc_info=True)
+        return self.full_data
 
     def _search_dict(self, meta):
         self.meta = meta
         if self.ext == ".gguf":
             for key, value in self.meta.items():
-                if self.verbose == True:
-                    print(f"{key} {value}")              ######################################DEBUG
-                if self.model_tag.get(key, "not_found") != "not_found":
-                    self.model_tag[key] = self.meta.get(key)  # drop it like its hot
-                if self.model_tag.get("general.architecture", "") != "":
+                logger.debug(f"{key}: {value}")
+                if key in self.model_tag:
+                    self.model_tag[key] = value
+                if "general.architecture" in self.model_tag and self.model_tag["general.architecture"]:
                     prefix = self.model_tag["general.architecture"]
-                    prefixless_key = key.replace(f"{prefix}.","")
-                    if self.model_tag.get(prefixless_key, "not_found") != "not_found":
-                        self.model_tag[prefixless_key] = value  # drop it like its hot
-        elif self.ext == ".safetensors" or self.ext == ".sft":
-            for num in list(self.meta): # handle inevitable exceptions invisibly
-                #if self.verbose == True:
-                     #print(num)
-                if self.model_tag.get(num, "not_found") != "not_found":
-                    self.model_tag[num] = self.meta.get(num)  # drop it like its hot
-                if "dtype" in num:
-                        self.model_tag["tensor_params"] += 1  # count tensors
-                elif "shape" in num: # measure first shape size thats returned
-                    if self.meta.get(num) > self.model_tag["shape"]:
-                        self.model_tag["shape"] = self.meta.get(num)
-                if "data_offsets" not in num:
-                    if ("shapes" or "dtype") not in num:
-                        for block, model_type in self.known.items():  # model type, dict data
-                            if block in num:  # if value matches one of our key values
-                                self.occurrence_counts[model_type] += 1 # count matches
-                                self.count_dict[model_type] = self.occurrence_counts.get(model_type, 0)  # pair match count to model type
-
+                    if key.startswith(f"{prefix}."):
+                        prefixless_key = key.replace(f"{prefix}.", "")
+                        if prefixless_key in self.model_tag:
+                            self.model_tag[prefixless_key] = value
+        elif self.ext in [".safetensors", ".sft," ""]:
+            for key in self.meta:
+                if key in self.model_tag:
+                    self.model_tag[key] = self.meta.get(key)
+                if "dtype" in key:
+                    self.model_tag["tensor_params"] += 1
+                elif "shape" in key:
+                    shape_value = self.meta.get(key)
+                    if shape_value > self.model_tag.get("shape", 0):
+                        self.model_tag["shape"] = shape_value
+                if "data_offsets" not in key and not any(x in key for x in ["shapes", "dtype"]):
+                    for block, model_type in self.known.items():
+                        if block in key:
+                            self.occurrence_counts[model_type] += 1
+                            self.count_dict[model_type] = self.occurrence_counts[model_type]
         return self.meta
-    
+
     def __repr__(self):
         return f"ReadMeta(data={self.data()})"
 

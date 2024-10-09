@@ -3,7 +3,8 @@ from time import process_time_ns
 from sdbx import logger
 from sdbx.config import config
 from sdbx.indexer import ReadMeta, EvalMeta
-
+import uvicorn
+from fastapi import FastAPI
 name = input("Enter filename or directory:")
 try:
     name_check = config.get_path(f"models.{name}")
@@ -31,10 +32,11 @@ if not os.path.isdir(name_check) or os.path.isdir(root_check) :
         print("Naw, I ain't see it tho")
     else:
         full_path = os.path.normpath(os.path.join(path_name, name)) #multi read
-        metareader = ReadMeta(full_path, verbose=True).data()
+        import variable_monitor_test as varmont
+        metareader = ReadMeta(full_path).data()
         if metareader is not None:
-            evaluate = EvalMeta(metareader, verbose=True).data()
-
+            evaluate = EvalMeta(metareader).data()
+            varmont.s(locals())
 else:
     if name == "models":
         root = name
@@ -50,6 +52,8 @@ else:
         if not os.path.isdir(os.path.join(path_name, each)):
             filename = each  # "PixArt-Sigma-XL-2-2K-MS.safetensors"
             full_path = os.path.join(path_name, filename)
-            metareader = ReadMeta(full_path, verbose=True).data()
+            import variable_monitor_test as varmont
+            metareader = ReadMeta(full_path).data()
             if metareader is not None:
-                evaluate = EvalMeta(metareader, verbose=True).data()
+                evaluate = EvalMeta(metareader).data()
+                varmont.s(locals())

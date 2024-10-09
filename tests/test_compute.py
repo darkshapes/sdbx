@@ -1,19 +1,13 @@
 import os
 import asyncio
+import threading
 from sdbx.config import config
+import variable_monitor_test as varmont
 from sdbx.nodes.helpers import soft_random
 
-async def outer_coroutine():
-    print("Initializing model index. \nPlease wait...\n")
-    await write_index_now()
-    return print("""Ready.
-                 """)
-
-async def write_index_now():
-    create_index = config.model_indexer.write_index()       # (defaults to config/index.json)
-
-asyncio.run(outer_coroutine())
-
+print("\nInitializing model index.")
+create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
+print(f"Ready.")
 name_path = input("Model Filename (default:ponyFaetality_v11.safetensors): ") or "ponyFaetality_v11.safetensors"
 name_path = os.path.basename(name_path)
 

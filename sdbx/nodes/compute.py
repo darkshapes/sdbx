@@ -366,38 +366,3 @@ class T2IPipe:
         if "cuda" in self.device:
             memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
             self.tc(self.clock, f"Memory used: {memory} GB")
-        
-############## DEBUG TOOLS
-# pass using self.debugger(locals())
-    def debugger(self, variables):
-        var_list = [
-        "__doc__",
-        "__name__",
-        "__package__",
-        "__loader__",
-        "__spec__",
-        "__annotations__",
-        "__builtins__",
-        "__file__",
-        "__cached__",
-        "config",
-        "indexer",
-        "json",
-        "os",
-        "defaultdict",
-        "IndexManager",
-        "logger",
-        "psutil",
-        "var_list",
-        "i"
-        "diffusers"
-        "transformers"
-        "torch"
-        "vae"
-        "AutoencoderKL"
-        "generation"
-        "tensor"
-        ]
-        for each in variables:
-            if each not in var_list:
-                print(f"{each} = {variables[each]}")

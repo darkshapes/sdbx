@@ -299,38 +299,67 @@ class Config(BaseSettings):
     def node_tuner(self):
         from sdbx.nodes.tuner import NodeTuner
         return NodeTuner()
+
+    # @cached_property
+    # def device(self):
+    #     import torch
+    #     return torch
     
-    @cached_property
-    def spec(self):
-        import torch
-        import psutil
-        self._defaults_dict["spec_2"]["devices"] = []
-        devices = self._defaults_dict["spec_2"]["devices"]
-        if config.device.cuda.is_available(): 
-            self._defaults_dict["spec_2"]["cuda"]["ram"] = torch.cuda.get_device_properties(0).total_memory
-            flash_attention_2 = torch.backends.cuda.flash_sdp_enabled()
-            self._defaults_dict["flash_attention_2"] = flash_attention_2
-        if (config.device.mps.is_available() & torch.backends.mps.is_built()): 
-            self._defaults_dict["spec_2"]["mps"]["ram"] = torch.mps.driver_allocated_memory()
-            devices.append("mps") # https://pytorch.org/docs/master/notes/mps.html
-            # ? memory_fraction = 0.5  https://iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
-            # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
-            try:
-                import flash_attn
-            except:
-                self._defaults_dict["flash_attention_2"] = "False"
-            else: 
-                self._defaults_dict["flash_attention_2"] = "True"  # hope for the best that user set this up
-                #set USE_FLASH_ATTENTION=1 in console
-        if config.device.xpu.is_available(): 
-            #todo: code for xpu total memory, possibly code for mkl
-            """ self._defaults_dict["spec_2"]["xps"] = ram"""
-        self._defaults_dict["spec_2"]["cpu"]["ram"] = psutil.virtual_memory().total # set all floats = fp32
-        #import sys
-        # sys.version_info >= (3, 12)
-        from platform import system
-        self._defaults_dict["spec_2"]["dynamo"] = "False" if system.lower() == "windows" else "True"
-        return self._defaults_dict["spec_2"]
+    # def write_spec(self):
+    #     import psutil
+    #     self.spec = {}
+    #     self.spec["data"] = {}
+    #     self.spec["data"]["cuda"] =  {}
+    #     self.spec["data"]["mps"] = {}
+    #     self.spec["data"]["cpu"] = {}
+    #     self.spec["data"]["flash_attention_2"] = False
+    #     self.spec["data"]["dynamo"] = False
+    #     self.spec["data"]["low_cpu_mem_usage"] = False  # todo: circumstances to flag as 'True'
+    #     devices = self.spec["data"]
+    #     if config.device.cuda.is_available(): 
+    #         self.spec["data"]["cuda"]["ram"] =  config.device.cuda.mem_get_info()[1]
+    #         flash_attention_2 = config.device.backends.cuda.flash_sdp_enabled()
+    #         self._defaults_dict["flash_attention_2"] = flash_attention_2
+    #     if (config.device.backends.mps.is_available() & self.device.backends.mps.is_built()): 
+    #         self.spec["data"]["mps"]["ram"] = config.device.mps.driver_allocated_memory()
+    #         devices.append("mps") # https://pytorch.org/docs/master/notes/mps.html
+    #         # ? memory_fraction = 0.5  https://iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
+    #         # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
+    #         try:
+    #             import flash_attn
+    #         except:
+    #             self._defaults_dict["flash_attention_2"] = "False"
+    #         else: 
+    #             self._defaults_dict["flash_attention_2"] = "True"  # hope for the best that user set this up
+    #             #set USE_FLASH_ATTENTION=1 in console
+    #     if config.device.xpu.is_available(): 
+    #         # todo: code for xpu total memory, possibly code for mkl
+    #         """ self.spec["data"]["xps"] = ram"""
+    #     self.spec["data"]["cpu"]["ram"] = psutil.virtual_memory().total # set all floats = fp32
+    #     #import sys
+    #     # sys.version_info >= (3, 12)
+    #     from platform import system
+    #     if system().lower() != "windows": self.spec["data"]["dynamo"] = "False" 
+    #     spec_file = os.path.join(config.get_path("config"), "spec.json")
+    #     if os.path.exists(spec_file):
+    #         try:
+    #             os.remove(spec_file)
+    #         except FileNotFoundError as error_log:
+    #             logging.debug(f"'Spec file absent at write time: {spec_file}.'{error_log}", exc_info=True)
+    #             self.delete_flag =False
+    #             pass
+    #     else:
+    #         if self._defaults_dict:
+    #             try:
+    #                 with open(spec_file, "w+", encoding="utf8") as file_out:
+    #                     """ try opening file"""
+    #             except Exception as error_log:
+    #                 logging.debug(f"Error writing spec file '{spec_file}': {error_log}", exc_info=True)
+    #             else:
+    #                 with open(spec_file, "w+", encoding="utf8") as file_out:
+    #                     json.dump(self.spec["data"], file_out, ensure_ascii=False, indent=4, sort_keys=True)
+    #         else:
+    #             logging.debug("No data to write to spec file.", exc_info=True)
 
 
 def parse() -> Config:
