@@ -6,7 +6,7 @@ from sdbx.indexer import IndexManager
 from sdbx.nodes.helpers import soft_random
 
 async def outer_coroutine():
-    print("Model index will now be written. \nPlease wait...\n")
+    print("Initializing model index. \nPlease wait...\n")
     await write_index_now()
     return print("""Ready.
                  """)

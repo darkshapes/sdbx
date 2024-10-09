@@ -7,6 +7,23 @@ from sdbx.nodes.helpers import soft_random
 from collections import defaultdict
 from diffusers.schedulers import AysSchedules
 
+
+# def collect_tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
+#     predecessors = graph.predecessors(node_id)
+
+#     node = graph.nodes[node_id]
+
+#     tuned_parameters = {}
+#     for p in predecessors:
+#         pnd = graph.nodes[p]  # predecessor node data
+#         pfn = node_manager.registry[pnd['fname']]  # predecessor function
+
+#         p_tuned_parameters = pfn.tuner.get_tuned_parameters(pnd['widget_inputs'])[node['fname']]
+
+#         tuned_parameters |= p_tuned_parameters
+    
+#     return tuned
+
 class NodeTuner:
     @cache        
     def determine_tuning(self, model):
@@ -222,14 +239,14 @@ class NodeTuner:
                         self.transformers["variant"][each] = self._tra[each][2]
                     else: 
                         self.transformers["torch_dtype"] = "auto"
-                        self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                        self.transformers["low_cpu_mem_usage"] = self.oh_no[0]
                 else: self.transformers["variant"][each] = "F32"
 
         else:
                 self.transformers["model"] = self.model["file"]
                 self.transformers["variant"] = self.model["dtype"]
                 self.transformers["torch_dtype"] = "auto"
-                self.transformer["low_cpu_mem_usage"] = self.oh_no[0]
+                self.transformers["low_cpu_mem_usage"] = self.oh_no[0]
                 self.pipe["variant"] = list(self.fetch)[2] #model variant              
 
         if next(iter(self._lora.items()),0) != 0:

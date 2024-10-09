@@ -216,7 +216,8 @@ class T2IPipe:
                 generation['embeddings'] = self.generate_embeddings(
                     [generation['prompt'], generation['prompt']],
                     [self.tokenizer, self.tokenizer_2],
-                    [self.text_encoder, self.text_encoder_2], self.enc_exp
+                    [self.text_encoder, self.text_encoder_2],
+                    self.enc_exp
                     )
 
 ############## CACHE MANAGEMENT
@@ -347,7 +348,6 @@ class T2IPipe:
                 self.seed = generation['seed']
                 self.tc(self.image_start, f"{i} of {len(self.queue)}", self.bug_off) 
                 generation['latents'] = generation['latents'].to(next(iter(self.pipe.vae.post_quant_conv.parameters())).dtype)
-
 
                 image = self.pipe.vae.decode(
                     generation['latents'] / self.pipe.vae.config.scaling_factor,

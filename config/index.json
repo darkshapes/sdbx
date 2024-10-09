@@ -35,6 +35,13 @@
                 "F16"
             ]
         },
+        "ichWilllMEINSTEIL_v10.safetensors": {
+            "STA-XL": [
+                7140753250,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\ichWilllMEINSTEIL_v10.safetensors",
+                "F16"
+            ]
+        },
         "lumina_nsdiffusion_pytorch_model (1).safetensors": {
             "LUM-NS": [
                 3509863800,
