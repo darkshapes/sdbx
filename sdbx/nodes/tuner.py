@@ -23,6 +23,16 @@ from diffusers.schedulers import AysSchedules
 #         tuned_parameters |= p_tuned_parameters
     
 #     return tuned
+# @cache
+#     def get_tuned_parameters(self, widget_inputs, model_types, metadata):
+#       
+#     def tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
+#         predecessors = graph.predecessors(node_id)
+#         node = graph.nodes[node_id]
+#         tuned_parameters = {}
+#         for p in predecessors:
+#             pnd = graph.nodes[p]  # predecessor node data
+#             pfn = node_manager.registry[pnd['fname']]  # predecessor function
 
 class NodeTuner:
     @cache        

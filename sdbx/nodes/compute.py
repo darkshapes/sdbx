@@ -2,7 +2,6 @@
 Credits:
 Felixsans
 """
-
 import gc
 import os
 import torch
@@ -24,15 +23,13 @@ from diffusers.schedulers import (
     DEISMultistepScheduler,
      )
 from diffusers.utils import logging as df_log
-from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionXLPipeline, AutoPipelineForText2Image
 from transformers import logging as tf_log
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
+from diffusers import AutoencoderKL, AutoPipelineForText2Image
+from transformers import AutoTokenizer, AutoModel, CLIPTextModelWithProjection
 import accelerate
 from sdbx import logger
-from sdbx.nodes.tuner import NodeTuner
-from sdbx.indexer import IndexManager
 from sdbx.config import config
-from sdbx.nodes.helpers import seed_planter, soft_random
+from sdbx.nodes.helpers import seed_planter
 
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
@@ -144,12 +141,12 @@ class T2IPipe:
             self.tformer_dict.setdefault("attn_implementation", self.enc_opt["attn_implementation"])
         self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)
 
-        self.tokenizer = CLIPTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             transformer,
             subfolder='tokenizer',
         )
         self.hf_log(fatal=True) #suppress layer skip messages
-        self.text_encoder = CLIPTextModel.from_pretrained(
+        self.text_encoder = AutoModel.from_pretrained(
             transformer,
             subfolder='text_encoder',
             **self.tformer_dict
@@ -159,7 +156,7 @@ class T2IPipe:
         if self.enc_opt.get("dynamo",0) != 0:
             self.compile_model(self.text_encoder, self.enc_opt["compile"])
 
-        self.tokenizer_2 = CLIPTokenizer.from_pretrained(
+        self.tokenizer_2 = AutoTokenizer.from_pretrained(
             transformer,
             subfolder='tokenizer_2',
         )

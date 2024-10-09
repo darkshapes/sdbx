@@ -285,16 +285,52 @@ class Config(BaseSettings):
         from sdbx.executor import Executor
         return Executor(self.node_manager)
     
-    # @cached_property
-    # def model_indexer(self):
-    #     from sdbx.indexer import ModelIndexer
-    #     return ModelIndexer()
+    @cached_property
+    def model_indexer(self):
+        from sdbx.indexer import IndexManager
+        return IndexManager()
 
     @cached_property
+    def t2i_pipe(self):
+        from sdbx.nodes.compute import T2IPipe
+        return T2IPipe()
+    
+    @cached_property
+    def node_tuner(self):
+        from sdbx.nodes.tuner import NodeTuner
+        return NodeTuner()
+    
+    @cached_property
     def spec(self):
-        # generate spec somehow
-        # return self.load_data()
-        return self._defaults_dict["spec"]
+        import torch
+        import psutil
+        self._defaults_dict["spec_2"]["devices"] = []
+        devices = self._defaults_dict["spec_2"]["devices"]
+        if config.device.cuda.is_available(): 
+            self._defaults_dict["spec_2"]["cuda"]["ram"] = torch.cuda.get_device_properties(0).total_memory
+            flash_attention_2 = torch.backends.cuda.flash_sdp_enabled()
+            self._defaults_dict["flash_attention_2"] = flash_attention_2
+        if (config.device.mps.is_available() & torch.backends.mps.is_built()): 
+            self._defaults_dict["spec_2"]["mps"]["ram"] = torch.mps.driver_allocated_memory()
+            devices.append("mps") # https://pytorch.org/docs/master/notes/mps.html
+            # ? memory_fraction = 0.5  https://iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
+            # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
+            try:
+                import flash_attn
+            except:
+                self._defaults_dict["flash_attention_2"] = "False"
+            else: 
+                self._defaults_dict["flash_attention_2"] = "True"  # hope for the best that user set this up
+                #set USE_FLASH_ATTENTION=1 in console
+        if config.device.xpu.is_available(): 
+            #todo: code for xpu total memory, possibly code for mkl
+            """ self._defaults_dict["spec_2"]["xps"] = ram"""
+        self._defaults_dict["spec_2"]["cpu"]["ram"] = psutil.virtual_memory().total # set all floats = fp32
+        #import sys
+        # sys.version_info >= (3, 12)
+        from platform import system
+        self._defaults_dict["spec_2"]["dynamo"] = "False" if system.lower() == "windows" else "True"
+        return self._defaults_dict["spec_2"]
 
 
 def parse() -> Config:
