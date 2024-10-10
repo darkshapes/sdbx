@@ -27,6 +27,7 @@ class EvalMeta:
     # CRITERIA THRESHOLDS
     model_tensor_pct = 2e-3  # fine tunings
     model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
+    model_size_pct = 7e-3
     vae_pct = 5e-3           # please do not disrupt
     vae_xl_pct = 1e-8
     tra_pct = 1e-4
@@ -161,16 +162,21 @@ class EvalMeta:
                         or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                            self.tag = "m"
-                            self.key = tensor_params
-                            self.sub_key = shape #found model
+                            if isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
+                                self.tag     = "m"
+                                self.key     = "1680"
+                                self.sub_key = "320" #found model
+                            else:
+                                self.tag = "m"
+                                self.key = tensor_params
+                                self.sub_key = shape #found model
                     else:
                         logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
                         self.tag = "m"
                         self.key = tensor_params
                         self.sub_key = shape               ######################################DEBUG
-                        if self.verbose is True: 
-                            print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
+                        #if self.verbose is True: 
+                        #print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
 
     def data(self):
 
@@ -219,7 +225,7 @@ class EvalMeta:
             self.code = f"LLM"
             self.lookup = f"{self.arch}"
         else:
-            if self.verbose is True: print(f"Unknown type:'{self.filename}'.")
+            # if self.verbose is True: print(f"Unknown type:'{self.filename}'.")
             # consider making ignore list for undetermined models
             logger.debug(f"'Could not determine id '{self.extract}'.", exc_info=True)
             pass
@@ -228,7 +234,8 @@ class EvalMeta:
             logger.debug(f"'Not indexed. 'No eval error' should follow: '{self.extract}'.", exc_info=True)
             pass
         else:   #format [ model type code, filename, compatability code, file size, full file path]
-            if self.verbose is True: print(self.code, self.lookup, self.filename, self.size, self.path)
+            #if self.verbose is True: 
+            #print(self.code, self.lookup, self.filename, self.size, self.path)
             return self.code, (
                 self.filename, self.lookup, self.size, self.path, 
                 (self.context_length if self.context_length else self.dtype))
@@ -313,8 +320,9 @@ class ReadMeta:
     def _parse_metadata(self):
         self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
         self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-        for k, v in self.full_data.items(): 
-            logger.debug(f"{k}: {v}")
+        logger.debug(f"{k}: {v}" for k, v in self.full_data.items())
+        # for k, v in self.full_data.items():  # uncomment to view model properties
+        #     print(k, v)     
         self.count_dict.clear()
         self.model_tag.clear()
         self.meta = {}
@@ -378,39 +386,41 @@ class IndexManager:
     
     def write_index(self, index_file="index.json"):
         # Collect all data to write at once
-        self.directories =  config.get_default("directories","models") #multi read
-        self.delete_flag = True
-        for each in self.directories:
-            self.path_name = config.get_path(f"models.{each}")
-            index_file = os.path.join(config_source_location, index_file)
-            for each in os.listdir(self.path_name):  # SCAN DIRECTORY           #todo - toggle directory scan
-                full_path = os.path.join(self.path_name, each)
-                if os.path.isfile(full_path):  # Check if it's a file
-                    self.metareader = ReadMeta(full_path).data()
-                    if self.metareader is not None:
-                        self.eval_data = EvalMeta(self.metareader).data()
-                        if self.eval_data != None:
-                            tag = self.eval_data[0]
-                            filename = self.eval_data[1][0]
-                            compatability = self.eval_data[1][1:2][0]
-                            data = self.eval_data[1][2:5]
-                            self.all_data[tag][filename][compatability] = (data)
-                        else:
-                            logger.debug(f"No eval: {each}.", exc_info=True)
-                    else:
-                        log = f"No data: {each}."
-                        logger.debug(log, exc_info=True)
-                        print(log)
+
+        config.write_spec()
+        self.index = {}
+        index_file = os.path.join(config_source_location, "index.json")        
+
+        def extract_files(tree):
+            for node in tree:
+                if 'path' in node:
+                    yield node['path']
+                elif 'children' in node:
+                    yield from extract_files(node['children'])
+
+        for full_path in list(extract_files(config.get_path_tree("models", file_callback=lambda path: {"path": path}))):
+            metareader_data = ReadMeta(full_path).data()
+            if not metareader_data:
+                logger.debug(f"No metadata found for '{full_path}'.", exc_info=True)
+                continue
+
+            eval_data = EvalMeta(metareader_data).data()
+            if not eval_data:
+                logger.debug(f"No evaluation data for '{full_path}'.", exc_info=True)
+                continue
+            else:
+                tag = eval_data[0]
+                filename = eval_data[1][0]
+                compatability = eval_data[1][1:2][0]
+                data = eval_data[1][2:5]
+                self.all_data[tag][filename][compatability] = (data)
         if self.all_data:
-            if self.delete_flag:
+            if os.path.exists(index_file):
                 try:
                     os.remove(index_file)
-                    self.delete_flag =False
                 except FileNotFoundError as error_log:
                     logger.debug(f"'Config file absent at write time: {index_file}.'{error_log}", exc_info=True)
-                    self.delete_flag =False
-                    pass
-            with open(os.path.join(config_source_location, index_file), "a", encoding="UTF-8") as index:
+            with open(index_file, "a", encoding="UTF-8") as index:
                 json.dump(self.all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
         else:
             log = "Empty model directory, or no data to write."

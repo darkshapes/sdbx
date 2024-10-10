@@ -37,7 +37,7 @@ from diffusers.schedulers import AysSchedules
 class NodeTuner:
     @cache        
     def determine_tuning(self, model):
-        self.spec = config.get_default("spec","data")
+        self.spec = config.defaults_metadata("spec","data")
         self.algorithms = list(config.get_default("algorithms","schedulers"))
         self.solvers = list(config.get_default("algorithms","solvers"))
         self.sort, self.category, self.fetch = IndexManager().fetch_id(model)
@@ -72,12 +72,18 @@ class NodeTuner:
     
     @cache
     def opt_exp(self):
-        peak_gpu = self.spec["gpu_ram"] #accommodate list of graphics card ram
+        peak_cpu = self.spec["devices"]["cpu"]
+        for key, val in self.spec["devices"]:
+                if val:
+                    gpu_ram = val
+        first_device = next(iter(self.spec["devices"]),"cpu")
+        ram = first_device[0]
+        if next(iter(self.spec["devices"]),"cpu") != "cpu": peak_gpu =  #accommodate list of graphics card ram
         overhead =  list(self.fetch)[0]
         peak_cpu = self.spec["cpu_ram"]
-        cpu_ceiling =  overhead/peak_cpu
-        gpu_ceiling = overhead/peak_gpu
-        total_ceiling = overhead/(peak_cpu+peak_gpu)
+        cpu_ceiling   = overhead / peak_cpu
+        gpu_ceiling   = overhead / peak_gpu
+        total_ceiling = overhead / (peak_cpu + peak_gpu)
 
         # size?  >50%   >100%  >cpu  >cpu+gpu , overhead condition numbers
         self.oh_no = [False, False, False, False,]
@@ -237,30 +243,34 @@ class NodeTuner:
         self.skip = skip
         if self._tra != "∅" and self._tra != {}: 
             self.skip = 12 - int(self.skip)
-            self.transformers["use_safetensors"] = True
-            self.transformers["num_hidden_layers"] = self.skip
+            self.optimized["transformer"] = []
             for each in self._tra:
+                self.optimized["transformer"].append(each)
                 # self.transformers["tokenizer"] = self._tra[each][1]
                 #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
                 #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
-                self.transformers["model"] = self._tra[each][1]
+                self.optimized[each]["model"] = self._tra[each][1]
                 if self.spec["devices"][0] != "cpu":
                     if not self.oh_no[0]:
-                        self.transformers["variant"][each] = self._tra[each][2]
+                        self.transformers[each]["variant"] = self._tra[each][2]
                     else: 
-                        self.transformers["torch_dtype"] = "auto"
-                        self.transformers["low_cpu_mem_usage"] = self.oh_no[0]
-                else: self.transformers["variant"][each] = "F32"
-
+                        self.transformers[each]["torch_dtype"] = "auto"
+                        #self.transformers[each]["low_cpu_mem_usage"] = self.oh_no[0]
+                else: 
+                    self.transformers[each]["variant"] = "F32"
+                self.transformers[each]["use_safetensors"] = True
+                self.transformers[each]["num_hidden_layers"] = self.skip
         else:
                 self.transformers["model"] = self.model["file"]
-                self.transformers["variant"] = self.model["dtype"]
+                self.transformers["class"] = self.model["class"]
                 self.transformers["torch_dtype"] = "auto"
-                self.transformers["low_cpu_mem_usage"] = self.oh_no[0]
-                self.pipe["variant"] = list(self.fetch)[2] #model variant              
-
+                self.transformers["low_cpu_mem_usage"] = self.oh_no[0]         
+                self.transformers["variant"] = list(self.fetch)[2] #model variant   
         if next(iter(self._lora.items()),0) != 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
+            if self.transformers.get("pop", 0) != 0:
+                for key, val in self.transformers["pop"]:
+                    self.transformers[key] = val
             # cfg enabled here
             if "PCM" in self.optimized["lora_class"]:
                 self.optimized["algorithm"] = self.algorithms[5] #DDIM
@@ -303,6 +313,7 @@ class NodeTuner:
                         for each in self.transformers["file"].lower():
                             if "t5" in each:
                                 for items in self.transformer:
+                                    self.transformers["pop"][items] = each
                                     try:
                                         self.transformers[items].pop(each)
                                     except KeyError as error_log:
@@ -335,14 +346,14 @@ class NodeTuner:
             or "STA-3" in self.category):
                 self.optimized["scheduler"]["interpolation type"] = "linear" #sgm_uniform/simple
                 self.optimized["scheduler"]["timestep_spacing"] = "trailing"
-            if (self.category == "STA-15"
-            or self.category == "STA-XL"
-            or self.category == "STA3"):
+            if ("STA-15" in self.category
+            or "STA-XL" in self.category
+            or"STA-3" in  self.category):
                 self.optimized["algorithm"] = self.algorithms[8] #AlignYourSteps
-                if "STA-15" == self.category: 
+                if "STA-15" in self.category: 
                     self.optimized["ays"] = "StableDiffusionTimesteps"
                     self.optimized["scheduler"]["timesteps"] = AysSchedules[self.ays]
-                elif "STA-XL" == self.category:
+                elif "STA-XL" in self.category:
                     self.gen["num_inference_steps"] = 10
                     self.gen["guidance_scale"] = 5 
                     self.optimized["ays"] = "StableDiffusionXLTimesteps"

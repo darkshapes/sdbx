@@ -46,7 +46,7 @@ insta.diffuse_latent(gen_exp)
 #cache ctrl nocude
 insta.cache_jettison(lora=True)
 
-#vae node
+#vae nodesorta but
 vae_exp = optimize.vae_exp()
 image = insta.decode_latent(vae_exp)
 

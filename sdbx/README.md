@@ -3,7 +3,7 @@
 
 ## CLASS Config
 ##### IMPORT from sdbx.config import
-##### METHODS get_default, get_path_contents, get_path, model_indexer
+##### METHODS get_default, get_path_contents, get_path, model_indexer, config.get_path_tree(os.path.join("models","metadata"), file_callback=lambda path: {"path": path}
 ##### VARIABLES config_source_location
 ##### PURPOSE find source directories and data
 ##### OUTPUT a dict of keys, a dict of files, a path to a file

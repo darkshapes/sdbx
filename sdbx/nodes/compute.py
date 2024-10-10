@@ -7,6 +7,8 @@ import os
 import torch
 import datetime
 from time import perf_counter_ns
+from collections import defaultdict
+
 from diffusers.schedulers import (
     EulerDiscreteScheduler,
     EulerAncestralDiscreteScheduler,
@@ -25,8 +27,9 @@ from diffusers.schedulers import (
 from diffusers.utils import logging as df_log
 from transformers import logging as tf_log
 from diffusers import AutoencoderKL, AutoPipelineForText2Image
-from transformers import AutoTokenizer, AutoModel, CLIPTextModelWithProjection
+from transformers import CLIPTextModel, CLIPTokenizer #CLIPTextModelWithProjection, AutoTokenizer, AutoModel
 import accelerate
+
 from sdbx import logger
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter
@@ -36,6 +39,7 @@ class T2IPipe:
 
     bug_off=False
     config_path = config.get_path("models.metadata")
+    device = config.get_metadata_default
 
 ############## TIMECODE
     def tc(self, clock, string, debug=False): 
@@ -109,13 +113,13 @@ class T2IPipe:
                 logger.debug(f"Scheduler error {error_log}.", exc_info=True)
 
 ############## DEVICE
-    def set_device(self, device=None):
-        if device==None:
-            if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
-            elif torch.xpu.is_available(): self.device= "xpu"
-            elif (torch.backends.mps.is_available() & torch.backends.mps.is_built()): self.device = "mps"
-            else: self.device = "cpu"# https://pytorch.org/docs/master/notes/mps.html
-        else: self.device = "cpu"
+    # def set_device(self, device=None):
+    #     if device==None:
+    #         if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
+    #         elif torch.xpu.is_available(): self.device= "xpu"
+    #         elif (torch.backends.mps.is_available() & torch.backends.mps.is_built()): self.device = "mps"
+    #         else: self.device = "cpu"# https://pytorch.org/docs/master/notes/mps.html
+    #     else: self.device = "cpu"
 
 ############## QUEUE
     def queue_manager(self, prompt, seed):
@@ -130,46 +134,37 @@ class T2IPipe:
             }])
         
 ############## ENCODERS
-    def declare_encoders(self, exp, transformer="stabilityai/stable-diffusion-xl-base-1.0"):
-        self.tformer, self.gen, self.enc_opt = exp
-        self.tformer_dict = {}
-        if self.tformer.get("variant",0) != 0:
-            var, dtype = self.float_converter(self.tformer["variant"][next(iter(self.tformer["variant"]),0)])
-            self.tformer_dict.setdefault("variant",var)
-            self.tformer_dict.setdefault("torch_dtype", dtype)
-        if self.enc_opt.get("attn_implementation",0) != 0: 
-            self.tformer_dict.setdefault("attn_implementation", self.enc_opt["attn_implementation"])
-        self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)
+    def declare_encoders(self, exp):
+        self.tformer, self.gen, self.opt = exp
+        self.encoder_dict = defaultdict(dict)
+        self.tokenizer = defaultdict(list)
+        self.text_encoder = defaultdict(list)
+        for each in self.opt["transformer"]:
+            i = enumerate(self.opt["transformer"])
+            if self.tformer[each].get("variant",0) != 0:
+                var, dtype = self.float_converter(self.tformer[each]["variant"][next(iter(self.tformer[each]["variant"]),0)])  
+                self.encoder_dict.setdefault("variant",var)
+                self.encoder_dict.setdefault("torch_dtype", dtype)
+            if self.opt.get("attn_implementation",0) != 0:
+                self.encoder_dict.setdefault("attn_implementation", self.opt["attn_implementation"])
+            self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)                     
+            
+            self.symlink_path = os.path.join(config.get_path("models.metadata"),each) #autoencoder also wants specific filenames
+            self.symlink_file = os.path.join(self.symlnk_path,f"model.safetensors")
+            
+            if os.path.isfile(self.symlink_file): os.remove(self.symlink_file)
+            #huggingface song and dance
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            transformer,
-            subfolder='tokenizer',
-        )
-        self.hf_log(fatal=True) #suppress layer skip messages
-        self.text_encoder = AutoModel.from_pretrained(
-            transformer,
-            subfolder='text_encoder',
-            **self.tformer_dict
-        ).to(self.device)
-        self.hf_log(on=True) #return to normal
-      
-        if self.enc_opt.get("dynamo",0) != 0:
-            self.compile_model(self.text_encoder, self.enc_opt["compile"])
+            self.tokenizer[i] = CLIPTokenizer.from_pretrained(
+                self.symlnk_path,
+                subfolder='tokenizer',
+            )
 
-        self.tokenizer_2 = AutoTokenizer.from_pretrained(
-            transformer,
-            subfolder='tokenizer_2',
-        )
-
-        self.hf_log(fatal=True) #suppress layer skip messages
-        self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-            transformer,
-            subfolder='text_encoder_2',
-            **self.tformer_dict
-        ).to(self.device)
-        self.hf_log(on=True) #return to normal
-        if self.enc_opt.get("dynamo",0) != 0:
-            self.compile_model(self.text_encoder_2, self.enc_opt["compile"])
+            os.symlink(self.opt["transformer"][i],self.symlnk_file) #note: no 'i' in 'symlnk'
+            self.text_encoder[i] = CLIPTextModel.from_pretrained(
+                self.symlnk_path,
+                **self.encoder_dict
+            ).to(self.device)
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, tokenizers, text_encoders, exp):
@@ -212,9 +207,7 @@ class T2IPipe:
             for generation in self.queue:
                 generation['embeddings'] = self.generate_embeddings(
                     [generation['prompt'], generation['prompt']],
-                    [self.tokenizer, self.tokenizer_2],
-                    [self.text_encoder, self.text_encoder_2],
-                    self.enc_exp
+                    self.tokenizer, self.text_encoder, self.enc_exp
                     )
 
 ############## CACHE MANAGEMENT
@@ -231,9 +224,9 @@ class T2IPipe:
  
 
 ############## PIPE
-    def construct_pipe(self, exp, model="stabilityai/stable-diffusion-xl-base-1.0"):
-        self.model = model
+    def construct_pipe(self, exp, model=None):
         self.pipe_exp, custom_model = exp
+        self.model = custom_model
         if self.pipe_exp.get("variant",0):
             var, dtype = self.float_converter(self.pipe_exp["variant"])
             self.pipe_exp["variant"] = var
@@ -241,7 +234,7 @@ class T2IPipe:
         self.tc(self.clock, f"precision set for: {var}, using {dtype}", self.bug_off)
 
         self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)
-        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_exp).to(self.device)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(self.model, **self.pipe_exp).to(self.device)
 
 ############## LORA
     def add_lora(self, exp, fuse, opt):
