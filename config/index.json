@@ -92,9 +92,9 @@
             ]
         },
         "sdxlbase.diffusion_pytorch_model.fp16.safetensors": {
-            "KOL-01": [
+            "STA-XL": [
                 5135149760,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\sdxlbase.diffusion_pytorch_model.fp16.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\image\\sdxlbase.diffusion_pytorch_model.fp16.safetensors",
                 "F16"
             ]
         },

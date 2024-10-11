@@ -27,6 +27,7 @@ class EvalMeta:
     # CRITERIA THRESHOLDS
     model_tensor_pct = 2e-3  # fine tunings
     model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
+    model_size_pct = 7e-4
     vae_pct = 5e-3           # please do not disrupt
     vae_xl_pct = 1e-8
     tra_pct = 1e-4
@@ -161,9 +162,14 @@ class EvalMeta:
                         or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                            self.tag = "m"
-                            self.key = tensor_params
-                            self.sub_key = shape #found model
+                            if isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
+                                self.tag     = "m"
+                                self.key     = "1680"
+                                self.sub_key = "320" #found model
+                            else:
+                                self.tag = "m"
+                                self.key = tensor_params
+                                self.sub_key = shape #found model
                     else:
                         logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
                         self.tag = "m"
@@ -378,6 +384,7 @@ class IndexManager:
     
     def write_index(self, index_file="index.json"):
         # Collect all data to write at once
+        config.write_spec()
         self.directories =  config.get_default("directories","models") #multi read
         self.delete_flag = True
         for each in self.directories:

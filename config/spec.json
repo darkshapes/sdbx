@@ -1,13 +1,10 @@
 {
     "data": {
         "dynamo": "False",
-        "low_cpu_mem_usage": "False",
-        "gpu_ram": 4080094412,
-        "cpu_ram": 8457080832,
-        "flash_attention_2": "False",
-        "devices": [
-            "mps",
-            "cpu"
-        ]
+        "devices": {
+            "cuda": 4294836224,
+            "cpu": 8457080832
+        },
+        "flash_attention_2": "True"
     }
 }
