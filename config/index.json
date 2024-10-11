@@ -21,13 +21,6 @@
                 "F16"
             ]
         },
-        "dmd2_sdxl_4step_unet_fp16.safetensors": {
-            "KOL-01": [
-                5135149736,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\dmd2_sdxl_4step_unet_fp16.safetensors",
-                "F16"
-            ]
-        },
         "forgottenmixTheNovelist_v10.safetensors": {
             "STA-15": [
                 4244099040,
@@ -98,10 +91,10 @@
                 "F16"
             ]
         },
-        "spo_sdxl_diffusion_diffusion_pytorch_model.safetensors": {
+        "sdxlbase.diffusion_pytorch_model.fp16.safetensors": {
             "KOL-01": [
                 5135149760,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\spo_sdxl_diffusion_diffusion_pytorch_model.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\sdxlbase.diffusion_pytorch_model.fp16.safetensors",
                 "F16"
             ]
         },
@@ -671,17 +664,17 @@
                 "I8"
             ]
         },
-        "clip_g.safetensors": {
+        "clip_g.model.fp16 (1).safetensors": {
             "CLI-VG": [
                 1389382176,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clip_g.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clip_g.model.fp16 (1).safetensors",
                 "F16"
             ]
         },
-        "clip_l.safetensors": {
+        "clip_vit_l.safetensors": {
             "CLI-VL": [
                 246144152,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clip_l.safetensors",
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clip_vit_l.safetensors",
                 "F16"
             ]
         },
@@ -689,20 +682,6 @@
             "T5X-PI": [
                 2950448704,
                 "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\model.fp16.safetensors",
-                "F16"
-            ]
-        },
-        "open_clip_model.safetensors": {
-            "CLI-OP": [
-                397696772,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\open_clip_model.safetensors",
-                "F32"
-            ]
-        },
-        "ostris-clip-vit-h-model.safetensors": {
-            "CLI-VH": [
-                1266183328,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\ostris-clip-vit-h-model.safetensors",
                 "F16"
             ]
         },
