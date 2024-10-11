@@ -77,9 +77,9 @@ class NodeTuner:
     
     @cache
     def opt_exp(self):
-        peak_cpu     = self.spec["data"]["devices"].get("cpu",1)
+        peak_cpu     = self.spec["devices"].get("cpu",1)
         if self.first_device != "cpu": 
-            peak_gpu = self.spec["data"]["devices"].get(self.first_device,1)  #accommodate list of graphics card ram
+            peak_gpu = self.spec["devices"].get(self.first_device,1)  #accommodate list of graphics card ram
         overhead    = list(self.fetch)[0]
         cpu_ceiling = overhead / peak_cpu
         if peak_gpu:
@@ -115,13 +115,13 @@ class NodeTuner:
         self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
         if self.spec.get("dynamo",False):
             self.optimized["sigmas"] = True #
-            self.optimized["dynamo"] = self.spec["data"]["dynamo"]
+            self.optimized["dynamo"] = self.spec["dynamo"]
         return self.optimized
   
     @cache
     def pipe_exp(self):
         if self.oh_no[0]: 
-            self.pipe["low_cpu_mem_usage"] = self.spec.get("low_cpu_mem_usage")
+            self.pipe["low_cpu_mem_usage"] = self.oh_no[0]
 
         if self.first_device != "cpu":
             if not self.oh_no[0]:
@@ -231,10 +231,26 @@ class NodeTuner:
             else:
                 logger.debug(f"LoRA not found?", exc_info=True)
 
+    def symlinker(self, true_file, class_name):
+        symlink_head      = os.path.join(config.get_path("models.metadata"),class_name)
+        symlink_full_path = os.path.join(symlink_head,"model.fp16.safetensors" )
+        symlink_full_path_32 = os.path.join(symlink_head,"model.safetensors")
+        try:
+            os.remove(symlink_full_path) 
+        except:
+            pass
+        try:
+            os.remove(symlink_full_path_32) 
+        except:
+            pass
+        os.symlink(true_file, symlink_full_path)
+        os.symlink(true_file, symlink_full_path_32)
+        return symlink_head #return path
+    
     @cache       
     def gen_exp(self, skip):
         self.skip = skip
-        if self._tra: 
+        if self._tra != "∅" and self._tra != {}: 
             self.skip = 12 - int(self.skip)
             self.optimized["transformer"] = []
             for each in self._tra:
@@ -242,23 +258,29 @@ class NodeTuner:
                 # self.transformers["tokenizer"] = self._tra[each][1]
                 #self.transformers[each]["tokenizer"]["local_dir"] = os.path.join(self.metadata_path,each)
                 #self.transformers[each]["text_encoder"]["local_dir"] = os.path.join(self.metadata_path,each)
-                self.optimized[each]["model"] = self._tra[each][1]
+
                 if next(iter(self.spec.get("devices","cpu"))) != "cpu":
                     if not self.oh_no[0]:
                         self.transformers[each]["variant"] = self._tra[each][2]
                     else: 
                         self.transformers[each]["torch_dtype"] = "auto"
-                        self.transformers[each]["low_cpu_mem_usage"] = self.spec.get("low_cpu_mem_usage",False)
+                        self.transformers[each]["low_cpu_mem_usage"] = self.oh_no[0]
                 else: 
                     self.transformers[each]["variant"] = "F32"
+
                 self.transformers[each]["use_safetensors"] = True
                 self.transformers[each]["num_hidden_layers"] = self.skip
+                links = self.symlinker(self._tra[each][1] , each)
+                self.optimized["transformer"][i] = links
+                i += 1
         else:
                 self.transformers["model"] = self.model["file"]
                 self.transformers["class"] = self.model["class"]
                 self.transformers["torch_dtype"] = "auto"
                 self.transformers["low_cpu_mem_usage"] = self.oh_no[0]         
                 self.transformers["variant"] = list(self.fetch)[2] #model variant   
+                links = self.symlinker(self.model["file"],self.model["class"])
+                self.optimized["model"] = links
 
         if self._lora and len(self._lora) > 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
@@ -363,7 +385,7 @@ class NodeTuner:
                 self.optimized["algorithm"] = self.algorithms[2] #EulerAncestralAliens
 
         self.gen["output_type"]       = "latent"
-        self.gen["low_cpu_mem_usage"] = self.spec.get("low_cpu_mem_usage",False)
+        self.gen["low_cpu_mem_usage"] = self.oh_no[0]
         if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #euler
         return  self.transformers, self.gen, self.optimized
     

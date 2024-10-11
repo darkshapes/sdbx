@@ -664,26 +664,7 @@
                 "I8"
             ]
         },
-        "clipg.model.fp16 (1).safetensors": {
-            "CLI-VG": [
-                1389382176,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clipg.model.fp16 (1).safetensors",
-                "F16"
-            ]
-        },
-        "clipl.model.safetensors": {
-            "CLI-VL": [
-                492265168,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\text\\clipl.model.safetensors",
-                "F32"
-            ]
-        },
         "model.fp16.safetensors": {
-            "CLI-VL": [
-                246144152,
-                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\metadata\\CLI-VL\\model.fp16.safetensors",
-                "F16"
-            ],
             "T5X-PI": [
                 2950448704,
                 "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\model.fp16.safetensors",

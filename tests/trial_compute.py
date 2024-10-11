@@ -1,12 +1,11 @@
 import os
-import asyncio
-import threading
 from sdbx.config import config
 import variable_monitor_test as varmont
 from sdbx.nodes.helpers import soft_random
+from sdbx.indexer import IndexManager
 
 print("\nInitializing model index, checking system specs.\n  Please wait...")
-create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
+create_index = IndexManager().write_index()      # (defaults to config/index.json)
 dif_index = config.get_default("index", "DIF")
 print(f"Ready.")
 name_path = input("""
@@ -35,13 +34,12 @@ insta.queue_manager(prompt,seed)
 
 #loader node transformer class
 gen_exp = optimize.gen_exp(2)#clip skip
-insta.set_device()
 insta.cache_jettison()
 insta.declare_encoders(gen_exp)
 
 #enocder node
 cond_exp = optimize.cond_exp()
-#insta.debugger(locals())
+#print(varmont.s(locals())) ### debug
 insta.encode_prompt(cond_exp)
 #insta.metrics()
 #cache ctrl node
@@ -50,7 +48,7 @@ insta.cache_jettison(encoder=True)
 #t2i
 pipe_exp = optimize.pipe_exp()
 insta.construct_pipe(pipe_exp)
-#insta.debugger(locals())
+print(varmont.s(locals())) ##debug
 insta.diffuse_latent(gen_exp)
 #insta.metrics()
 #cache ctrl nocude

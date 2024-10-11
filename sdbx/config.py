@@ -220,7 +220,7 @@ class Config(BaseSettings):
                 }
                 if entry.is_dir(follow_symlinks=True):
                     entries.append({ **info, "children": recurse(fp) })
-                elif entry.is_file(follow_symlinks=True) and (not extension or entry.name.endswith(extension)):
+                elif entry.is_file(follow_symlinks=False) and (not extension or entry.name.endswith(extension)):
                     entries.append({ **info, **file_callback(fp) })
             return entries
 
@@ -310,7 +310,6 @@ class Config(BaseSettings):
         from platform import system
         spec = defaultdict(dict)
         spec["data"]["dynamo"] = "False" if system().lower() == "windows" else "True"
-        spec["data"]["low_cpu_mem_usage"] = False  # todo: circumstances to flag as 'True'
         spec["data"]["devices"]           = {}
         if config.device.cuda.is_available(): 
             spec["data"]["devices"]["cuda"]   = config.device.cuda.mem_get_info()[1]

@@ -27,7 +27,7 @@ from diffusers.schedulers import (
 from diffusers.utils import logging as df_log
 from transformers import logging as tf_log
 from diffusers import AutoencoderKL, AutoPipelineForText2Image
-from transformers import CLIPTextModel, CLIPTokenizer #CLIPTextModelWithProjection, AutoTokenizer, AutoModel
+from transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer, AutoModel#CLIPTextModelWithProjection, 
 import accelerate
 
 from sdbx import logger
@@ -40,7 +40,8 @@ class T2IPipe:
     bug_off=False
     config_path = config.get_path("models.metadata")
     spec = config.get_default("spec","data")
-    device = next(iter(spec["data"].get("devices","cpu")),"cpu")
+    device = next(iter(spec.get("devices","cpu")),"cpu")
+    print(device)
 
 ############## TIMECODE
     def tc(self, clock, string, debug=False): 
@@ -113,15 +114,6 @@ class T2IPipe:
             except ValueError as error_log:
                 logger.debug(f"Scheduler error {error_log}.", exc_info=True)
 
-############## DEVICE
-    # def set_device(self, device=None):
-    #     if device==None:
-    #         if torch.cuda.is_available(): self.device = "cuda" # https://pytorch.org/docs/stable/torch_cuda_memory.html
-    #         elif torch.xpu.is_available(): self.device= "xpu"
-    #         elif (torch.backends.mps.is_available() & torch.backends.mps.is_built()): self.device = "mps"
-    #         else: self.device = "cpu"# https://pytorch.org/docs/master/notes/mps.html
-    #     else: self.device = "cpu"
-
 ############## QUEUE
     def queue_manager(self, prompt, seed):
         self.clock = perf_counter_ns() # 00:00:00
@@ -134,51 +126,61 @@ class T2IPipe:
             "seed": seed,
             }])
         
-############## ENCODERS
+
+
     def declare_encoders(self, exp):
         self.tformer, self.gen, self.opt = exp
         self.encoder_dict = defaultdict(dict)
-        self.tokenizer = defaultdict(list)
-        self.text_encoder = defaultdict(list)
-        for each in self.opt["transformer"]:
-            i = enumerate(self.opt["transformer"])
-            if self.tformer[each].get("variant",0) != 0:
-                var, dtype = self.float_converter(self.tformer[each]["variant"][next(iter(self.tformer[each]["variant"]),0)])  
-                self.encoder_dict.setdefault("variant",var)
-                self.encoder_dict.setdefault("torch_dtype", dtype)
+        symlink      = defaultdict(list)
+        symlink_tail = defaultdict(list)
+        print(self.tformer)
+        print(self.opt["transformer"])
+        i=0
+        for class_name in self.opt["transformer"]:
+            source_data_type = self.tformer[class_name].get("variant",0)
+            if source_data_type != 0:
+                var, dtype = self.float_converter(self.tformer[class_name]["variant"])  
+                self.encoder_dict[i].setdefault("variant",var)
+                self.encoder_dict[i].setdefault("torch_dtype", dtype)
+            else:
+                self.encoder_dict[i].setdefault("torch_dtype", "auto")
             if self.opt.get("attn_implementation",0) != 0:
-                self.encoder_dict.setdefault("attn_implementation", self.opt["attn_implementation"])
-            self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)                     
-            
-            self.symlink_path = os.path.join(config.get_path("models.metadata"),each) #autoencoder also wants specific filenames
-            self.symlink_file = os.path.join(self.symlnk_path,f"model.safetensors")
-            
-            if os.path.isfile(self.symlink_file): os.remove(self.symlink_file)
-            #huggingface song and dance
+                self.encoder_dict[i].setdefault("attn_implementation", self.opt["attn_implementation"])
+            self.tc(self.clock, f"configuring encoders as {var} {dtype}...", self.bug_off)                  
+            i+=1
+ 
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.opt["transformer"][0],
+        )
+        self.text_encoder = AutoModel.from_pretrained(
+            self.opt["transformer"][0],
+            **self.encoder_dict[0]
+        ).to(self.device)
+        self.tokenizer_2 = AutoTokenizer.from_pretrained(
+            self.opt["transformer"][1],
+        )
+        self.text_encoder_2 = AutoModel.from_pretrained(
+            self.opt["transformer"][1],
+            **self.encoder_dict[1]
+        ).to(self.device)
 
-            self.tokenizer[i] = CLIPTokenizer.from_pretrained(
-                self.symlnk_path,
-                subfolder='tokenizer',
-            )
 
-            os.symlink(self.opt["transformer"][i],self.symlnk_file) #note: no 'i' in 'symlnk'
-            self.text_encoder[i] = CLIPTextModel.from_pretrained(
-                self.symlnk_path,
-                **self.encoder_dict
-            ).to(self.device)
+        return self.tokenizer, self.text_encoder
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, tokenizers, text_encoders, exp):
-        self.emb_exp = exp
-        self.tc(self.clock, f"encoding prompt with device: {self.device}...", self.bug_off)
+       # print(f"{tc()} encoding prompt with device: {self.device}...") #debug
         embeddings_list = []
-        #for prompt, tokenizer, text_encoder in zip(prompts, self.tokenizer.values(), self.text_encoder.values()):
+
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
             prompt,
             max_length=tokenizer.model_max_length,
-            **self.emb_exp
+            padding='max_length',
+            truncation=True,
+            return_tensors='pt',
         )
+
             prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
 
             pooled_prompt_embeds = prompt_embeds[0]
@@ -199,8 +201,9 @@ class T2IPipe:
 
         pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
         negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
-        return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
+        return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+          
 ############## PROMPT
     def encode_prompt(self, exp):
         self.enc_exp = exp
@@ -208,7 +211,9 @@ class T2IPipe:
             for generation in self.queue:
                 generation['embeddings'] = self.generate_embeddings(
                     [generation['prompt'], generation['prompt']],
-                    self.tokenizer, self.text_encoder, self.enc_exp
+                    [self.tokenizer, self.tokenizer_2],
+                    [self.text_encoder, self.text_encoder_2], 
+                    self.enc_exp
                     )
 
 ############## CACHE MANAGEMENT

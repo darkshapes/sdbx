@@ -1,7 +1,6 @@
 {
     "data": {
         "dynamo": "False",
-        "low_cpu_mem_usage": false,
         "devices": {
             "cuda": 4294836224,
             "cpu": 8457080832
