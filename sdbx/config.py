@@ -264,19 +264,6 @@ class Config(BaseSettings):
         
         return d
 
-    def defaults_metadata(self, name, prop, folder=None):  # UnicodeDecodeError: 'charmap' codec can't decode byte 0x81 in position 971: character maps to <undefined>
-        d = {}
-        root_dir = self. get_path("models.metadata")
-        if folder != None: root_dir = os.path.join(root_dir,folder)
-        print(root_dir)
-        glob_source = partial(glob, root_dir=root_dir)
-        for filename in glob_source("*.toml") + glob_source("*.json"):
-            fp = os.path.join(root_dir, filename)
-            name, _ = os.path.splitext(filename)
-            d[name] = self.load_data(fp)
-        
-        return d
-
     @cached_property
     def extension_data(self):
         with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
@@ -320,26 +307,23 @@ class Config(BaseSettings):
     def write_spec(self):
         import psutil
         from collections import defaultdict
-        spec                              = defaultdict(dict)
-        spec["data"]                      = {}
         from platform import system
+        spec = defaultdict(dict)
         spec["data"]["dynamo"] = "False" if system().lower() == "windows" else "True"
-        spec["data"]["low_cpu_mem_usage"]            = False  # todo: circumstances to flag as 'True'
-
-        try: 
-            import flash_attn
-        except: 
-            spec["data"]["flash_attention_2"] = "False"
-        else: 
-            spec["data"]["flash_attention_2"] = "True"  # hope for the best that user set this up
-            #set USE_FLASH_ATTENTION=1 in console
-        spec["data"]["devices"]            = {}
+        spec["data"]["low_cpu_mem_usage"] = False  # todo: circumstances to flag as 'True'
+        spec["data"]["devices"]           = {}
         if config.device.cuda.is_available(): 
-            spec["data"]["devices"]["cuda"] = config.device.cuda.mem_get_info()[1]
-            flash_attention_2                           = config.device.backends.cuda.flash_sdp_enabled()
-            spec["data"]["flash_attention_2"]    = flash_attention_2
-        if (config.device.backends.mps.is_available() & self.device.backends.mps.is_built()): 
+            spec["data"]["devices"]["cuda"]   = config.device.cuda.mem_get_info()[1]
+            spec["data"]["flash_attention_2"] = str(config.device.backends.cuda.flash_sdp_enabled()).title()
+        if config.device.backends.mps.is_available() & self.device.backends.mps.is_built(): 
             spec["data"]["devices"]["mps"] = config.device.mps.driver_allocated_memory()
+            try: 
+                import flash_attn
+            except: 
+                spec["data"]["flash_attention_2"] = "False"
+            else:
+                spec["data"]["flash_attention_2"] = "True"  # hope for the best that user set this up
+            #set USE_FLASH_ATTENTION=1 in console
             # ? https                       : //pytorch.org/docs/master/notes/mps.html
             # ? memory_fraction = 0.5  https: //iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
             # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
@@ -347,13 +331,13 @@ class Config(BaseSettings):
             # todo: code for xpu total memory, possibly code for mkl
             """ spec["data"]["devices"]["xps"] = ram"""
         spec["data"]["devices"]["cpu"] = psutil.virtual_memory().total # set all floats = fp32
-        spec_file = os.path.join(config.get_path("models.metadata"), "spec.json")
+        spec_file = os.path.join(config_source_location, "spec.json")
         if os.path.exists(spec_file):
             try:
                 os.remove(spec_file)
             except FileNotFoundError as error_log:
                 logging.debug(f"'Spec file absent at write time: {spec_file}.'{error_log}", exc_info=True)
-        if self.spec:
+        if spec:
             try:
                 with open(spec_file, "w+", encoding="utf8") as file_out:
                     """ try opening file"""
@@ -364,7 +348,7 @@ class Config(BaseSettings):
                     json.dump(spec, file_out, ensure_ascii=False, indent=4, sort_keys=False)
         else:
             logging.debug("No data to write to spec file.", exc_info=True)
-        #return spec["data"]
+        #return data
 
 
 def parse() -> Config:

@@ -5,18 +5,28 @@ from sdbx.config import config
 import variable_monitor_test as varmont
 from sdbx.nodes.helpers import soft_random
 
-print("\nInitializing model index.")
+print("\nInitializing model index, checking system specs.\n  Please wait...")
 create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
+dif_index = config.get_default("index", "DIF")
 print(f"Ready.")
-name_path = input("Model Filename (default:ponyFaetality_v11.safetensors): ") or "ponyFaetality_v11.safetensors"
-name_path = os.path.basename(name_path)
+name_path = input("""
+Please type the filename of an available checkpoint.
+Path will be detected.
+(default:ponyFaetality_v11.safetensors):
+""" or "ponyFaetality_v11.safetensors")
 
+name_path = os.path.basename(name_path)
+spec = config.get_default("index","DIF")
+for key,val in spec.items():
+    if name_path in key:
+        model = key
+        pass
 prompt = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles"
 seed = int(soft_random())
 
 optimize = config.node_tuner
 insta = config.t2i_pipe
-optimize.determine_tuning(name_path)
+optimize.determine_tuning(model)
 opt_exp = optimize.opt_exp() 
 #below is fed from genesis
 

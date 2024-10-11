@@ -39,7 +39,8 @@ class T2IPipe:
 
     bug_off=False
     config_path = config.get_path("models.metadata")
-    device = config.get_metadata_default
+    spec = config.get_default("spec","data")
+    device = next(iter(spec["data"].get("devices","cpu")),"cpu")
 
 ############## TIMECODE
     def tc(self, clock, string, debug=False): 
