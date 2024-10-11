@@ -3,12 +3,12 @@ import os
 from time import perf_counter_ns
 import datetime
 
-from diffusers import AutoPipelineForText2Image, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, FromOriginalModelMixin
+from diffusers import UNet2DConditionModel, StableDiffusionXLPipeline, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, FromOriginalModelMixin
 from diffusers.schedulers import AysSchedules
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter, soft_random
 import torch
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, AutoTokenizer, AutoModel
 
 def tc(clock, string, debug=False): 
     if not debug: 
@@ -62,12 +62,11 @@ def encode_prompt(prompts, tokenizers, text_encoders):
     return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
 model_path = "C:\\Users\\Public\\models\\metadata\\STA-XL"
-# token_encoder = "C:\\Users\\Public\\models\\metadata\\CLI-VL"
-# token_encoder_2 = "C:\\Users\\Public\\models\\metadata\\CLI-VG"
+token_encoder = "C:\\Users\\Public\\models\\metadata\\CLI-VL"
+token_encoder_2 = "C:\\Users\\Public\\models\\metadata\\CLI-VG"
 
 tokenizer = CLIPTokenizer.from_pretrained(
-    model_path,
-    subfolder='tokenizer',
+    token_encoder,
 )
 
 text_encoder = CLIPTextModel.from_pretrained(
@@ -79,8 +78,7 @@ text_encoder = CLIPTextModel.from_pretrained(
 ).to(device)
 
 tokenizer_2 = CLIPTokenizer.from_pretrained(
-    model_path,
-    subfolder='tokenizer_2',
+    token_encoder_2,
 )
 
 text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
@@ -103,9 +101,13 @@ with torch.no_grad():
 
     if device == "cuda": torch.cuda.empty_cache()
 
-model_file = "C:\\Users\\Public\\models\\image\\ponyFaetality_v11.safetensors",
+model_file = "C:\\Users\\Public\\models\\image\\"
+original_config = "C:\\Users\\Public\\models\\metadata\\STA-XL\\sdxl_base.yaml"
+unet_file = "C:\\Users\\Public\\models\\image\\sdxlbase.diffusion_pytorch_model.fp16.safetensors"
 
-pipe = AutoPipelineForText2Image.from_pretrained(
+
+unet = UNet2DConditionModel.from_single_file(unet_file, original_config=original_config, torch_dtype=torch.float16, variant="fp16")
+pipe = StableDiffusionXLPipeline.from_single_file(
     model_path, torch_dtype=torch.float16, variant="fp16"                
 ).to(device)
 
