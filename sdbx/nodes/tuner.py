@@ -188,7 +188,7 @@ class NodeTuner:
         #self.pipe["device_map"] = None
         if "STA-15" in self.category: 
             self.pipe["safety_checker"] = None
-        return self.pipe, self.model["path"], self.model["file"], self.unet["model"]
+        return self.pipe, self.model["path"] #, self.model["file"], self.unet["model"]
     
     @cache
     def cond_exp(self):

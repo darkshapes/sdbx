@@ -1,6 +1,5 @@
 import os
 from sdbx.config import config
-import variable_monitor_test as varmont
 from sdbx.nodes.helpers import soft_random
 from sdbx.indexer import IndexManager
 
@@ -38,7 +37,6 @@ insta.declare_encoders(gen_exp)
 
 #enocder node
 cond_exp = optimize.cond_exp()
-#print(varmont.s(locals())) ### debug
 insta.encode_prompt(cond_exp)
 #insta.metrics()
 #cache ctrl node
@@ -46,9 +44,7 @@ insta.cache_jettison(encoder=True)
 
 #t2i
 pipe_exp = optimize.pipe_exp()
-print(varmont.s(locals())) ##debug
 insta.construct_pipe(pipe_exp)
-print(varmont.s(locals())) ##debug
 insta.diffuse_latent(gen_exp)
 #insta.metrics()
 #cache ctrl nocude
