@@ -43,8 +43,7 @@ insta.encode_prompt(cond_exp)
 insta.cache_jettison(encoder=True)
 
 #t2i
-pipe_exp = optimize.pipe_exp()
-vae_exp = optimize.vae_exp()
+
 insta.construct_pipe(pipe_exp, vae_exp)
 insta.diffuse_latent(gen_exp)
 #insta.metrics()

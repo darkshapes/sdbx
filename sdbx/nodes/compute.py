@@ -121,7 +121,8 @@ class T2IPipe:
             "prompt": prompt,
             "seed": seed,
             }])
-        
+        return self.queue, self.clock
+    
 ############## ENCODERS
     def declare_encoders(self, exp):
         self.tformer, self.gen, self.enc_opt = exp
@@ -225,27 +226,30 @@ class T2IPipe:
         if self.device == "mps": torch.mps.empty_cache()
         if self.device == "xpu": torch.xpu.empty_cache()
  
-
+ ############## PIPE
+    def add_vae(self, vae, device):
+        self.vae_opt, self.vae_exp = vae
+        self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
+        if self.vae_exp.get("variant",0) != 0:
+            var, dtype = self.float_converter(self.vae_exp["variant"])
+            self.vae_exp["variant"] = var
+            self.vae_exp.setdefault("torch_dtype", dtype)
+        self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(device)
+        return self.autoencoder
+    
 ############## PIPE
     def construct_pipe(self, exp, vae):
         self.pipe_exp, self.model, = exp
-        self.vae_opt, self.vae_exp = vae
+      
         if self.pipe_exp.get("variant",0):
             var, dtype = self.float_converter(self.pipe_exp["variant"])
             self.pipe_exp["variant"] = var
             self.pipe_exp.setdefault("torch_dtype", dtype)
         self.tc(self.clock)
 
-
-        self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
-        if self.vae_exp.get("variant",0) != 0:
-            var, dtype = self.float_converter(self.vae_exp["variant"])
-            self.vae_exp["variant"] = var
-            self.vae_exp.setdefault("torch_dtype", dtype)
-        self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
-
         self.tc(self.clock)
-        self.pipe = AutoPipelineForText2Image.from_pretrained(self.model, vae=self.autoencoder, **self.pipe_exp).to(self.device)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(self.model, vae=vae, **self.pipe_exp).to(self.device)
+        return self.pipe
 
 ############## LORA
     def add_lora(self, exp, fuse, opt):
@@ -258,6 +262,7 @@ class T2IPipe:
         if fuse: 
             self.pipe.fuse_lora(**self.lora_opt) #add unet only possibility
             self.tc(self.clock)
+        return self.pipe
 
 ############## MEMORY OFFLOADING
     def offload_to(self, seq=False, cpu=False, disk=False):
@@ -282,8 +287,6 @@ class T2IPipe:
         self.pipe.scheduler = self.algorithm_converter(self.opt_exp["algorithm"], self.opt_exp["scheduler"])
 
         self.tc(self.clock) ### cue lag spike
-        if self.opt_exp.get("lora",0) !=0:
-            self.add_lora(self.opt_exp["lora"], self.opt_exp["fuse_lora_on"], self.opt_exp["fuse_lora"])
         if self.enc_opt.get("dynamo",0) != 0:
             self.compile_model(self.pipe.unet, self.opt_exp["compile"])
 
