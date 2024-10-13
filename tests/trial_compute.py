@@ -44,14 +44,15 @@ insta.cache_jettison(encoder=True)
 
 #t2i
 pipe_exp = optimize.pipe_exp()
-insta.construct_pipe(pipe_exp)
+vae_exp = optimize.vae_exp()
+insta.construct_pipe(pipe_exp, vae_exp)
 insta.diffuse_latent(gen_exp)
 #insta.metrics()
 #cache ctrl nocude
 insta.cache_jettison(lora=True)
 
 #vae nodesorta but
-vae_exp = optimize.vae_exp()
+
 image = insta.decode_latent(vae_exp)
 
 #cache ctrl node

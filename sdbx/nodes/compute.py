@@ -26,8 +26,8 @@ from diffusers.schedulers import (
      )
 from diffusers.utils import logging as df_log
 from transformers import logging as tf_log
-from diffusers import AutoencoderKL, AutoPipelineForText2Image, DiffusionPipeline, UNet2DConditionModel
-from transformers import CLIPTextModel, CLIPTokenizer, CLIPTokenizerFast, AutoTokenizer, AutoModel, CLIPTextModelWithProjection
+from diffusers import AutoencoderKL, AutoPipelineForText2Image,
+from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
 import accelerate
 
 from sdbx import logger
@@ -139,12 +139,10 @@ class T2IPipe:
 
         self.tokenizer = CLIPTokenizer.from_pretrained(
             self.tformer["model"][0],
-            cache_dir=self.config_path
         )
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder = CLIPTextModel.from_pretrained(
             self.tformer["model"][0],
-            cache_dir=self.config_path,
             **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
@@ -154,13 +152,11 @@ class T2IPipe:
 
         self.tokenizer_2 = CLIPTokenizer.from_pretrained( #CLIPTokenizerFast.from_pretrained(
             self.tformer["model"][1],
-            cache_dir=self.config_path
         )
 
         self.hf_log(fatal=True) #suppress layer skip messages
         self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
             self.tformer["model"][1],
-            cache_dir=self.config_path,
             **self.tformer_dict
         ).to(self.device)
         self.hf_log(on=True) #return to normal
@@ -229,15 +225,23 @@ class T2IPipe:
 ############## PIPE
     def construct_pipe(self, exp, model="stabilityai/stable-diffusion-xl-base-1.0"):
         self.model = model
-        self.pipe_exp, custom_model = exp
+        self.pipe_exp, custom_model, self.vae_opt, self.vae_exp = exp
         if self.pipe_exp.get("variant",0):
             var, dtype = self.float_converter(self.pipe_exp["variant"])
             self.pipe_exp["variant"] = var
             self.pipe_exp.setdefault("torch_dtype", dtype)
         self.tc(self.clock, f"precision set for: {var}, using {dtype}", self.bug_off)
 
+
+        self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
+        if self.vae_exp.get("variant",0) != 0:
+            var, dtype = self.float_converter(self.vae_exp["variant"])
+            self.vae_exp["variant"] = var
+            self.vae_exp.setdefault("torch_dtype", dtype)
+        self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
+
         self.tc(self.clock, f"load model {os.path.basename(self.model)}...", self.bug_off)
-        self.pipe = AutoPipelineForText2Image.from_pretrained(model, **self.pipe_exp).to(self.device)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(model, vae=self.autoencoder, **self.pipe_exp).to(self.device)
 
 ############## LORA
     def add_lora(self, exp, fuse, opt):
@@ -266,28 +270,12 @@ class T2IPipe:
             exp.setdefault("mode","max-autotune")
         if False:self.model = torch.compile(self.model, **exp) #compile needs to be put in another routine
         return self.model
-
-############## CFG CUTOFF
-    def _dynamic_guidance(self, pipe, step_index, timestep, callback_key):
-        if step_index == int(pipe.num_timesteps * 0.5):
-            callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
-            callback_key['add_text_embeds'] = callback_key['add_text_embeds'].chunk(2)[-1]
-            callback_key['add_time_ids'] = callback_key['add_time_ids'].chunk(2)[-1]
-            pipe._guidance_scale = 0.0
-        return callback_key
     
-    def add_dynamic_cfg(self):
-            self.tc(self.clock, "set dynamic cfg")
-            self.gen_dict.setdefault("callback_on_step_end",self._dynamic_guidance)
-            self.gen_dict.setdefault("callback_on_step_end_tensor_inputs",['prompt_embeds', 'add_text_embeds','add_time_ids'])
-
 ############## INFERENCE
     def diffuse_latent(self, exp):
         tformer, self.gen_dict, self.opt_exp = exp
         self.tc(self.clock, f"set scheduler", self.bug_off)
         self.pipe.scheduler = self.algorithm_converter(self.opt_exp["algorithm"], self.opt_exp["scheduler"])
-        if self.opt_exp.get("dynamic_cfg",0) != 0: 
-            self.add_dynamic_cfg()
 
         self.tc(self.clock, "activating device. this may take a moment...") ### cue lag spike
         if self.opt_exp.get("lora",0) !=0:
@@ -321,15 +309,15 @@ class T2IPipe:
 ############## AUTODECODE
     def decode_latent(self, opt):
         self.vae_opt, self.vae_exp = opt
-        self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
-        if self.vae_exp.get("variant",0) != 0:
-            var, dtype = self.float_converter(self.vae_exp["variant"])
-            self.vae_exp["variant"] = var
-            self.vae_exp.setdefault("torch_dtype", dtype)
-        file_prefix = f"{self.vae_opt['file_prefix']}-{self.vae_opt['lora_class']}-{self.vae_opt['algorithm']}"
-        self.tc(self.clock, f"decode configured for {os.path.basename(self.autoencoder)}...", self.bug_off)
-        self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
-        self.pipe.vae = self.autoencoder
+        # self.autoencoder = self.vae_opt["vae"] #autoencoder wants full path and filename 
+        # if self.vae_exp.get("variant",0) != 0:
+        #     var, dtype = self.float_converter(self.vae_exp["variant"])
+        #     self.vae_exp["variant"] = var
+        #     self.vae_exp.setdefault("torch_dtype", dtype)
+        # file_prefix = f"{self.vae_opt['file_prefix']}-{self.vae_opt['lora_class']}-{self.vae_opt['algorithm']}"
+        # self.tc(self.clock, f"decode configured for {os.path.basename(self.autoencoder)}...", self.bug_off)
+        # self.autoencoder = AutoencoderKL.from_single_file(self.autoencoder,**self.vae_exp).to(self.device)
+        # self.pipe.vae = self.autoencoder
         if self.vae_opt.get("upcast_vae",0) != 0: 
             self.pipe.upcast_vae()
         if self.enc_opt.get("dynamo",0) != 0:

@@ -79,7 +79,7 @@ from numpy.random import SeedSequence, Generator, Philox
 def soft_random(size=0x2540BE3FF): # returns a deterministic random number using Philox
     entropy = f"0x{secrets.randbits(128):x}" # git gud entropy
     rndmc = Generator(Philox(SeedSequence(int(entropy,16))))
-    return rndmc.integers(0, size) 
+    return int(rndmc.integers(0, size))
 
 def hard_random(hardness=5): # returns a non-prng random number use secrets
     return int(secrets.token_hex(hardness),16) # make hex secret be int

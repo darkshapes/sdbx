@@ -1,32 +1,21 @@
-import gc
 import os
-from time import perf_counter_ns
-import datetime
-
-from diffusers import UNet2DConditionModel, StableDiffusionXLPipeline, AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, FromOriginalModelMixin
-from diffusers.schedulers import AysSchedules
+from sdbx.nodes.helpers import soft_random, seed_planter
 from sdbx.config import config
-from sdbx.nodes.helpers import seed_planter, soft_random
+
 import torch
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, AutoTokenizer, AutoModel
-
-def tc(clock, string, debug=False): 
-    if not debug: 
-        return print(f"[ {str(datetime.timedelta(milliseconds=(((perf_counter_ns()-clock)*1e-6))))[:-2]} ] {string}") 
-
-clock = perf_counter_ns() # 00:00:00
-tc(clock, " ")
+from diffusers import AutoPipelineForText2Image, DPMSolverMultistepScheduler, AutoencoderKL, UNet2DConditionModel #EulerAncestralDiscreteScheduler StableDiffusionXLPipeline
+from diffusers.schedulers import AysSchedules
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 queue = []    
 prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
-seed = int(soft_random())
+seed = soft_random()
 queue.extend([{
 "prompt": prompt,
 "seed": seed,
 }])
 
 device = "cuda"
-tc(clock,f"encoding prompt with device: {device}")
 def encode_prompt(prompts, tokenizers, text_encoders):
     embeddings_list = []
     for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
@@ -60,33 +49,36 @@ def encode_prompt(prompts, tokenizers, text_encoders):
     negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
 
     return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
-
-model_path = "C:\\Users\\Public\\models\\metadata\\STA-XL"
-token_encoder = "C:\\Users\\Public\\models\\metadata\\CLI-VL"
-token_encoder_2 = "C:\\Users\\Public\\models\\metadata\\CLI-VG"
+model = "C:\\Users\\Public\\models\\metadata\\STA-XL"
 
 tokenizer = CLIPTokenizer.from_pretrained(
-    token_encoder,
+    model,
+    subfolder='tokenizer',
+    local_files_only=True,
 )
 
 text_encoder = CLIPTextModel.from_pretrained(
-    model_path,
+    model,
     subfolder='text_encoder',
     use_safetensors=True,
     torch_dtype=torch.float16,
     variant='fp16',
+    local_files_only=True,
 ).to(device)
 
 tokenizer_2 = CLIPTokenizer.from_pretrained(
-    token_encoder_2,
+    model,
+    subfolder='tokenizer_2',
+    local_files_only=True,
 )
 
 text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-    model_path,
+    model,
     subfolder='text_encoder_2',
     use_safetensors=True,
     torch_dtype=torch.float16,
     variant='fp16',
+    local_files_only=True,
 ).to(device)
 
 with torch.no_grad():
@@ -97,61 +89,58 @@ with torch.no_grad():
             [text_encoder, text_encoder_2],
     )
 
-    del tokenizer, text_encoder, tokenizer_2, text_encoder_2
+del tokenizer, text_encoder, tokenizer_2, text_encoder_2
 
-    if device == "cuda": torch.cuda.empty_cache()
+torch.cuda.empty_cache()
+max_memory = round(torch.cuda.max_memory_allocated(device=device) / 1e9, 2)
+print('Max. memory used:', max_memory, 'GB')
 
-model_file = "C:\\Users\\Public\\models\\image\\"
-original_config = "C:\\Users\\Public\\models\\metadata\\STA-XL\\sdxl_base.yaml"
-unet_file = "C:\\Users\\Public\\models\\image\\sdxlbase.diffusion_pytorch_model.fp16.safetensors"
+vae_file = "C:\\Users\\Public\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors"
+config_file = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae\\config.json"
+vae = AutoencoderKL.from_single_file(vae_file, config=config_file, local_files_only=True,  torch_dtype=torch.float16, variant="fp16").to("cuda")
 
+pipe = AutoPipelineForText2Image.from_pretrained(
+    model,
+    torch_dtype=torch.float16, 
+    variant="fp16",
+    tokenizer = None,
+    text_encoder = None,
+    tokenizer_2 = None,
+    text_encoder_2 = None,
+    local_files_only=True,
+    vae = vae #"C:\\Users\\Public\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors"
+    ).to("cuda")
 
-unet = UNet2DConditionModel.from_single_file(unet_file, original_config=original_config, torch_dtype=torch.float16, variant="fp16")
-pipe = StableDiffusionXLPipeline.from_single_file(
-    model_path, torch_dtype=torch.float16, variant="fp16"                
-).to(device)
+ays = AysSchedules["StableDiffusionXLTimesteps"]
 
-pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="dpmsolver++")
 pipe.enable_sequential_cpu_offload()
 
-tc(clock, "set generator")
 generator = torch.Generator(device=device)
 
-tc(clock, "begin queue loop...")
-
 for i, generation in enumerate(queue, start=1):
-    image_start = perf_counter_ns()                        #start the metric stopwatch
-    tc(clock, f"planting seed {generation['seed']}...")
     seed_planter(generation['seed'])
     generator.manual_seed(generation['seed'])
-    tc(clock, f"inference device: {device}....")
 
     generation['latents'] = pipe(
         prompt_embeds=generation['embeddings'][0],
         negative_prompt_embeds =generation['embeddings'][1],
         pooled_prompt_embeds=generation['embeddings'][2],
         negative_pooled_prompt_embeds=generation['embeddings'][3],
-        num_inference_steps=20,
+        num_inference_steps=10,
+        timesteps=ays,
         guidance_scale=5,
         generator=generator,
         output_type='latent',
     ).images 
 
-    if device == "cuda": torch.cuda.empty_cache()
+torch.cuda.empty_cache()
 
-tc(clock, "decoding using {vae_path}...")
-vae_file = "c:\\Users\\Public\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors",
-vae_path = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae"
-vae_config = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae\\config.json"
-#vae = AutoencoderKL.from_single_file(vae_file, config=vae_path, torch_dtype=torch.float16, cache_dir="vae_").to("cuda")
-vae = FromOriginalModelMixin.from_single_file(vae_file, config=vae_config).to(device)
-pipe.vae=vae
 pipe.upcast_vae()
-
+output_dir = config.get_path("output")
 with torch.no_grad():
-    counter = [s.endswith('png') for s in os.listdir(config.get_path("output"))].count(True) # get existing images
+    counter = [s.endswith('png') for s in output_dir].count(True) # get existing images
     for i, generation in enumerate(queue, start=1):
-        generation['total_time'] = perf_counter_ns() - image_start
         generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
 
         image = pipe.vae.decode(
@@ -161,22 +150,12 @@ with torch.no_grad():
 
         image = pipe.image_processor.postprocess(image, output_type='pil')[0]
 
-        tc(clock, "saving")     
         counter += 1
         filename = f"Shadowbox-{counter}-batch-{i}.png"
 
         image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
 
 
-if device == "cuda": torch.cuda.empty_cache()
-
-### METRICS
-images_totals = ', '.join(map(lambda generation: str(round(generation['total_time'], 1)), queue))
-print('Image time:', images_totals, 'seconds')
-
-images_average = round(sum(generation['total_time'] for generation in queue) / len(queue), 1)
-print('Average image time:', images_average, 'seconds')
-
-if device == "cuda":
-        max_memory = round(torch.cuda.max_memory_allocated(device='cuda') / 1000000000, 2)
-        print('Max. memory used:', max_memory, 'GB')
+torch.cuda.empty_cache()
+max_memory = round(torch.cuda.max_memory_allocated(device='cuda') / 1e9, 2)
+print('Max. memory used:', max_memory, 'GB')
