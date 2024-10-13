@@ -27,6 +27,7 @@ class EvalMeta:
     # CRITERIA THRESHOLDS
     model_tensor_pct = 2e-3  # fine tunings
     model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
+    model_size_pct = 3e-3    
     vae_pct = 5e-3           # please do not disrupt
     vae_xl_pct = 1e-8
     tra_pct = 1e-4
@@ -161,17 +162,18 @@ class EvalMeta:
                         or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
                         or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                            self.tag = "m"
-                            self.key = tensor_params
-                            self.sub_key = shape #found model
+                                self.tag = "m"
+                                self.key = tensor_params
+                                self.sub_key = shape #found model
                     else:
                         logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
                         self.tag = "m"
                         self.key = tensor_params
                         self.sub_key = shape               ######################################DEBUG
-                        if self.verbose is True: 
-                            print(f"{self.tag}, VAE-{self.tag}:{self.vae_inside}, CLI-{self.tag}:{self.clip_inside}")
-
+            elif isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
+                            self.tag = "m"
+                            self.key = "1468"
+                            self.sub_key = "320" #found model
     def data(self):
 
         if self.name_value != "": # check LLM
@@ -219,7 +221,7 @@ class EvalMeta:
             self.code = f"LLM"
             self.lookup = f"{self.arch}"
         else:
-            if self.verbose is True: print(f"Unknown type:'{self.filename}'.")
+            logger.debug(f"Unknown type:'{self.filename}'.")
             # consider making ignore list for undetermined models
             logger.debug(f"'Could not determine id '{self.extract}'.", exc_info=True)
             pass
@@ -228,7 +230,7 @@ class EvalMeta:
             logger.debug(f"'Not indexed. 'No eval error' should follow: '{self.extract}'.", exc_info=True)
             pass
         else:   #format [ model type code, filename, compatability code, file size, full file path]
-            if self.verbose is True: print(self.code, self.lookup, self.filename, self.size, self.path)
+            if self.verbose is True: logger.debug(self.code, self.lookup, self.filename, self.size, self.path)
             return self.code, (
                 self.filename, self.lookup, self.size, self.path, 
                 (self.context_length if self.context_length else self.dtype))
@@ -283,7 +285,6 @@ class ReadMeta:
         except Exception as log:
             logger.debug(f"Error reading safetensors metadata from '{self.path}': {log}", exc_info=True)
             logger.debug(log, exc_info=True)
-            print(log)
         else:
             with open(self.path, "rb") as file:
                 header = struct.unpack("<Q", file.read(8))[0]
@@ -400,7 +401,7 @@ class IndexManager:
                     else:
                         log = f"No data: {each}."
                         logger.debug(log, exc_info=True)
-                        print(log)
+                        logger.debug(log)
         if self.all_data:
             if self.delete_flag:
                 try:
@@ -415,7 +416,6 @@ class IndexManager:
         else:
             log = "Empty model directory, or no data to write."
             logger.debug(f"{log}{error_log}", exc_info=True)
-            print(log)
 
      #recursive function to return model codes assigned to tree keys and transformer model values
     def _fetch_txt_enc_types(self, data, query, path=None, return_index_nums=False):
@@ -483,7 +483,6 @@ class IndexManager:
         except TypeError as error_log:
             log = f"No match found for {query}"
             logger.debug(f"{log}{error_log}", exc_info=True)
-            print(log)
         if self.tra_req == None:
             tra_sorted =str("∅")
             logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
@@ -508,6 +507,7 @@ class IndexManager:
         lora_sorted = dict(lora_sorted)
         if vae_sorted == []: 
             vae_sorted =str("∅")
+            print(query)
             logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
         if lora_sorted == []: 
             lora_sorted =str("∅")
@@ -536,7 +536,7 @@ class IndexManager:
             sort = sorted(pack.items(), key=lambda item: item[1])
             return sort
         else:
-            print("Compatible models not found")
+            logger.debug("Compatible models not found")
             return "∅"
     
 

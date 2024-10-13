@@ -40,7 +40,8 @@ class NodeTuner:
     algorithms = list(config.get_default("algorithms","schedulers"))
     solvers = list(config.get_default("algorithms","solvers"))
     metadata_path = config.get_path("models.metadata")
-    first_device = next(iter(spec.get("devices")),"cpu")
+    first_device = next(iter(spec.get("devices","cpu")),"cpu")
+
 
 
     def symlinker(self, true_file, class_name, filename, full_path=False): 
@@ -82,26 +83,28 @@ class NodeTuner:
         if self.sort == "LLM":
             """LLM-specific tuning"""
         elif self.sort in ["VAE", "TRA", "LOR"]:           
-            """Handle VAE, TRA, LOR types"""
+            """Handle VAE, TRA, LOR types when sent from individual nodes"""
         else:
             self.model["class"] = self.category
             self.model["dtype"] = list(self.fetch)[2]
-            model_extension = "fp16.safetensors" if self.model["dtype"] == "F16" else ".safetensors"
-            model_filename  = os.path.join("unet","diffusion_pytorch_model",model_extension)
-            link = self.symlinker(list(self.fetch)[1],self.category, model_filename, full_path=True)
-            self.model["file"]     = link
-            self.model["basename"] = os.path.basename(self.model["file"])
-            self.model["path"]      = str(self.model["file"]).replace(self.model["basename"],"")
+            self.sym_suffix = "diffusion_pytorch_model"
+            self.extensions_list = [".fp16.safetensors",".safetensors"]
             self.unet["model"]      = list(self.fetch)[1]
-            self.unet["class"]      = self.category
+            for model_extension in self.extensions_list:
+                model_filename  = os.path.join("unet",self.sym_suffix + model_extension)
+                link = self.symlinker(self.unet["model"], self.category ,model_filename)
+            self.model["file"] = link
+            self.unet["class"] = self.category
             self._vae, self._tra, self._lora =  IndexManager().fetch_compatible(self.category)
-            self.pipe["local_files_only"] = True
-            self.pipe["low_cpu_mem_usage"] =True
-            self.vae["local_files_only"]  = True
-            self.pipe["low_cpu_mem_usage"] =True
+            self.pipe["local_files_only"]          = True
+            self.pipe["low_cpu_mem_usage"]         = True
+            self.vae["local_files_only"]           = True
+            self.pipe["low_cpu_mem_usage"]         = True
             self.transformers["local_files_only"]  = True
             self.transformers["use_safetensors"]   = True
-            self.transformers["low_cpu_mem_usage"] = self.oh_no[1]
+            self.transformers["low_cpu_mem_usage"] = True
+            self.vae["config"] = os.path.join(config.get_path("models.metadata"),self.category,"vae","config.json")
+
 
     @cache
     def opt_exp(self):
@@ -129,8 +132,6 @@ class NodeTuner:
 
         self.optimized["cache_jettison"] = self.oh_no[1]
         self.optimized["device"]         = self.first_device
-        if self.spec.get("flash_attention_2",False)  == True: 
-            self.optimized["attn_implementation"] = "flash_attention_2" #dont add unless necessary
         self.optimized["dynamic_cfg"]    = False
         self.optimized["seq"]            = self.oh_no[1]
         self.optimized["cpu"]            = self.oh_no[2]
@@ -164,7 +165,7 @@ class NodeTuner:
         #self.pipe["device_map"] = None
         if "STA-15" in self.category: 
             self.pipe["safety_checker"] = None
-        return self.pipe, self.model["path"] #, self.model["file"], self.unet["model"]
+        return self.pipe, self.model["file"] #, self.model["file"], self.unet["model"]
     
     @cache
     def cond_exp(self):
@@ -176,11 +177,11 @@ class NodeTuner:
     @cache
     def vae_exp(self):
         # ensure value returned
+        print(self._vae)
         if self._vae != "∅":  
-            vae_extension       = "fp16.safetensors" if self._vae[0][1][2]  == "F16" else ".safetensors"
-            vae_filename        = os.path.join("vae","diffusion_pytorch_model",vae_extension)
-            link                = self.symlinker(self._vae[0][1][1], self.category, vae_filename)
-            self.vae ["config"] = link
+            # for vae_extension in self.extensions_list:
+            #     vae_filename  = os.path.join(os.sep,"vae", self.sym_suffix + vae_extension)
+            #     link          = self.symlinker(self._vae[0][1][1], self.category, vae_filename, full_path=True)
             self.optimized["vae"] = self._vae[0][1][1]
             if self.first_device == "cpu":
                 self.vae["variant"] = "F32"
@@ -264,29 +265,34 @@ class NodeTuner:
         if self._tra != "∅" and self._tra != {}: 
             i=0
             for each in self._tra:
-                tra_extension = "fp16.safetensors" if self._tra[each][2] == "F16" else ".safetensors"
-                if i==0:
-                    filename = os.path.join("text_encoder","model",tra_extension)
-                else:
-                    filename = os.path.join(f"text_encoder_{i+1}","model",tra_extension)                        
-                link = self.symlinker(self._tra[each][1],each, filename)
-                self.transformers["model"][i] = link
+                for tra_extension in self.extensions_list:
+                    if i==0:
+                        tra_filename = os.path.join("text_encoder","model" + tra_extension)
+                    else:
+                        tra_filename = os.path.join(f"text_encoder_{i+1}","model" + tra_extension)                        
+                    link = self.symlinker(self._tra[each][1], self.category, tra_filename)
+                self.optimized["transformer"][i] = link
                 i+=1
-            self.skip                              = 12 - int(self.skip)
-            self.transformers["num_hidden_layers"] = self.skip
-            for each in self._tra:
-                if self.first_device != "cpu":
+                if self.first_device == "cpu":
                     if not self.oh_no[0]:
-                        self.transformers["variant"][each] = self._tra[each][2]
+                        self.transformers[each]["variant"] = self._tra[each][2]
                     else: 
-                        self.transformers["torch_dtype"]       = "auto"
-                        self.transformers["low_cpu_mem_usage"] = self.oh_no[1]
-                else: self.transformers["variant"][each] = "F32"
+                        self.transformers[each]["torch_dtype"]      = "auto"
+                        self.transformers[each]["low_cpu_mem_usage"] = self.oh_no[1]
+                else: 
+                    self.transformers[each]["variant"] = "F32"
+                self.skip                              = 12 - int(self.skip)
+                self.transformers[each]["num_hidden_layers"] = self.skip
+                if self.spec.get("flash_attention_2",False)  == True: 
+                    self.transformers[each]["attn_implementation"] = "flash_attention_2" #dont add unless necessary
         else:
-                self.transformers["model"]   = self.model["path"]
-                self.transformers["variant"] = self.model["dtype"]
-                self.transformers["torch_dtype"]       = "auto"
-                self.pipe["variant"]                   = self.model["dtype"] #model variant
+                for tra_extension in self.extensions_list:
+                    tra_filename = os.path.join("text_encoder", self.sym_suffix + tra_extension)
+                    link = self.symlinker(list(self.fetch)[1],self.category, tra_filename)
+                self.optimized["transformer"] = link
+                self.transformers[self.category]["variant"] = self.model["dtype"]
+                self.transformers[self.category]["torch_dtype"]       = "auto"
+                #self.pipe["variant"]                   = self.model["dtype"] #model variant
 
         if next(iter(self._lora.items()),0) != 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()

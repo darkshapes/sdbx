@@ -10,7 +10,7 @@ print(f"Ready.")
 name_path = input("""
 Please type the filename of an available checkpoint.
 Path will be detected.
-(default:ponyFaetality_v11.safetensors):""" or "ponyFaetality_v11.safetensors")
+(default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensorss")
 
 name_path = os.path.basename(name_path)
 spec = config.get_default("index","DIF")
