@@ -314,6 +314,7 @@ class Config(BaseSettings):
         if config.device.cuda.is_available(): 
             spec["data"]["devices"]["cuda"]   = config.device.cuda.mem_get_info()[1]
             spec["data"]["flash_attention_2"] = str(config.device.backends.cuda.flash_sdp_enabled()).title()
+            spec["data"]["torch.backends.cudnn.allow_tf32"] = False
         if config.device.backends.mps.is_available() & self.device.backends.mps.is_built(): 
             spec["data"]["devices"]["mps"] = config.device.mps.driver_allocated_memory()
             try: 

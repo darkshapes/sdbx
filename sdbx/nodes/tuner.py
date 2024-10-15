@@ -86,7 +86,7 @@ class NodeTuner:
             """Handle VAE, TRA, LOR types when sent from individual nodes"""
         else:
             self.model["class"] = self.category
-            self.model["dtype"] = list(self.fetch)[2]
+            self.model["variant"] = list(self.fetch)[2]
             self.sym_suffix = "diffusion_pytorch_model"
             self.extensions_list = [".fp16.safetensors",".safetensors"]
             self.unet["model"]      = list(self.fetch)[1]
@@ -98,11 +98,11 @@ class NodeTuner:
             self._vae, self._tra, self._lora =  IndexManager().fetch_compatible(self.category)
             self.pipe["local_files_only"]          = True
             self.pipe["low_cpu_mem_usage"]         = True
-            self.vae["local_files_only"]           = True
             self.pipe["low_cpu_mem_usage"]         = True
             self.transformers["local_files_only"]  = True
             self.transformers["use_safetensors"]   = True
             self.transformers["low_cpu_mem_usage"] = True
+            self.vae["local_files_only"]           = True
             self.vae["config"] = os.path.join(config.get_path("models.metadata"),self.category,"vae","config.json")
 
 
@@ -130,6 +130,17 @@ class NodeTuner:
         elif gpu_ceiling < .5:
             self.oh_no[0] = True
 
+        if self.first_device == "cuda":
+            compute_capability = config.device.cuda.get_device_capability()[0]
+            if compute_capability < 7 & self.oh_no[0] == False:
+                self.model["variant"] = "F16"
+                self.transformer[self.category]["variant"] = "F16"
+                self.vae["variant"] = "F16"            
+        elif self.first_device == "cpu":
+            self.model["variant"] = "F32"
+            self.tra["variant"] = "F32"
+            self.vae["variant"] = "F32"
+
         self.optimized["cache_jettison"] = self.oh_no[1]
         self.optimized["device"]         = self.first_device
         self.optimized["dynamic_cfg"]    = False
@@ -141,7 +152,9 @@ class NodeTuner:
         self.optimized["upcast_vae"]     = True if self.category == "STA-XL" else False # f32, fp16 broken by default
         self.optimized["fuse_lora_on"]   = False
         #self.optimized["fuse_pipe"]     = True #pipe.fuse_qkv_projections(), untested
-        self.optimized["fuse_unet_only"] = False # x todo - add conditions where this is useful
+        self.optimized["fuse_unet_only"] = False # todo - add conditions where this is useful
+        if self.spec.get("flash_attention_2", 0) == True:
+                    self.optimized["flash_attention_2"] = True
         if self.spec.get("dynamo",False):
             self.optimized["sigmas"] = True #
             self.optimized["dynamo"] = self.spec["dynamo"]
@@ -149,19 +162,13 @@ class NodeTuner:
   
     @cache
     def pipe_exp(self):
-        if self.first_device != "cpu":
-            if self.oh_no[0] == True:
-                #self.pipe["variant"] = self.model["dtype"] #model variant
-                self.pipe["torch_dtype"] = "auto"
-            elif self.oh_no[1] == True:
-                self.pipe["variant"] = "F16" #model variant
-        else: 
-            self.pipe["variant"] = "F32"
+        if self.model.get("variant",0) != "F32" and self.model.get("variant,0") != "F16": self.pipe["variant"] = self.model["variant"]
         self.pipe["tokenizer"]      = None
         self.pipe["text_encoder"]   = None
         self.pipe["tokenizer_2"]    = None
         self.pipe["text_encoder_2"] = None
         self.unet["variant"]        = self.pipe["variant"]
+
         #self.pipe["device_map"] = None
         if "STA-15" in self.category: 
             self.pipe["safety_checker"] = None
@@ -183,12 +190,7 @@ class NodeTuner:
             #     vae_filename  = os.path.join(os.sep,"vae", self.sym_suffix + vae_extension)
             #     link          = self.symlinker(self._vae[0][1][1], self.category, vae_filename, full_path=True)
             self.optimized["vae"] = self._vae[0][1][1]
-            if self.first_device == "cpu":
-                self.vae["variant"] = "F32"
-            elif not self.oh_no[0]: 
-                self.vae["variant"] = self._vae[0][1][2]
-            else:
-                self.vae["torch_dtype"] = "auto"
+            if self.vae.get("variant",0) == 0: self.vae["variant"] = self._vae[0][1][2]
         else:
             self.optimized["vae"] = self.model["file"]
             self.vae["torch_dtype"] = "auto"
@@ -202,6 +204,7 @@ class NodeTuner:
             self.vae["enable_slicing"]  = True
         else: 
             self.vae["disable_slicing"] = True # [compatibility] serialize vae to lower memory
+
         return self.optimized, self.vae
     
     def _get_step_from_filename(self, key, val):
@@ -261,8 +264,8 @@ class NodeTuner:
 
     @cache       
     def gen_exp(self, skip):
-        self.skip = skip
-        if self._tra != "∅" and self._tra != {}: 
+        self.skip =  12 - int(skip)
+        if self._tra != "∅" and self._tra != {}:
             i=0
             for each in self._tra:
                 for tra_extension in self.extensions_list:
@@ -274,14 +277,10 @@ class NodeTuner:
                 self.optimized["transformer"][i] = link
                 i+=1
                 if self.first_device == "cpu":
-                    if not self.oh_no[0]:
-                        self.transformers[each]["variant"] = self._tra[each][2]
-                    else: 
-                        self.transformers[each]["torch_dtype"]      = "auto"
-                        self.transformers[each]["low_cpu_mem_usage"] = self.oh_no[1]
-                else: 
                     self.transformers[each]["variant"] = "F32"
-                self.skip                              = 12 - int(self.skip)
+                else: 
+                    self.transformers[each]["variant"] = self._tra[each][2]
+
                 self.transformers[each]["num_hidden_layers"] = self.skip
                 if self.spec.get("flash_attention_2",False)  == True: 
                     self.transformers[each]["attn_implementation"] = "flash_attention_2" #dont add unless necessary
@@ -290,9 +289,8 @@ class NodeTuner:
                     tra_filename = os.path.join("text_encoder", self.sym_suffix + tra_extension)
                     link = self.symlinker(list(self.fetch)[1],self.category, tra_filename)
                 self.optimized["transformer"] = link
-                self.transformers[self.category]["variant"] = self.model["dtype"]
-                self.transformers[self.category]["torch_dtype"]       = "auto"
-                #self.pipe["variant"]                   = self.model["dtype"] #model variant
+                self.transformers[self.category]["variant"] = self.model["variant"]
+                self.transformers[self.category]["num_hidden_layers"] = self.skip
 
         if next(iter(self._lora.items()),0) != 0:
             self.optimized["lora"], self.optimized["lora_class"] = self.prioritize_loras()
@@ -301,7 +299,6 @@ class NodeTuner:
                 self.optimized["algorithm"]                     = self.algorithms[5] #DDIM
                 self.optimized["scheduler"]["timestep_spacing"] = "trailing"
                 self.optimized["scheduler"]["set_alpha_to_one"] = False  # [compatibility]PCM False
-                #self.optimized["scheduler"]["rescale_betas_zero_snr"] = True  # [compatibility] DDIM True 
                 self.optimized["scheduler"]["clip_sample"] = False
                 self.gen["guidance_scale"] = 5 if "normal" in str(self.optimized["lora"]).lower() else 2
             elif "SPO" in self.optimized["lora_class"]:
@@ -399,13 +396,12 @@ class NodeTuner:
             self.refiner["denoising_end"]       = self.refiner["high_noise_fra"]
             self.refiner["num_inference_steps"] = self.gen["num_inference_steps"], #begin step
             self.refiner["denoising_start"]     = self.refiner["high_noise_fra"],  #begin noise
-
         return self.refiner
 
     @cache
     def dynamo_exp(self):
         self.dynamo= defaultdict(dict)
-        self.gen["return_dict"]        = False
+        self.gen["return_dict"]             = False
         self.dynamo["compile"]["fullgraph"] = True
         self.dynamo["compile"]["mode"]      = "reduce-overhead" #switches to max-autotune if cuda device
         return self.dynamo

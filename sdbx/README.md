@@ -91,6 +91,7 @@ evaluate = ('DIF', ('noosphere_v42.safetensors', 'STA-15', 2132626794, 'C:\\User
 ##### METHODS get_tuned_parameters, determine_tuning
 ##### PURPOSE collect model defaults and apply to current node graph
 ##### OUTPUT a dict of defaults ready to be passed as arguments (save for optimized and model)
+        
 ##### RETURN FORMAT: { file: , variant: , torch_dtype, ... }
 ##### SYNTAX
 ```
@@ -129,7 +130,7 @@ dictionary map:
     fuse_pipe                        `-compile[ mode            use_beta_sigmas
     fuse_unet_only                              fullgraph       rescale_betas_zero_snr
                                                                                                                 
-    ```
+```
 
 ## CLASS T2IPipe
 ##### IMPORT from sdbx.nodes.compute import T2IPipe

@@ -76,9 +76,9 @@ def example_node(                                                     # by defau
     # to use multiple type-named outputs
     #   ) -> Tuple[Conditioning, Conditioning]:
     # to use multiple custom-named outputs
-    #   ) -> Tuple[A[Conditioning, Name("Positive")], A[Conditioning, Name("Negative")]]
+    #   ) -> Tuple[A[Conditioning, Name("Positive")], A[Conditioning, Name("Negative")]]:
     # to have no outputs
     #   ) -> None:
 
-# and thats how nodes are made! xox
+# and thats how nodes are made!
 # the end!
