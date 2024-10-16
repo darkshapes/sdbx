@@ -315,12 +315,17 @@ class Config(BaseSettings):
             spec["data"]["devices"]["cuda"]   = config.device.cuda.mem_get_info()[1]
             spec["data"]["flash_attention_2"] = str(config.device.backends.cuda.flash_sdp_enabled()).title()
             spec["data"]["torch.backends.cudnn.allow_tf32"] = False
+            if (config.device.backends.cuda.mem_efficient_sdp_enabled() 
+                | config.device.backends.cuda.flash_sdp_enabled()
+                | config.device.backends.cuda.math_sdp_enabled()) == True:
+                spec["data"]["enable_attention_slicing"] = False
         if config.device.backends.mps.is_available() & self.device.backends.mps.is_built(): 
             spec["data"]["devices"]["mps"] = config.device.mps.driver_allocated_memory()
             try: 
                 import flash_attn
             except: 
                 spec["data"]["flash_attention_2"] = "False"
+                spec["data"]["enable_attention_slicing"] = True
             else:
                 spec["data"]["flash_attention_2"] = "True"  # hope for the best that user set this up
             #set USE_FLASH_ATTENTION=1 in console

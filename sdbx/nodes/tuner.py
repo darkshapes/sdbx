@@ -44,7 +44,7 @@ class NodeTuner:
 
 
 
-    def symlinker(self, true_file, class_name, filename, full_path=False): 
+    def symlinker(self, true_file, class_name, filename, full_path=False):
         symlink_head      = os.path.join(config.get_path("models.metadata"), class_name)
         symlink_full_path = os.path.join(symlink_head, filename)
         try:
@@ -368,6 +368,7 @@ class NodeTuner:
             if self.category in ["STA-15", "STA-XL", "STA3"]:
                 self.optimized["algorithm"]     = self.algorithms[4] #DPMAlignYourSteps
                 self.gen["algorithm_type"]      = self.solvers[0]
+                self.optimized["scheduler"]["euler_at_final"] = True
                 self.gen["num_inference_steps"] = 10
                 if "STA-15" == self.category: 
                     self.optimized["scheduler"]["timesteps"] = AysSchedules[ "StableDiffusionTimesteps"]
@@ -384,7 +385,7 @@ class NodeTuner:
 
         self.gen["output_type"] = "latent"
         self.gen["low_cpu_mem_usage"] = self.oh_no[0]
-        if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #euler
+        if self.optimized.get("algorithm",0) == 0: self.optimized["algorithm"] = self.algorithms[0] #Euler
         return  self.transformers, self.gen, self.optimized
     
     @cache      

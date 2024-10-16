@@ -71,7 +71,7 @@ evaluate = ('DIF', ('noosphere_v42.safetensors', 'STA-15', 2132626794, 'C:\\User
 
         create_index = config.model_indexer.write_index(optional_filename)       # (defaults to config/index.json)
         fetch = IndexManager().fetch_id(query_as_string)                   # (single id search, first candidate only)
-        a,b,c = IndexManager().fetch_compatible(fetch)                     # (automated all type search)
+        a,b,c = IndexManager().fetch_compatible(model_class)                     # (automated all type search)
         ## using next(iter(___)):
                 a,b,c[0][0] filename
                 a,b,c[0][0][1:2] compatability short code
