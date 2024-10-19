@@ -32,8 +32,9 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     
     fn.generator = isgeneratorfunction(fn)
 
-    from sdbx.nodes.info import NodeInfo  # Avoid circular import
-    fn.info = NodeInfo(fn, **kwargs)
+    #commented for speed
+    #from sdbx.nodes.info import NodeInfo  # Avoid circular import
+    #fn.info = NodeInfo(fn, **kwargs)
 
     # from sdbx.nodes.tuner import NodeTuner
     # fn.tuner = NodeTuner(fn)

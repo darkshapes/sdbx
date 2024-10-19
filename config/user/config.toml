@@ -1,7 +1,7 @@
 [extensions]
-disable = false # [default false] Toggle extensions. false | "clients" | "nodes" | true 
+disable = false # [default false] Toggle extensions. false | "clients" | "nodes" | true
 
-[location] # Paths for loading and saving = "c:\\foo\\bar" or "..\\foo\\bar" | "/user/username/foo/bar" or "../foo/bar"
+[location] # Assigned paths for loading and saving = "c:\\foo\\bar" or "..\\foo\\bar" | "/user/username/foo/bar" or "../foo/bar"
 clients = "clients" # [default "clients"]
 nodes = "nodes"     # [default "nodes"]
 flows = "flows"     # [default "flows"]
@@ -9,8 +9,8 @@ input = "input"     # [default "input"]
 output = "output"   # [default "output"]
 models = "models"   # [default "models]
 
-[web] # http://listen:port and related settings. IPv4 format addresses.
-listen = "127.0.0.1" # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0" 
+[web] # http: //listen:port and related settings. IPv4 format addresses.
+listen = "127.0.0.1" # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0"
 port = 8188 # [default 8188] Chooses the listen port.
 reload = true # [default true] Reload the server on changes to source or user config directory.
 reload-include = [ # [default .toml, .json, models/] Glob for which file changes to reload the server to.
@@ -21,26 +21,18 @@ reload-include = [ # [default .toml, .json, models/] Glob for which file changes
 external-address = "localhost" # [default "localhost"] URL for external API, such as for image paths.
 max-upload-size = 100 # [default 100] Maximum file import size
 auto-launch = true # [default true] Opens Shadowbox in the default browser on launch.
-known-models = true # [default true] Toggle whether known (downloadable) models are shown in the UI.
-preview-mode = "auto" # [default auto] Show image while generating. "none" | "auto" | "latent2rgb" | "taesd"
+preview-mode = "auto" # [default auto] Show image while generating. "none" | "auto" | "taesd"
 
 [computational] # Settings that directly affect inference computation
 deterministic = false # [default false] Use slower deterministic algorithms. Determinism not guaranteed
 
-[memory] # force RAM management
-vram = "normal"     # [default "normal"] Available VRAM = "high" | "normal" | "low" | "none"
-smart-memory = true # [default true] Agressively offload to DRAM instead of VRAM
+[memory] # Override RAM management
+vram = "normal"         # [default "normal"] Available GPU RAM = "high" | "normal" | "low" | "none"
+system-profiling = true # [default true] Prevent out-of-memory errors by auto-configuring to system GPU and CPU
+channels-first = false  # [default false] Toggles channels last memory format when inferencing the models.
 
-[precision] # Bitrate for float point and weight calculation
-fp = "mixed"             # [default "mixed"] Floating point = "mixed" | "float32" | "float16" | "bfloat16" 
-unet = "float32"         # [default "float32"] Unet = "float32" | "float16" | "bfloat16" | "float8_e4m3fn" | "float8_e5m2"
-vae = "mixed"            # [default "mixed"] VAE = "mixed" | "float32" | "float16" | "bfloat16"
-text-encoder = "float16" # [default "float16"] Text encoder = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"
-
-[distributed] # Multi GPU and computer rendering
-role = false                                    # [default false] mode = "worker" | "frontend" | false.
-name = "shadowbox"                              # [default "shadowbox"] Exchange prompt requests and replies using queue_name.user_ID.
-connection-uri = "amqp://guest:guest@127.0.0.1" # [default "amqp://guest:guest@127.0.0.1"] AMQP communication URL.
-
-[organization]
-channels-first = false # [default false] Toggles channels last format when inferencing the models.
+[precision] # Override bitrate for float point and weight calculation
+fp = "mixed"             # [default "mixed"] Floating point = "mixed" | "float32" | "float16" | "bfloat16"
+unet = "float32"         # [default "float32"] Unet           = "float32" | "float16" | "bfloat16" | "float8_e4m3fn" | "float8_e5m2"
+vae = "mixed"            # [default "mixed"] VAE             = "mixed" | "float32" | "float16" | "bfloat16"
+text-encoder = "float16" # [default "float16"] Text encoder           = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"

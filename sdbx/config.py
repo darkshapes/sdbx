@@ -293,7 +293,7 @@ class Config(BaseSettings):
     def t2i_pipe(self):
         from sdbx.nodes.compute import T2IPipe
         return T2IPipe()
-    
+
     @cached_property
     def node_tuner(self):
         from sdbx.nodes.tuner import NodeTuner
@@ -309,25 +309,24 @@ class Config(BaseSettings):
         from collections import defaultdict
         from platform import system
         spec = defaultdict(dict)
-        spec["data"]["dynamo"] = "False" if system().lower() == "windows" else "True"
-        spec["data"]["devices"]           = {}
+        spec["data"]["dynamo"]  = False if system().lower() == "windows" else True
+        spec["data"]["devices"] = {}
         if config.device.cuda.is_available(): 
-            spec["data"]["devices"]["cuda"]   = config.device.cuda.mem_get_info()[1]
-            spec["data"]["flash_attention_2"] = str(config.device.backends.cuda.flash_sdp_enabled()).title()
-            spec["data"]["torch.backends.cudnn.allow_tf32"] = False
-            if (config.device.backends.cuda.mem_efficient_sdp_enabled() 
-                | config.device.backends.cuda.flash_sdp_enabled()
-                | config.device.backends.cuda.math_sdp_enabled()) == True:
+            spec["data"]["devices"]["cuda"] = config.device.cuda.mem_get_info()[1]
+            spec["data"]["flash_attention"] = False #str(config.device.backends.cuda.flash_sdp_enabled()).title()
+            spec["data"]["allow_tf32"]      = False
+            spec["data"]["xformers"]        = config.device.backends.cuda.mem_efficient_sdp_enabled()
+            if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
                 spec["data"]["enable_attention_slicing"] = False
         if config.device.backends.mps.is_available() & self.device.backends.mps.is_built(): 
             spec["data"]["devices"]["mps"] = config.device.mps.driver_allocated_memory()
             try: 
                 import flash_attn
             except: 
-                spec["data"]["flash_attention_2"] = "False"
+                spec["data"]["flash_attention"]          = False
                 spec["data"]["enable_attention_slicing"] = True
             else:
-                spec["data"]["flash_attention_2"] = "True"  # hope for the best that user set this up
+                spec["data"]["flash_attention"] = True  # hope for the best that user set this up
             #set USE_FLASH_ATTENTION=1 in console
             # ? https                       : //pytorch.org/docs/master/notes/mps.html
             # ? memory_fraction = 0.5  https: //iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction

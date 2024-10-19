@@ -31,4 +31,4 @@ lora_priority = ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
 step_priority = [2, 4, 8, 10, 12, 16, 1] #default [2, 4, 8, 10, 12, 16, 1]
 
 # this order does not need to be changed
-solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver"]
+solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver", "None"]

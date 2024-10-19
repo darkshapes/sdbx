@@ -130,6 +130,126 @@ dictionary map:
     fuse_pipe                        `-compile[ mode            use_beta_sigmas
     fuse_unet_only                              fullgraph       rescale_betas_zero_snr
                                                                                                                 
+scheduler_data
+    scheduler
+    algorithm_type,
+    timesteps,
+    interpolation_type,
+    timestep_spacing,
+    use_beta_sigmas,
+    use_karras_sigmas,
+    ays_schedules,
+    set_alpha_to_one,
+    rescale_betas_zero_snr,
+    clip_sample,
+    use_exponential_sigmas,
+    euler_at_final,
+    lu_lambdas,
+    sigmas,
+
+
+empty_cache
+    data
+    encoder
+    lora
+    pipe
+    vae
+
+encode_prompt
+    transformers
+    queue
+    padding
+    truncation
+    return_tensors:
+
+compile_pipe
+    pipe
+    fullgraph
+    mode
+
+load_lora
+    pipe
+    lora_0
+    fuse_0
+    scale_0
+    lora_1
+    fuse_1
+    scale_1
+    lora_2
+    fuse_2
+    scale_2
+
+diffusion_pipe
+    model
+    use_model_to_encode
+    transformers
+    vae
+    precision
+    device
+    low_cpu_mem_usage
+    safety_checker
+    fuse
+    padding
+    truncation
+    return_tensors
+
+load_vae_model
+    vae
+    device
+    precision
+    low_cpu_mem_usage
+    slicing
+    tiling
+
+force_device
+    device_name
+    gpu_id
+
+load_transformer
+    transformer_0
+    transformer_1
+    transformer_2
+    precision_0
+    precision_1
+    precision_2
+    clip_skip
+    device
+    flash_attention
+    low_cpu_mem_usage
+
+text_input
+    prompt
+    negative_terms
+    seed
+    batch
+
+generate_image
+    pipe
+    queue
+    encoding
+    scheduler
+    num_inference_steps
+    guidance_scale
+    eta
+    dynamic_guidance
+    precision
+    device
+    offload_method
+    output_type
+
+autodecode
+    pipe
+    upcast
+    file_prefix
+    file_format
+    compress_level
+    temp
+
+load_refiner
+    pipe
+    high_aesthetic_score
+    low_aesthetic_score
+    padding
 ```
 
 ## CLASS T2IPipe

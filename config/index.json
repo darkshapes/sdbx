@@ -77,6 +77,13 @@
                 "F16"
             ]
         },
+        "ponyFaetality_v11.unet.safetensors": {
+            "STA-XL": [
+                5135174448,
+                "C:\\Users\\woof\\AppData\\Local\\Shadowbox\\models\\download\\ponyFaetality_v11.unet.safetensors",
+                "F16"
+            ]
+        },
         "sdvn8Artxl_base.safetensors": {
             "STA-XL": [
                 6938040682,

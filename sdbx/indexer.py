@@ -151,46 +151,49 @@ class EvalMeta:
                             self.sub_key = shape # found transformer
 
     def process_model(self):
-        for tensor_params, attributes, in self.model_peek.items():
-            if isclose(self.tensor_value, int(tensor_params), rel_tol=self.model_tensor_pct):
-                for shape, name in attributes.items():
-                    num = self.shape_value[0:1]
-                    if num:
-                        if (isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
-                        or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
-                        or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                                self.tag = "m"
-                                self.key = tensor_params
-                                self.sub_key = shape #found model
-                    else:
-                        logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
-                        self.tag = "m"
-                        self.key = tensor_params
-                        self.sub_key = shape               ######################################DEBUG
-            elif isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
-                            self.tag = "m"
-                            self.key = "1468"
-                            self.sub_key = "320" #found model
-    def data(self):
+        if isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
+            self.tag = "m"
+            self.key = "1468"
+            self.sub_key = "320" #found model
+        else:
+            for tensor_params, attributes, in self.model_peek.items():
+                if isclose(self.tensor_value, int(tensor_params), rel_tol=self.model_tensor_pct):
 
-        if self.name_value != "": # check LLM
+                    for shape, name in attributes.items():
+                        num = self.shape_value[0:1]
+                        if num:
+                            if (isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
+                            or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
+                            or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
+                            or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
+                            or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
+                            or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
+                                    self.tag = "m"
+                                    self.key = tensor_params
+                                    self.sub_key = shape #found model
+                        else:
+                            logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
+                            self.tag = "m"
+                            self.key = tensor_params
+                            self.sub_key = shape               ######################################DEBUG
+
+    def data(self):
+        if "" not in self.name_value or self.context_length: # check LLM
             self.tag = "c"
             self.key = ""
             self.sub_key = ""
-        if self.unet_value > 96: 
-            self.vae_inside = True
-        if self.unet_value == 96:  # Check VAE
-            self.code = self.process_vae()
-        if self.diffuser_value >= 256:  # Check LoRA
-            self.code = self.process_lor()
-        if self.transformer_value >= 2:  # Check CLIP
-            self.clip_inside = True
-            self.code = self.process_tra()
-        if self.size > 1e9:  # Check model
-            self.code = self.process_model()
+        else:
+            if self.unet_value > 96:
+                self.vae_inside = True
+            if self.unet_value == 96:  # Check VAE
+                self.code = self.process_vae()
+            if self.diffuser_value >= 256:  # Check LoRA
+                self.code = self.process_lor()
+            if self.transformer_value >= 2:  # Check CLIP
+                self.clip_inside = True
+                self.code = self.process_tra()
+            if self.size > 1e9:  # Check model
+                self.code = self.process_model()
 
 
         self.tag_dict = {}
@@ -381,6 +384,7 @@ class IndexManager:
         # Collect all data to write at once
         self.directories =  config.get_default("directories","models") #multi read
         self.delete_flag = True
+        config.write_spec()
         for each in self.directories:
             self.path_name = config.get_path(f"models.{each}")
             index_file = os.path.join(config_source_location, index_file)
@@ -521,8 +525,6 @@ class IndexManager:
             if key == "STA-XR":
                 return value
         return "∅"
-
-        
 
     #within a dict of models of the same type, match model code & sort by file size
     def filter_compatible(self, query, index):
