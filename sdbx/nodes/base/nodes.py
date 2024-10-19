@@ -8,7 +8,7 @@ from sdbx.nodes.helpers import soft_random, hard_random
 import datetime
 from time import perf_counter_ns, sleep
 from transformers import AutoConfig
-
+from sdbx.nodes.compute import T2IPipe
 
 llms             = config.get_default("index","LLM")
 diffusion_models = config.get_default("index","DIF")
@@ -17,7 +17,7 @@ primary_models   = llms | diffusion_models
 
 index            = config.model_indexer
 optimize         = config.node_tuner
-insta            = config.t2i_pipe
+insta            = T2IPipe()
 
 system           = config.get_default("spec","data") #needs to be set by system @ launch
 spec             = system.get("devices","cpu")
@@ -28,6 +28,7 @@ expressions      = defaultdict(dict)
 model_symlinks   = defaultdict(dict)
 tokenizers       = defaultdict(dict)
 transform_models = config.get_default("index","TRA")
+
 text_models      = llms | transform_models
 extensions_list  = [".fp16.safetensors",".safetensors"]
 variant_list     = ["F64", "F32", "F16", "BF16", "F8_E4M3", "F8_E5M2", "I64", "I32", "I16", "I8", "U8", "nf4", "BOOL"]
@@ -176,7 +177,7 @@ def text_input(
     batch         : A[int, Numerical(min=0, max=512, step=1)]          = 1,
 ) -> A[tuple, Name("Queue")]:
     queue_data = []
-    full_prompt = [prompt]
+    full_prompt = []
     if negative_terms is not None:
         full_prompt.append(negative_terms)
     for i in range(batch):
@@ -189,54 +190,57 @@ def text_input(
 
 @node(path="load/", name="Load Transformers", display=True)
 def load_transformer(
-    transformer_0     : Literal[*text_models.keys()] = None, # type: ignore
+    transformer_0     : Literal[*text_models.keys()]                                                    = None, # type: ignore
         transformer_1 : A[Literal[*text_models.keys()], Dependent(on="transformer", when=(not None))]   = None, # type: ignore
         transformer_2 : A[Literal[*text_models.keys()], Dependent(on="transformer_2", when=(not None))] = None, # type: ignore
-    precision_0       : Literal[*variant_list] = "F16", # type: ignore
-        precision_1   : A[Literal[*variant_list], Dependent(on="transformer_2", when=(not None))] = None, # type: ignore
-        precision_2   : A[Literal[*variant_list], Dependent(on="transformer_3", when=(not None))] = None, # type: ignore
-    clip_skip         : A[int, Numerical(min=0, max=12, step=1)] = 2,
-    device            : A[iter,Literal[*spec]]                   = next(iter(spec)), # type: ignore
-    flash_attention   : bool                                     = False,
-    xformers_mem_eff  : bool                                     = True,
-    low_cpu_mem_usage : bool                                     = True,
-) -> Tuple[A[ModelType, Name("Tokenizers")], A[ModelType, Name("Encoders")]]:
-    insta.set_device(device)
+    precision_0       : Literal[*variant_list]                                                          = "F16", # type: ignore
+        precision_1   : A[Literal[*variant_list], Dependent(on="transformer_2", when=(not None))]       = None, # type: ignore
+        precision_2   : A[Literal[*variant_list], Dependent(on="transformer_3", when=(not None))]       = None, # type: ignore
+    clip_skip         : A[int, Numerical(min=0, max=12, step=1)]                                        = 2,
+    device            : A[iter,Literal[*spec]]                                                          = None, # type: ignore
+    flash_attention   : bool                                                                            = None,
+    low_cpu_mem_usage : bool                                                                            = True,
+) -> A[ModelType, Name("Encoders")]:
+    # insta.set_device(device)
     num_hidden_layers = 12 - clip_skip
     transformer_list = []
     for i in range(3):
-        if locals().get(f"transformer_{i}",None) is not None:
-            transformer_list.append(locals().get(f"transformer_{i}")) 
+        if globals().get(f"transformer_{i}",None) is not None:
+            transformer_list.append(globals().get(f"transformer_{i}"))
 
     for i in range(len(transformer_list)):
-        expressions[i]["variant"] = locals().get(f"precision_{i}",None)
+        expressions[i]["variant"].append(globals().get(f"precision_{i}",None))
+        expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"
         expressions[i]["num_hidden_layers"] = num_hidden_layers
         expressions[i]["low_cpu_mem_usage"] = low_cpu_mem_usage
-        expressions[i]["local_files_only"] = True
-        if flash_attention == True: expressions[i]["attn_implementation"] = "flash_attention_2"
-        model_symlinks["transformer"][i] = symlink_prepare(transformer_list[i])
+        tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
+        if flash_attention is True: expressions[i]["attn_implementation"] = "flash_attention_2"
+        model_symlinks["transformer"][i] = symlink_prepare(transformer_list[i], expressions[i]["subfolder"])
 
     transformer_models = insta.declare_encoders(model_symlinks["transformer"], expressions)
     return transformer_models
 
 @node(path="transform/", name="Force Device", display=True)
 def force_device(
-    device_name: Literal[*spec] = next(iter(spec), "cpu"), # type: ignore
+    device_name: Literal[*spec] = None, # type: ignore
     gpu_id     : A[int, Dependent(on="device", when=not None), Slider(min=0, max=100)] = 0,
 ) ->  A[iter, Name("Device")]:
-    if device_name != "cpu": device = f"{device_name}:{gpu_id}"
-    return device
+    device_name = next(iter(spec),"cuda")
+    if gpu_id != 0:
+        device_name = f"{device_name}:{gpu_id}"
+    insta.set_device(device_name)
+    return device_name
 
 @node(path="load/", name="Load Vae Model", display=True)
 def load_vae_model(
     vae       : Literal[*vae_models.keys()], # type: ignore
-    device    : A[iter,Literal[*spec]] = next(iter(spec), "cpu"),         # type: ignore
+    device    : A[iter,Literal[*spec]] = None,         # type: ignore
     precision : Literal[*variant_list] = "F16",                             # type: ignore
     low_cpu_mem_usage : bool = True,
     slicing   : bool = False,
     tiling    : bool = False,
 ) -> A[ModelType, Name("VAE")]:
-    insta.set_device(device)
+   # insta.set_device(device)
     de = ["disable","enable"]
     vae_input[f"{de[slicing]}_slicing"]
     vae_input[f"{de[tiling]}_tiling"]
@@ -266,7 +270,7 @@ def diffusion_pipe(
     return_tensors      : A[Literal["pt"],Dependent(on="use_model_to_encode", when=True)]          = None,
     add_watermarker     : bool                                                                     = False,
 ) -> A[ModelType, Name("Model")]:
-    insta.set_device(device)
+    #insta.set_device(device)
 
     pipe_input["vae"] = vae
     pipe_input["variant"] = precision
@@ -431,7 +435,7 @@ def generate_image(
     offload_method      : Literal[*offload_list]                              = "none", # type: ignore
     output_type         : Literal["latent"]                                   = "latent",
 ) -> A[TensorType, Name("Latent")]:
-    insta.set_device(device)
+    #insta.set_device(device)
     gen_input["num_inference_steps"] = num_inference_steps
     gen_input["guidance_scale"] = guidance_scale
     if eta is not None: gen_input["eta"] = eta
@@ -444,22 +448,24 @@ def generate_image(
     if dynamic_guidance is True: 
         gen_input["callback_on_step_end"] = insta._dynamic_guidance
         gen_input["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds','add_time_ids']
-    latent , pipe_out = insta.diffuse_latent(pipe, queue_or_encoding, scheduler, gen_input)
-    return latent, pipe_out
+    latent = insta.diffuse_latent(pipe, queue_or_encoding, scheduler, gen_input)
+    return latent
 
 @node(path="save/", name="Autodecode/Save/Preview", display=True)
 def autodecode(
-    pipe   : TensorType = None,
+    latent : TensorType = None,
     upcast : bool       = True,
     file_prefix   : A[str, Text(multiline=False, dynamic_prompts=True)]                                  = "Shadowbox-",
     file_format   : A[Literal["png","jpg","optimize"], Dependent(on="temp", when="False")]               = "optimize",
     compress_level: A[int, Slider(min=1, max=9, step=1),  Dependent(on="format", when=(not "optimize"))] = 7,
     temp: bool = False,
 ) -> I[Any]:
-    queue, pipe = pipe
-    file_prefix = os.path.join(config.get_path("output"), file_prefix)
-    final_queue = insta.decode_latent(pipe, queue, upcast)
-    for image in range(final_queue):
+    pipe, queue = latent
+    output_folder = os.path.join(config.get_path("output"))
+    counter = [s.endswith('png') for s in os.listdir(output_folder)].count(True) # get existing images
+    file_prefix = os.path.join(output_folder, f"{file_prefix}")
+    output = insta.decode_latent(pipe, queue, upcast, file_prefix, counter)
+    for image in range(output):
         yield image
 
 @node(path="generate/", name="Timecode", display=True)

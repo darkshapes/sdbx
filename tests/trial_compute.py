@@ -1,10 +1,6 @@
 import os
-from collections import defaultdict
 from sdbx.config import config
-from sdbx.nodes.helpers import soft_random
-from sdbx.indexer import IndexManager
 from sdbx.nodes.base import nodes
-
 
 #print("\nInitializing model index, checking system specs.\n  Please wait...")
 #create_index = IndexManager().write_index()      # (defaults to config/index.json)
@@ -31,22 +27,23 @@ for key,val in spec.items():
 
 defaults = optimize.determine_tuning(model)
 
-device = nodes.force_device(**defaults["force_device"])
+device = nodes.force_device(**defaults.get("force_device"))
 if defaults["empty_cache"]["stage"].get("head", None) != None:
-        nodes.empty_cache(**defaults["empty_cache"]["stage"]["head"])
+        nodes.empty_cache(**defaults["empty_cache"]["stage"].get("head"))
 queue = nodes.text_input(**defaults.get("text_input"))
-transformer_models = nodes.load_transformer(**defaults["load_transformer"])
+transformer_models = nodes.load_transformer(**defaults.get("load_transformer"))
 
-vae = nodes.load_vae_model(**defaults["load_vae_model"])
-queue = nodes.encode_prompt(queue=queue, transformer_models=transformer_models, **defaults["encode_prompt"])
+vae = nodes.load_vae_model(**defaults.get("load_vae_model"))
+queue = nodes.encode_prompt(queue=queue, transformer_models=transformer_models, **defaults.get("encode_prompt"))
 if defaults["empty_cache"]["stage"].get("encoder", None) != None:
-    nodes.empty_cache(queue, defaults["empty_cache"]["stage"]["encoder"])
-pipe = nodes.diffusion_pipe(vae, **defaults["diffusion_pipe"])
-lora = nodes.load_lora(**defaults["load_lora"])
-scheduler = nodes.noise_scheduler(**defaults["noise_scheduler"])
-pipe = nodes.generate_image(pipe, queue, scheduler, **defaults["generate_image"])
+    nodes.empty_cache(queue, defaults["empty_cache"]["stage"].get("encoder"))
+pipe = nodes.diffusion_pipe(vae, **defaults.get("diffusion_pipe"))
+lora = nodes.load_lora(**defaults.get("load_lora"))
+scheduler = nodes.noise_scheduler(**defaults.get("noise_scheduler"))
+pipe = nodes.generate_image(pipe, queue, scheduler, **defaults.get("generate_image"))
 if defaults["empty_cache"]["stage"].get("generate", None) != None:
-    nodes.empty_cache(pipe, defaults["empty_cache"]["stage"]["generate"])
-image = nodes.autodecode(pipe, **defaults["autodecode"])
-if defaults["empty_cache"]["stage"].get("tail", None) != None:
-        nodes.empty_cache(image, **defaults["empty_cache"]["stage"]["tail"])
+    nodes.empty_cache(pipe, defaults["empty_cache"]["stage"].get("generate"))
+image = nodes.autodecode(pipe, **defaults.get("autodecode"))
+
+#if defaults["empty_cache"]["stage"].get("tail", None) != None:
+#       nodes.empty_cache(image, **defaults["empty_cache"]["stage"]["tail"])

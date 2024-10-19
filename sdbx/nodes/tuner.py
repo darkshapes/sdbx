@@ -53,19 +53,24 @@ class NodeTuner:
             return {"fit": "all", "memory": "gpu"}
 
         file_list = list(file_sizes.items())
-        for i in range(len(file_list) - 1, -1, -1):
+        for i in range(len(file_list) - 1, 0, -1):
             total_size = sum(size for _, size in file_list[:i])
             if total_size <= peak_gpu:
-                return {"fit": file_list[i][0], "memory": "gpu"}
+                threshold = {"fit": file_list[i-1][0], "memory": "gpu"}
+                return threshold
 
+        import shutil
+        disk_utilization = shutil.disk_usage(config.get_path("output"))
+        disk_free = disk_utilization[2]
         model, model_size = file_list[-1]
-        offloading = { "sequential":1 * (1024 ** 3), "cpu":3 * (1024 ** 3) }  # Extend to cpu offloading
+        offloading = { "cpu":1073741824, "sequential":3221225472, "disk": disk_free }  # Extend to cpu offloading
 
-        for offload_type, additional_memory in offloading:
+        for offload_type, additional_memory in offloading.items():
             if model_size <= (peak_gpu + additional_memory):
-                return {"fit": model, "memory": offload_type}
+                threshold = {"fit": "model", "memory": offload_type}
+                return threshold
 
-        return {"fit": model, "memory": "disk"} #if nothing fits
+        return threshold
 
     @cache
     def system_profile(self, first_device, main_model_size, vae_size = 0, apex = False, tra_size= None):
@@ -77,11 +82,11 @@ class NodeTuner:
         if first_device    != "cpu":
             peak_gpu = self.spec["devices"].get(self.first_device,1)  #todo: accommodate list of graphics card ram
             model_sizes_dict = {}
+            model_sizes_dict["model"] = main_model_size
             if tra_size is not None:
                 model_sizes_dict["tra"] = tra_size
             if vae_size is not None:
                 model_sizes_dict["vae"] = vae_size
-            model_sizes_dict["model"] = main_model_size
             threshold = self.check_memory_fit(peak_gpu, **model_sizes_dict)
         else:
             if main_model_size > peak_cpu:
@@ -214,8 +219,8 @@ class NodeTuner:
         self.image_data        = defaultdict(dict)
         self.encode_data       = defaultdict(dict)
         self.refiner_data      = defaultdict(dict)
-        self.compile_data      = defaultdict(dict)
         self.tuned_defaults    = defaultdict(dict)
+        self.compile_data      = defaultdict(dict)
 
         #dicts that do not leave the class
         self.info              = defaultdict(dict)
@@ -246,13 +251,15 @@ class NodeTuner:
         # self.pipe_data["fuse_unet_only"] = False # todo - add conditions where this is useful
         #self.pipe_data["unet_file"]    = list(self.info["model_details"])[1] full path to file
         self.refiner_data["model"] = config.model_indexer.fetch_refiner()
-        if self.spec.get("flash_attention", 0) == True:
-            self.transformers_data["flash_attention"] = True
+        # if self.spec.get("flash_attention", 0) == True:
+        #     self.transformers_data["flash_attention"] = True
         if self.spec.get("dynamo",False):
             self.scheduler_data["sigmas"]  = [] # custom sigma data
             self.gen_data["return_dict"]   = False
             self.compile_data["fullgraph"] = True
             self.compile_data["mode"]      = "reduce-overhead" #switches to max-autotune if cuda device
+        else:
+            self.compile_data = None
 
         if self.info["model_details"] != "∅" and self.info["model_details"] != None:
             if self.info["model_category"] == "LLM":
@@ -427,54 +434,3 @@ class NodeTuner:
                 self.tuned_defaults.pop(each)
 
         return self.tuned_defaults
-
-        # maybe can be used to return individual values?
-        # @cache
-        # def force_device(self):
-        #     return self.device_data
-
-        # @cache
-        # def empty_cache(self):
-        #     return self.cache_data
-        # @cache
-        # def text_input(self):
-        #     return self.queue_data
-
-        # @cache
-        # def diffusion_pipe(self):
-        #     return self.pipe_data
-
-        # @cache
-        # def load_transformer(self):
-        #     return self.transformers_data
-
-        # @cache
-        # def encode_prompt(self):
-        #     return self.encode_data
-
-        # @cache
-        # def load_vae_model(self):
-        #     return self.vae_data
-
-        # @cache
-        # def compile_pipe(self):
-        #     return self.compile_data
-
-        # @cache
-        # def load_lora(self):
-        #     return self.lora_data
-
-        # @cache
-        # def noise_scheduler(self):
-        #     return self.scheduler_data
-
-        # @cache
-        # def generate_image(self):
-        #     return self.gen_data
-
-        # @cache
-        # def autodecode(self):
-        #     return self.image_data
-        # @cache
-        # def load_refiner(self):
-        #     return self.refiner_data

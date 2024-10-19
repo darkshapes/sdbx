@@ -50,16 +50,15 @@ def encode_prompt(prompts, tokenizers, text_encoders):
 
     return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 model = "C:\\Users\\Public\\models\\metadata\\STA-XL"
-
+clip = "C:\\Users\\Public\\models\\metadata\\CLI-VL"
+clip2 = "C:\\Users\\Public\\models\\metadata\\CLI-VG"
 tokenizer = CLIPTokenizer.from_pretrained(
-    model,
-    subfolder='tokenizer',
+    clip,
     local_files_only=True,
 )
 
 text_encoder = CLIPTextModel.from_pretrained(
-    model,
-    subfolder='text_encoder',
+    clip,
     use_safetensors=True,
     torch_dtype=torch.float16,
     variant='fp16',
@@ -67,14 +66,12 @@ text_encoder = CLIPTextModel.from_pretrained(
 ).to(device)
 
 tokenizer_2 = CLIPTokenizer.from_pretrained(
-    model,
-    subfolder='tokenizer_2',
+    clip2,
     local_files_only=True,
 )
 
 text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-    model,
-    subfolder='text_encoder_2',
+    clip2,
     use_safetensors=True,
     torch_dtype=torch.float16,
     variant='fp16',
