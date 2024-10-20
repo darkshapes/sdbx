@@ -1,5 +1,6 @@
 import unittest
 
+from sdbx import logger
 from sdbx.nodes.types import *
 from sdbx.nodes.info import NodeInfo
 class TestNodeInfo(unittest.TestCase):
@@ -161,11 +162,11 @@ class TestNodeInfo(unittest.TestCase):
         self.assertIn('Param1', inputs['required'])
         param1_info = inputs['required']['Param1']
         self.assertEqual(param1_info['type'], 'List')
-        self.assertEqual(param1_info['subtype'], 'Int')
+        self.assertEqual(param1_info['sub']['type'], 'Int')
         self.assertFalse(hasattr(param1_info, "constraints"))
 
         self.assertIn('Param2', inputs['required'])
         param2_info = inputs['required']['Param2']
         self.assertEqual(param2_info['type'], 'List')
-        self.assertEqual(param2_info['subtype'], 'Str')
+        self.assertEqual(param2_info['sub']['type'], 'Str')
         self.assertEqual(param2_info['constraints']['length'], 4)

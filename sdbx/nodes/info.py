@@ -74,29 +74,40 @@ class NodeInfo:
             if key == 'return':
                 self.terminal = True
                 return
-            raise Exception(f"Argument {key} cannot be typed as None.")
+            raise Exception(f"Argument {key}: Cannot be typed as None.")
 
-        info = {}
         necessity = "required"
         output = key == "return"
 
-        # TODO: multiple unnamed outputs of same type will overwrite each other
-        name = format_name(value.__name__)
+        name = format_name(value.__name__ if output else format_name(key))
 
-        if not output:
-            info["fname"] = key
-            name = format_name(key)
-
-        vtype = typing.get_origin(value)
+        try:
+            info, prospective = self._get_info(value)
+            name = prospective or name
+        except Exception as e:
+            # logger.exception(e)
+            raise Exception(f"Argument {key}: {e}")
 
         # Handle default values
         if default is not inspect.Parameter.empty:
             info["default"] = default
             necessity = "optional"
 
+        if output:
+            self.outputs[name] = info
+        else:
+            info["fname"] = key
+            self.inputs[necessity][name] = info
+    
+    def _get_info(self, v, passed_type=False, error_on_list=False):
+        info = {}
+        name = None  # TODO: multiple unnamed outputs of same type will overwrite each other
+
+        vt = (v if passed_type else typing.get_origin(v)) or v
+
         # Parse annotations
-        if vtype is typing.Annotated:
-            base_type, *metadata = typing.get_args(value)
+        if vt is typing.Annotated:
+            base_type, *metadata = typing.get_args(v)
 
             if base_type not in primitives:
                 raise Exception(f"Argument {key} cannot annotate a non-primitive type {base_type}.")
@@ -122,41 +133,41 @@ class NodeInfo:
                     info["dependent"] = asdict(item)
 
                 # TODO: Check for Validator
-        elif vtype is typing.Literal:
+        elif vt is typing.Literal:
             info["type"] = "OneOf"
 
-            choices = typing.get_args(value)
+            choices = typing.get_args(v)
             if len(choices) == 0:
-                # raise Exception(f"{key} of type Literal has no values.")
-                logger.warning(f"Literal-typed argument '{key}' in node '{self.name}' has no values. This will show as an empty list of choices to the client.")
+                # raise Exception(f"Literal-typed argument has no values.")
+                logger.warning(f"Literal-typed argument in node '{self.name}' has no values. This will show as an empty list of choices to the client.")
 
             info["choices"] = choices
-        elif vtype is list or vtype is tuple:
+        elif vt is list or vt is tuple:
+            if error_on_list:
+                raise Exception("Argument cannot contain nested iterator types.")
+
             info["type"] = "List"
 
-            base_types = set(typing.get_args(value))
+            base_types = set(typing.get_args(v))
 
             if len(base_types) == 0:
-                raise Exception(f"Argument {key} contains no member types.")
+                raise Exception(f"Argument contains no member types.")
             elif len(base_types) != 1:
-                raise Exception(f"Argument {key} contains more than one member type.")
+                raise Exception(f"Argument contains more than one member type.")
             else:
                 base_type = next(iter(base_types))
 
             if base_type not in primitives:
-                raise Exception(f"Argument {key} cannot contain non-primitive type {t}.")
+                raise Exception(f"Argument cannot contain non-primitive type {t}.")
             
-            info["subtype"] = base_type.__name__.capitalize()
+            info["sub"], name = self._get_info(base_type, passed_type=True, error_on_list=True)
 
-            if vtype is tuple:
-                info["constraints"] = { "length": len(typing.get_args(value)) }
+            if vt is tuple:
+                info["constraints"] = { "length": len(typing.get_args(v)) }
         else:
-            info["type"] = value.__name__.capitalize()
-
-        if output:
-            self.outputs[name] = info
-        else:
-            self.inputs[necessity][name] = info
+            info["type"] = v.__name__.capitalize()
+        
+        return info, name
     
     def dict(self):
         return {
