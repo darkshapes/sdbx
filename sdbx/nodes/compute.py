@@ -170,36 +170,47 @@ class T2IPipe:
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, transformers_models, conditioning):
+
         tokenizers, text_encoders = transformers_models
+        print(prompts, tokenizers, text_encoders)
+
         self.conditioning = conditioning
         embeddings_list = []
-        self.hf_log(fatal=True) #suppress layer skip messages
+        pooled_embeddings_list = []
+
+        self.hf_log(fatal=True)  # Suppress layer skip messages
+
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
-            prompt,
-            max_length=tokenizer.model_max_length,
-            **self.conditioning
-        )
-            prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
+                prompt,
+                max_length=tokenizer.model_max_length,
+                **self.conditioning
+            )
+            prompt_embeds_output = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
 
-            pooled_prompt_embeds = prompt_embeds[0]
-            embeddings_list.append(prompt_embeds.hidden_states[-2])
+            embeddings_list.append(prompt_embeds_output.hidden_states[-2])
+            pooled_embeddings_list.append(prompt_embeds_output[0])
 
-            prompt_embeds = torch.concat(embeddings_list, dim=-1)
-        self.hf_log(on=True) #return to normal
+        self.hf_log(on=True)  # Return to normal
+
+        if not embeddings_list:
+            raise ValueError("Embeddings list is empty. Please check the inputs.")
+
+        prompt_embeds = torch.concat(embeddings_list, dim=-1)
+        pooled_prompt_embeds = torch.concat(pooled_embeddings_list, dim=-1)
+
         negative_prompt_embeds = torch.zeros_like(prompt_embeds)
         negative_pooled_prompt_embeds = torch.zeros_like(pooled_prompt_embeds)
 
         bs_embed, seq_len, _ = prompt_embeds.shape
-        prompt_embeds = prompt_embeds.repeat(1, 1, 1)
-        prompt_embeds = prompt_embeds.view(bs_embed * 1, seq_len, -1)
+        prompt_embeds = prompt_embeds.repeat(1, 1, 1).view(bs_embed, seq_len, -1)
 
         seq_len = negative_prompt_embeds.shape[1]
-        negative_prompt_embeds = negative_prompt_embeds.repeat(1, 1, 1)
-        negative_prompt_embeds = negative_prompt_embeds.view(1 * 1, seq_len, -1)
+        negative_prompt_embeds = negative_prompt_embeds.repeat(1, 1, 1).view(1, seq_len, -1)
 
-        pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
-        negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
+        pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed, -1)
+        negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed, -1)
+
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
 ############## ENCODE

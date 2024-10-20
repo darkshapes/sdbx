@@ -1,12 +1,11 @@
 {
     "data": {
-        "dynamo": false,
+        "dynamo": true,
         "devices": {
-            "cuda": 4294836224,
-            "cpu": 8457080832
+            "mps": 1785856,
+            "cpu": 137438953472
         },
         "flash_attention": false,
-        "allow_tf32": false,
-        "xformers": true
+        "enable_attention_slicing": true
     }
 }

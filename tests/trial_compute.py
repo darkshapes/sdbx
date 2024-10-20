@@ -2,16 +2,18 @@ import os
 from sdbx.config import config
 from sdbx.nodes.base import nodes
 
-#print("\nInitializing model index, checking system specs.\n  Please wait...")
-#create_index = IndexManager().write_index()      # (defaults to config/index.json)
-#dif_index = config.get_default("index", "DIF")
-#print(f"Ready.")
-#name_path = input("""
-#Please type the filename of an available checkpoint.
-#Path will be detected.
-#(default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
+from sdbx.indexer import IndexManager
 
-name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors"
+print("\nInitializing model index, checking system specs.\n  Please wait...")
+create_index = IndexManager().write_index()      # (defaults to config/index.json)
+dif_index = config.get_default("index", "DIF")
+print(f"Ready.")
+name_path = input("""
+Please type the filename of an available checkpoint.
+Path will be detected.
+(default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
+
+# name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors"
 optimize         = config.node_tuner
 
 name_path = os.path.basename(name_path)
@@ -32,6 +34,7 @@ if defaults["empty_cache"]["stage"].get("head", None) != None:
         nodes.empty_cache(**defaults["empty_cache"]["stage"].get("head"))
 queue = nodes.text_input(**defaults.get("text_input"))
 transformer_models = nodes.load_transformer(**defaults.get("load_transformer"))
+print(transformer_models)
 
 vae = nodes.load_vae_model(**defaults.get("load_vae_model"))
 queue = nodes.encode_prompt(queue=queue, transformer_models=transformer_models, **defaults.get("encode_prompt"))

@@ -7,11 +7,13 @@ from collections import OrderedDict
 from collections.abc import Iterator
 
 from sdbx import logger
-from sdbx.nodes.helpers import format_name, timing
+from sdbx.nodes.helpers import format_name #, timing
 from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
 
+primitives = (bool, str, int, float)
+
 class NodeInfo:
-    @timing(logger.debug)
+    # @timing(logger.debug)
     def __init__(self, fn, path=None, name=None, display=False):
         self.fname = getattr(fn, '__name__')
 
@@ -55,11 +57,13 @@ class NodeInfo:
                     assert len(iterator_args) > 0, "Generator return type requires a type in the I[yield type] brackets"
                     return_annotation = iterator_args[0] if len(iterator_args) == 1 else Tuple[iterator_args]
 
-                if typing.get_origin(return_annotation) is tuple:
-                    for v in typing.get_args(return_annotation):
+                if isinstance(return_annotation, tuple):
+                    for v in return_annotation:
                         self.put('return', v)
                 else:
                     self.put('return', return_annotation)
+            else:
+                self.terminal = True
 
         except Exception as e:
             logger.exception(e)
@@ -94,6 +98,9 @@ class NodeInfo:
         if vtype is typing.Annotated:
             base_type, *metadata = typing.get_args(value)
 
+            if base_type not in primitives:
+                raise Exception(f"Argument {key} cannot annotate a non-primitive type {base_type}.")
+
             info["type"] = base_type.__name__.capitalize()
 
             for item in metadata:
@@ -115,8 +122,7 @@ class NodeInfo:
                     info["dependent"] = asdict(item)
 
                 # TODO: Check for Validator
-        
-        if vtype is typing.Literal:
+        elif vtype is typing.Literal:
             info["type"] = "OneOf"
 
             choices = typing.get_args(value)
@@ -125,8 +131,26 @@ class NodeInfo:
                 logger.warning(f"Literal-typed argument '{key}' in node '{self.name}' has no values. This will show as an empty list of choices to the client.")
 
             info["choices"] = choices
-        
-        if not vtype:
+        elif vtype is list or vtype is tuple:
+            info["type"] = "List"
+
+            base_types = set(typing.get_args(value))
+
+            if len(base_types) == 0:
+                raise Exception(f"Argument {key} contains no member types.")
+            elif len(base_types) != 1:
+                raise Exception(f"Argument {key} contains more than one member type.")
+            else:
+                base_type = next(iter(base_types))
+
+            if base_type not in primitives:
+                raise Exception(f"Argument {key} cannot contain non-primitive type {t}.")
+            
+            info["subtype"] = base_type.__name__.capitalize()
+
+            if vtype is tuple:
+                info["constraints"] = { "length": len(typing.get_args(value)) }
+        else:
             info["type"] = value.__name__.capitalize()
 
         if output:

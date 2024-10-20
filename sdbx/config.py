@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import tomllib
@@ -313,7 +314,7 @@ class Config(BaseSettings):
             spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
             if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
                 spec["data"]["enable_attention_slicing"] = False
-        if torch.backends.mps.is_available() & self.device.backends.mps.is_built():
+        if torch.backends.mps.is_available() & torch.backends.mps.is_built():
             spec["data"]["devices"]["mps"] = torch.mps.driver_allocated_memory()
             try: 
                 import flash_attn
@@ -350,7 +351,7 @@ class Config(BaseSettings):
         #return data
 
 
-def parse() -> Config:
+def parse(testing: bool = False) -> Config:
     parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument('-c', '--config', type=str, default=get_config_location(), help='Location of the config file.')
@@ -360,16 +361,16 @@ def parse() -> Config:
     parser.add_argument('-h', '--help', action='help', help='See config.toml for more configuration options.')
     # parser.add_argument('--setup', action='store_true', help='Setup and exit.')
 
-    args = parser.parse_args()
+    args = parser.parse_args() if not testing else parser.parse_args([])
 
     level = logging.INFO
     if args.verbose:
         level = logging.DEBUG
     if args.silent:
         level = logging.ERROR
-    
+
     logging.basicConfig(encoding='utf-8', level=level)
-    
+
     return Config(path=args.config)
 
-config = parse()
+config = parse(testing=hasattr(sys, '_called_from_test'))
