@@ -72,19 +72,25 @@ def example_node(                                      # by default the `def` li
 
     # the next line creates your output type
 
+List[] makes arbitrarily many inputs, Tuple[] makes a finite number of inputs
+
+
+
 ) -> Latent:
     a_thing = tensor([stu,ff]).much_smoll(wao)      # after that you can write your nodes function using the input variables
     return a_thing #, a_second_thing, a_third_thing...    # the last line sends your final output
+
+
 
 
     # to name the output -
     #   ) -> A[Latent, Name("Samples Out")]:
     
     # to use multiple type-named outputs
-    #   ) -> Tuple[Tensor, Tensor]:
+    #   ) -> (Tensor, Tensor):
     
     # to use multiple custom-named outputs
-    #   ) -> Tuple[A[Tensor, Name("Positive")], A[Tensor, Name("Negative")]]:
+    #   ) -> (A[Tensor, Name("Positive")], A[Tensor, Name("Negative")]):
     
     # to have no outputs
     #   ) -> None:

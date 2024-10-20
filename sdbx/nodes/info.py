@@ -8,9 +8,7 @@ from collections.abc import Iterator
 
 from sdbx import logger
 from sdbx.nodes.helpers import format_name #, timing
-from sdbx.nodes.types import Slider, Numerical, Text, Validator, Dependent, Name
-
-primitives = (bool, str, int, float)
+from sdbx.nodes.types import Annotation, Slider, Numerical, Text, Validator, Dependent, Name
 
 class NodeInfo:
     # @timing(logger.debug)
@@ -109,30 +107,20 @@ class NodeInfo:
         if vt is typing.Annotated:
             base_type, *metadata = typing.get_args(v)
 
-            if base_type not in primitives:
-                raise Exception(f"Argument {key} cannot annotate a non-primitive type {base_type}.")
-
             info["type"] = base_type.__name__.capitalize()
 
             for item in metadata:
+                if not isinstance(item, Annotation):
+                    raise Exception(f"Cannot annotate {base_type} with non-annotation type {item}.")
+
+                if not item.check(base_type):
+                    raise Exception(f"Argument {item} is incompatible with Annotated of type {base_type}.")
+                
                 # Check for Name
                 if isinstance(item, Name):
                     name = item.name
-
-                if base_type in (int, float):
-                    if isinstance(item, (Numerical, Slider)): # Check for Numerical or Slider
-                        info["constraints"] = asdict(item)
-                        info["display"] = type(item).__name__.lower() # numerical | slider
-
-                if base_type is str:
-                    if isinstance(item, Text): # Check for Text
-                        info["constraints"] = asdict(item)
-            
-                # Check for Dependent
-                if isinstance(item, Dependent):
-                    info["dependent"] = asdict(item)
-
-                # TODO: Check for Validator
+                else:
+                    info |= item.serialize()
         elif vt is typing.Literal:
             info["type"] = "OneOf"
 
@@ -157,8 +145,8 @@ class NodeInfo:
             else:
                 base_type = next(iter(base_types))
 
-            if base_type not in primitives:
-                raise Exception(f"Argument cannot contain non-primitive type {t}.")
+            # if base_type not in primitives:
+                # raise Exception(f"Argument cannot contain non-primitive type {t}.")
             
             info["sub"], name = self._get_info(base_type, passed_type=True, error_on_list=True)
 

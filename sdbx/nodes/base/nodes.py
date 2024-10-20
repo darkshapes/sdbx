@@ -178,6 +178,7 @@ def text_input(
 ) -> A[tuple, Name("Queue")]:
     queue_data = []
     full_prompt = []
+    full_prompt.append(prompt)
     if negative_terms is not None:
         full_prompt.append(negative_terms)
     for i in range(batch):
@@ -190,32 +191,24 @@ def text_input(
 
 @node(path="load/", name="Load Transformers", display=True)
 def load_transformer(
-    transformer_0     : Literal[*text_models.keys()]                                                    = None, # type: ignore
-        transformer_1 : A[Literal[*text_models.keys()], Dependent(on="transformer", when=(not None))]   = None, # type: ignore
-        transformer_2 : A[Literal[*text_models.keys()], Dependent(on="transformer_2", when=(not None))] = None, # type: ignore
-    precision_0       : Literal[*variant_list]                                                          = "F16", # type: ignore
-        precision_1   : A[Literal[*variant_list], Dependent(on="transformer_2", when=(not None))]       = None, # type: ignore
-        precision_2   : A[Literal[*variant_list], Dependent(on="transformer_3", when=(not None))]       = None, # type: ignore
+    transformers      : List[Literal[*text_models.keys()]]                                              = None, # type: ignore
+    precisions        : A[List[Literal[*variant_list]], EqualLength(to="transformers")]                 = "F16", # type: ignore
     clip_skip         : A[int, Numerical(min=0, max=12, step=1)]                                        = 2,
-    device            : A[iter,Literal[*spec]]                                                          = None, # type: ignore
+    device            : A[iter, Literal[*spec]]                                                         = None, # type: ignore
     flash_attention   : bool                                                                            = None,
     low_cpu_mem_usage : bool                                                                            = True,
 ) -> A[ModelType, Name("Encoders")]:
     # insta.set_device(device)
     num_hidden_layers = 12 - clip_skip
-    transformer_list = []
-    for i in range(3):
-        if globals().get(f"transformer_{i}",None) is not None:
-            transformer_list.append(globals().get(f"transformer_{i}"))
 
-    for i in range(len(transformer_list)):
-        expressions[i]["variant"].append(globals().get(f"precision_{i}",None))
-        expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"
+    for i in range(len(transformers)):
+        expressions[i].setdefault("variant", "F16")
+        #expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"
         expressions[i]["num_hidden_layers"] = num_hidden_layers
         expressions[i]["low_cpu_mem_usage"] = low_cpu_mem_usage
-        tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
+        #tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
         if flash_attention is True: expressions[i]["attn_implementation"] = "flash_attention_2"
-        model_symlinks["transformer"][i] = symlink_prepare(transformer_list[i], expressions[i]["subfolder"])
+        model_symlinks["transformer"][i] = symlink_prepare(transformers[i])#, expressions[i]["subfolder"])
 
     transformer_models = insta.declare_encoders(model_symlinks["transformer"], expressions)
     return transformer_models

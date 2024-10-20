@@ -1,8 +1,8 @@
 from enum import Enum
 from functools import partial
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
-from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
+from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -87,32 +87,59 @@ from collections.abc import Iterator as I
 
 
 ## Annotation classes ##
-@dataclass
-class Name:
-    name: str = ""
+class AnnotationMeta(type):
+    def __getitem__(cls, item):
+        if not isinstance(item, tuple):
+            item = (item,)
+        return type('AnnotationInstance', (Annotation,), {'__args__': item})
+
+class Annotation(metaclass=AnnotationMeta):
+    def check(self, t):
+        args = getattr(self, '__args__', ())
+        return Any in args or any(issubclass(t, arg) for arg in args)
+    
+    def serialize(self):
+        return { "constraints": asdict(self) }
 
 @dataclass
-class Slider:
+class Name(Annotation[Any]):
+    name: str = ""
+
+    def serialize(self):  # special
+        pass
+
+@dataclass
+class Dependent(Annotation[Any]):
+    on: str
+    when: Any
+
+    def serialize(self):
+        return { "dependent": asdict(self) }
+
+@dataclass
+class Validator(Annotation[Any]):
+    condition: Callable[[Any], bool]
+    error_message: str
+
+@dataclass
+class Slider(Annotation[int, float]):
     min: Union[int, float]
     max: Union[int, float]
     step: Union[int, float] = 1.0
     round: bool = False
+
+    def serialize(self):
+        return { **super().serialize(), "display": type(self).__name__.lower() }
 
 @dataclass
 class Numerical(Slider):
     randomizable: bool = False
 
 @dataclass
-class Text:
+class Text(Annotation[str]):
     multiline: bool = False
     dynamic_prompts: bool = False
 
 @dataclass
-class Dependent:
-    on: str
-    when: Any
-
-@dataclass
-class Validator:
-    condition: Callable[[Any], bool]
-    error_message: str
+class EqualLength(Annotation[List]):
+    to: str
