@@ -178,6 +178,7 @@ def text_input(
 ) -> A[tuple, Name("Queue")]:
     queue_data = []
     full_prompt = []
+    full_prompt.append(prompt)
     if negative_terms is not None:
         full_prompt.append(negative_terms)
     for i in range(batch):
@@ -204,18 +205,21 @@ def load_transformer(
     # insta.set_device(device)
     num_hidden_layers = 12 - clip_skip
     transformer_list = []
-    for i in range(3):
-        if globals().get(f"transformer_{i}",None) is not None:
-            transformer_list.append(globals().get(f"transformer_{i}"))
+    if transformer_0:
+        transformer_list.append(transformer_0)
+    if transformer_1:
+        transformer_list.append(transformer_1)
+    if transformer_2:
+        transformer_list.append(transformer_2)
 
     for i in range(len(transformer_list)):
-        expressions[i]["variant"].append(globals().get(f"precision_{i}",None))
-        expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"
+        expressions[i].setdefault("variant", "F16")
+        #expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"
         expressions[i]["num_hidden_layers"] = num_hidden_layers
         expressions[i]["low_cpu_mem_usage"] = low_cpu_mem_usage
-        tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
+        #tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
         if flash_attention is True: expressions[i]["attn_implementation"] = "flash_attention_2"
-        model_symlinks["transformer"][i] = symlink_prepare(transformer_list[i], expressions[i]["subfolder"])
+        model_symlinks["transformer"][i] = symlink_prepare(transformer_list[i])# expressions[i]["subfolder"])
 
     transformer_models = insta.declare_encoders(model_symlinks["transformer"], expressions)
     return transformer_models

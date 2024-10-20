@@ -313,7 +313,7 @@ class Config(BaseSettings):
             spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
             if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
                 spec["data"]["enable_attention_slicing"] = False
-        if torch.backends.mps.is_available() & self.device.backends.mps.is_built():
+        if torch.backends.mps.is_available() & torch.backends.mps.is_built():
             spec["data"]["devices"]["mps"] = torch.mps.driver_allocated_memory()
             try: 
                 import flash_attn

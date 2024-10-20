@@ -118,8 +118,8 @@ class T2IPipe:
     def declare_encoders(self, model_symlinks, expressions):
         self.tformer_models = model_symlinks
         self.encoder_expressions = expressions
-        self.tokenizer = []
-        self.text_encoder = []
+        self.tokenizer_list = []
+        self.text_encoder_list = []
 
         for i in self.tformer_models:
             model_class = os.path.basename(self.tformer_models[i])
@@ -131,75 +131,85 @@ class T2IPipe:
             self.hf_log(fatal=True) #suppress layer skip messages
 
             if model_class == "CLI-VL":
-                tokenizer = CLIPTokenizer.from_pretrained(
+                self.tokenizer = CLIPTokenizer.from_pretrained(
                     self.tformer_models[i])
-                self.tokenizer.append(tokenizer)
+                self.tokenizer_list.append(self.tokenizer)
 
-                text_encoder = CLIPTextModel.from_pretrained(
+                self.text_encoder = CLIPTextModel.from_pretrained(
                     self.tformer_models[i],
                     **self.encoder_expressions[i]
                 ).to(self.device)
-                self.text_encoder.append(text_encoder)
+                self.text_encoder_list.append(self.text_encoder)
 
             elif model_class == "CLI-VG":
                 self.tokenizer = CLIPTokenizer.from_pretrained(
                     self.tformer_models[i])
-                self.tokenizer.append(tokenizer)
+                self.tokenizer_list.append(self.tokenizer)
 
                 self.text_encoder = CLIPTextModelWithProjection.from_pretrained(
                     self.tformer_models[i],
                     **self.encoder_expressions[i]
                 ).to(self.device)
-                self.text_encoder.append(text_encoder)
+                self.text_encoder_list.append(self.text_encoder)
 
             elif "T5" in model_class:
                 self.tokenizer = T5Tokenizer.from_pretrained(
                     self.tformer_models[i]
                 )
-                self.tokenizer.append(tokenizer)
+                self.tokenizer_list.append(self.tokenizer)
 
                 self.text_encoder = T5EncoderModel.from_pretrained(
                     self.tformer_models[i],
                     **self.encoder_expressions[i]
                 ).to(self.device)
-                self.text_encoder.append(text_encoder)
+                self.text_encoder_list.append(self.text_encoder)
 
             self.hf_log(on=True) #return to normal
 
-        return self.tokenizer, self.text_encoder
+        return self.tokenizer_list, self.text_encoder_list
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, transformers_models, conditioning):
+
         tokenizers, text_encoders = transformers_models
+
         self.conditioning = conditioning
         embeddings_list = []
-        self.hf_log(fatal=True) #suppress layer skip messages
+        pooled_embeddings_list = []
+
+        self.hf_log(fatal=True)  # Suppress layer skip messages
+
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
             cond_input = tokenizer(
-            prompt,
-            max_length=tokenizer.model_max_length,
-            **self.conditioning
-        )
-            prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
+                prompt,
+                max_length=tokenizer.model_max_length,
+                **self.conditioning
+            )
+            prompt_embeds_output = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
 
-            pooled_prompt_embeds = prompt_embeds[0]
-            embeddings_list.append(prompt_embeds.hidden_states[-2])
+            embeddings_list.append(prompt_embeds_output.hidden_states[-2])
+            pooled_embeddings_list.append(prompt_embeds_output[0])
 
-            prompt_embeds = torch.concat(embeddings_list, dim=-1)
-        self.hf_log(on=True) #return to normal
+        self.hf_log(on=True)  # Return to normal
+
+        if not embeddings_list:
+            raise ValueError("Embeddings list is empty. Please check the inputs.")
+
+        prompt_embeds = torch.concat(embeddings_list, dim=-1)
+        pooled_prompt_embeds = torch.concat(pooled_embeddings_list, dim=-1)
+
         negative_prompt_embeds = torch.zeros_like(prompt_embeds)
         negative_pooled_prompt_embeds = torch.zeros_like(pooled_prompt_embeds)
 
         bs_embed, seq_len, _ = prompt_embeds.shape
-        prompt_embeds = prompt_embeds.repeat(1, 1, 1)
-        prompt_embeds = prompt_embeds.view(bs_embed * 1, seq_len, -1)
+        prompt_embeds = prompt_embeds.repeat(1, 1, 1).view(bs_embed, seq_len, -1)
 
         seq_len = negative_prompt_embeds.shape[1]
-        negative_prompt_embeds = negative_prompt_embeds.repeat(1, 1, 1)
-        negative_prompt_embeds = negative_prompt_embeds.view(1 * 1, seq_len, -1)
+        negative_prompt_embeds = negative_prompt_embeds.repeat(1, 1, 1).view(1, seq_len, -1)
 
-        pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
-        negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed * 1, -1)
+        pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, 1).view(bs_embed, -1)
+        negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(1, 1).view(bs_embed, -1)
+
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
 ############## ENCODE
@@ -211,6 +221,7 @@ class T2IPipe:
                     [generation['prompt'], generation['prompt']],
                     transformers_data, conditioning
                     )
+        return self.queue
 
  ############## VAE PT1
     def add_vae(self, model, vae):
@@ -237,7 +248,6 @@ class T2IPipe:
         if self.device == "mps":
             if self.spec.get("enable_attention_slicing",False) == True:
                 self.pipe.enable_attention_slicing()
-        self.metrics()
         return self.pipe
 
 ############## LORA
@@ -272,7 +282,6 @@ class T2IPipe:
             else:
                 generation['latents'] = self.pipe(generator=generator,**self.gen_data).images # return entire batch at once
                 #  pipe ends with image, but really its a latent...
-        self.metrics()
         return self.pipe, self.queue
 
 ############## AUTODECODE
@@ -299,7 +308,6 @@ class T2IPipe:
                 filename = f"{file_prefix}-{counter}-{self.append_data}.png"
 
                 self.image.save(filename) # optimize=True,
-                self.metrics()
                 return self.image
 
 ############## SET DEVICE
@@ -308,14 +316,14 @@ class T2IPipe:
             self.device = next(iter(self.spec.get("devices","cpu")),"cpu")
         else:
             self.device = device
-            # tf32 = self.spec.get("allow_tf32",False)
-            # fasdp = self.spec.get("flash_attention",False)
-            # mps_as = self.spec.get("enable_attention_slicing",False)
-            # if device == "cuda":
-            #     torch.backends.cudnn.allow_tf32 = tf32
-            #     torch.backends.cuda.enable_flash_sdp = fasdp
-            # elif device == "mps":
-            #      torch.backends.mps.enable_attention_slicing = mps_as
+            tf32 = self.spec.get("allow_tf32",False)
+            fasdp = self.spec.get("flash_attention",False)
+            mps_as = self.spec.get("enable_attention_slicing",False)
+            if device == "cuda":
+                torch.backends.cudnn.allow_tf32 = tf32
+                torch.backends.cuda.enable_flash_sdp = fasdp
+            elif device == "mps":
+                 torch.backends.mps.enable_attention_slicing = mps_as
         return self.device
 
 ############## MEMORY OFFLOADING
@@ -358,4 +366,3 @@ class T2IPipe:
         if "cuda" in self.device:
             memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
             logger.debug(f"Total mem use: {memory}.", exc_info=True)
-            # self.tc(self.clock)

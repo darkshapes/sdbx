@@ -366,7 +366,7 @@ class NodeTuner:
                                 self.gen_data["guidance_scale"] = 7.5
                         if ("FLU" in self.info["lora_class"]
                         or "STA-3" in self.info["lora_class"]):
-                            self.lora_data["scale_0"]=0.125
+                            self.lora_data["scale_0"] = 0.125
                         self.scheduler_data["scheduler"]        = self.algorithms[5] #DDIM
                         self.scheduler_data["timestep_spacing"] = "trailing"
         else :   #if no lora
