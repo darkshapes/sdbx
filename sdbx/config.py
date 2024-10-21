@@ -53,6 +53,45 @@ class VRAM(str, Enum):
             return order.index(self) < order.index(other)
         return NotImplemented
 
+# class SD_ASPECT(str, Enum):
+#         "1:1___ 512x512"= (512, 512)
+#         "4:3___ 682x512"= (682, 512)
+#         "3:2___ 768x512"= (768, 512)
+#         "16:9__ 910x512"= (910, 512)
+#         "1:85:1 952x512"= (952, 512)
+#         "2:1__ 1024x512"= (1024, 512)
+
+# class SD21_ASPECT(str,Enum):
+#         "1:1_ 768x768"= (768, 768)
+
+# class SVD_ASPECT(str, Enum):
+#         "1:1__ 576x576" = (576, 576)
+#         "16:9 1024X576"= (1024, 576)
+
+# class XL_ASPECT(str, Enum):
+#         "1:1_ 1024x1024"= (1024, 1024)
+#         "16:15 1024x960"= (1024, 960)
+#         "17:15 1088x960"= (1088, 960)
+#         "17:14 1088x896"= (1088, 896)
+#         "4:3__ 1152x896"= (1152, 896)
+#         "18:13 1152x832"= (1152, 832)
+#         "3:2__ 1216x832"= (1216, 832)
+#         "5:3__ 1280x768"= (1280, 768)
+#         "7:4__ 1344x768"= (1344, 768)
+#         "21:11 1344x704"= (1344, 704)
+#         "2:1__ 1408x704"= (1408, 704)
+#         "23:11 1472x704"= (1472, 704)
+#         "21:9_ 1536x640"= (1536, 640)
+#         "5:2__ 1600x640"= (1600, 640)
+#         "26:9_ 1664x576"= (1664, 576)
+#         "3:1__ 1728x576"= (1728, 576)
+#         "28:9_ 1792x576"= (1792, 576)
+#         "29:8_ 1856x512"= (1856, 512)
+#         "15:4_ 1920x512"= (1920, 512)
+#         "31:8_ 1984x512"= (1984, 512)
+#         "4:1__ 2048x512"= (2048, 512)
+
+
 class Precision(str, Enum):
     MIXED = "mixed"
     FP64 = "float64"
@@ -289,10 +328,10 @@ class Config(BaseSettings):
         from sdbx.indexer import IndexManager
         return IndexManager()
 
-    # @cached_property
-    # def t2i_pipe(self):
-    #     from sdbx.nodes.compute import T2IPipe
-    #     return T2IPipe()
+    @cached_property
+    def t2i_pipe(self):
+        from sdbx.nodes.compute import T2IPipe
+        return T2IPipe()
 
     @cached_property
     def node_tuner(self):

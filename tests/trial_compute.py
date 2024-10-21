@@ -1,10 +1,10 @@
 import os
 from sdbx.config import config
 from sdbx.nodes.base import nodes
-from sdbx.indexer import IndexManager
+from sdbx.config import config
 
 # print("\nInitializing model index, checking system specs.\n  Please wait...")
-# create_index = IndexManager().write_index()      # (defaults to config/index.json)
+# create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
 # dif_index = config.get_default("index", "DIF")
 # print(f"Ready.")
 name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors" #input("""
@@ -25,24 +25,15 @@ for key,val in spec.items():
         model = key
         pass
 
+# device = nodes.force_device(**defaults.get("force_device"))
+#pipe = nodes.empty_cache(transformer_models, lora_pipe, unet_pipe, vae_pipe)
 defaults = optimize.determine_tuning(model)
-
-device = nodes.force_device(**defaults.get("force_device"))
-if defaults["empty_cache"]["stage"].get("head", None) != None:
-        nodes.empty_cache(**defaults["empty_cache"]["stage"].get("head"))
-queue = nodes.text_input(**defaults.get("text_input"))
-transformer_models = nodes.load_transformer(**defaults.get("load_transformer"))
-
+queue = nodes.diffusion_prompt(**defaults.get("diffusion_prompt"))
+tokenizers, text_encoders = nodes.load_transformer(**defaults.get("load_transformer"))
+queue = nodes.encode_prompt(queue, tokenizers, text_encoders,**defaults.get("encode_prompt"))
 vae = nodes.load_vae_model(**defaults.get("load_vae_model"))
-queue = nodes.encode_prompt(queue=queue, transformer_models=transformer_models, **defaults.get("encode_prompt"))
-if defaults["empty_cache"]["stage"].get("encoder", None) != None:    nodes.empty_cache(queue, defaults["empty_cache"]["stage"].get("encoder"))
-pipe = nodes.diffusion_pipe(vae, **defaults.get("diffusion_pipe"))
-lora = nodes.load_lora(**defaults.get("load_lora"))
-scheduler = nodes.noise_scheduler(**defaults.get("noise_scheduler"))
-pipe = nodes.generate_image(pipe, queue, scheduler, **defaults.get("generate_image"))
-if defaults["empty_cache"]["stage"].get("generate", None) != None:
-    nodes.empty_cache(pipe, defaults["empty_cache"]["stage"].get("generate"))
-image = nodes.autodecode(pipe, **defaults.get("autodecode"))
-
-#if defaults["empty_cache"]["stage"].get("tail", None) != None:
-#       nodes.empty_cache(image, **defaults["empty_cache"]["stage"]["tail"])
+pipe = nodes.diffusion_pipe(vae,**defaults.get("diffusion_pipe"))
+pipe = nodes.load_lora(pipe, **defaults.get("load_lora"))
+pipe = nodes.load_scheduler(pipe, **defaults.get("noise_scheduler"))
+pipe, latent = nodes.generate_image(pipe, queue, **defaults.get("generate_image"))
+image = nodes.autodecode(pipe, latent, **defaults.get("autodecode"))

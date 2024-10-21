@@ -63,7 +63,8 @@ class NodeTuner:
         disk_utilization = shutil.disk_usage(config.get_path("output"))
         disk_free = disk_utilization[2]
         model, model_size = file_list[-1]
-        offloading = { "cpu":1073741824, "sequential":3221225472, "disk": disk_free }  # Extend to cpu offloading
+        offloading = { "sequential":1073741824, "cpu":3221225472, "disk": disk_free }  # Extend to cpu offloading
+        # offload estimate is 1gb sequential and 3gb cpu
 
         for offload_type, additional_memory in offloading.items():
             if model_size <= (peak_gpu + additional_memory):
@@ -91,13 +92,15 @@ class NodeTuner:
         else:
             if main_model_size > peak_cpu:
                 threshold = {"memory": "disk"}
-            self.pipe_data["precision"] = "F32"
+            self.pipe_data["precision"]        = "F32"
             self.transformer_data["precision"] = "F32"
-            self.vae_data["precision"] = "F32"
+            self.vae_data["precision"]         = "F32"
+            self.pipe_data["low_cpu_mem_usage"] = True
 
         if threshold.get("fit",None) == "all":
-            self.vae_data["torch_dtype"] = "auto"
+            self.vae_data["torch_dtype"]  = "auto"
             self.pipe_data["torch_dtype"] = "auto"
+            self.pipe_data["low_cpu_mem_usage"] = True
 
         if threshold.get("fit", None) in ["vae", "all"]:
             self.pipe_data["padding"]        = "max_length"
@@ -105,40 +108,35 @@ class NodeTuner:
             self.pipe_data["return_tensors"] = 'pt'
 
         if threshold.get("fit", None) == "vae":
-            self.cache_data["stage"]["generate"] = 1,1,1,0
+            self.vae_data["low_cpu_mem_usage"] = True
 
         #treat any other case the same way
         if threshold.get("fit", None) not in [None, "all"]:
-            self.cache_data["stage"]["encoder"] = 1,0,0,0
-            self.cache_data["stage"]["generate"] = 0,1,1,0
-            self.gen_data["output_type"] = "latent"
-            self.pipe_data["transformer_models"] = None
-            self.pipe_data["precision"] = "F16"
-            self.vae_data["precision"] = "F16"
-            self.encode_data["padding"]        = "max_length"
-            self.encode_data["truncation"]     = True
-            self.encode_data["return_tensors"] = 'pt'
+            self.gen_data["output_type"]         = "latent"
+            self.pipe_data["text_encoders"]      = None
+            self.pipe_data["precision"]          = "F16"
+            self.vae_data["precision"]           = "F16"
+            self.encode_data["padding"]          = "max_length"
+            self.encode_data["truncation"]       = True
+            self.encode_data["return_tensors"]   = 'pt'
             if self.transformers_data is not None:
                 for i in range(len(self._tra)):
                     self.transformers_data[f"precision_{i}"] = "F16"
 
         if threshold.get("memory","gpu") != "gpu":
             self.gen_data["offload_method"] = threshold.get("memory","none")
-            if  self.gen_data["offload_method"] == "sequential":
-                self.cache_data["stage"]["head"] = 1,0,0,0
-                self.vae_data["tiling"] = True
+            if  self.gen_data["offload_method"] == "cpu":
+                self.vae_data["tiling"]  = True
                 self.vae_data["slicing"] = False
             elif  self.gen_data["offload_method"] == "disk":
-                self.cache_data["stage"]["head"] = 1,0,0,0
-                self.cache_data["stage"]["tail"] = 0,0,0,1
-                self.vae_data["tiling"] = True
-                self.vae_data["slicing"]  = True
-            else: #if it equals cpu
-                self.vae_data["tiling"] = False
+                self.vae_data["tiling"]  = True
+                self.vae_data["slicing"] = True
+            else: #if it equals sequential
+                self.vae_data["tiling"]  = True
                 self.vae_data["slicing"] = False
         else:
             self.gen_data["offload_method"] = "none"
-            self.vae_data["tiling"] = False
+            self.vae_data["tiling"]  = False
             self.vae_data["slicing"] = False
 
     def _get_step_from_filename(self, key, val):
@@ -228,15 +226,13 @@ class NodeTuner:
 
         self.info["model_category"], self.info["model_class"], self.info["model_details"] = config.model_indexer.fetch_id(self.pipe_data["model"])
         self.info["model_size"]             = self.info["model_details"][0]
-        self.pipe_data["device"]            = self.first_device
-        self.pipe_data["low_cpu_mem_usage"] = True
+
         self.gen_data["dynamic_guidance"]   = False
         self.pipe_data["add_watermarker"]   = False
         self.device_data["device_name"]     = self.first_device
         self.device_data["gpu_id"]          = 0
         self.lora_data["fuse_0"]            = True
-        #self.gen_data["low_cpu_mem_usage"]  = True
-        self.image_data["file_prefix"]      = "Shadowbox-"
+        self.image_data["file_prefix"]      = "Shadowbox"
         self.image_data["upcast"]       = True if self.info["model_class"] == "STA-XL" else False # f32, fp16 broken by default
         #self.pipe["device_map"] = None    #todo: work on use case
         if self.info["model_class"] in ["STA-15", "STA-XL", "STA-3M", "STA-3C", "STA-3Q"]:
@@ -274,7 +270,7 @@ class NodeTuner:
                 self.queue_data = {
                         "prompt":"A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
                         "seed" : soft_random(),
-                        "batch": 1,
+                        "batch": 4,
                     }
                 self._vae, self._tra, self._lora =  IndexManager().fetch_compatible(self.info["model_class"])
 
@@ -285,8 +281,8 @@ class NodeTuner:
                         self.transformers_data[f"precision_{i}"]    = self._tra[each][2]
                         self.transformers_data["clip_skip"]         = 2
                         self.transformers_data["device"]            = self.first_device
-                        self.transformers_data["low_cpu_mem_usage"] = True
                         self.transformers_data["flash_attention"]   = self.spec.get("flash_attention",False) #dont add param unless necessary
+                        self.transformers_data["low_cpu_mem_usage"] = True
                         self.info["tra_size"][i] = self._tra[each][0]
                         i += 1
                 else:
@@ -300,7 +296,6 @@ class NodeTuner:
                     self.vae_data["vae"]               = self._vae[0][0][0]
                     self.info["vae_size"]              = self._vae[0][1][0]
                     self.vae_data["device"]            = self.first_device
-                    self.vae_data["low_cpu_mem_usage"] = True
                 else:
                     self.vae_data = None
 
@@ -422,7 +417,7 @@ class NodeTuner:
             "load_vae_model"  : self.vae_data,
             "force_device"    : self.device_data,
             "load_transformer": self.transformers_data,
-            "text_input"      : self.queue_data,
+            "diffusion_prompt": self.queue_data,
             "generate_image"  : self.gen_data,
             "autodecode"      : self.image_data,
             "load_refiner"    : self.refiner_data
