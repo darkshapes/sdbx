@@ -3,15 +3,16 @@ from sdbx.config import config
 from sdbx.nodes.base import nodes
 from sdbx.config import config
 
-# print("\nInitializing model index, checking system specs.\n  Please wait...")
-# create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
-# dif_index = config.get_default("index", "DIF")
-# print(f"Ready.")
-name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors" #input("""
-# Please type the filename of an available checkpoint.
-# Path will be detected.
-# (default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
-
+print("\nInitializing model index, checking system specs.\n  Please wait...")
+create_index = config.model_indexer.write_index()      # (defaults to config/index.json)
+create_index = config.sys_cap.main()
+dif_index = config.get_default("index", "DIF")
+print(f"Ready.")
+name_path = input("""
+Please type the filename of an available checkpoint.
+Path will be detected.
+(default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
+# name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors"
 optimize         = config.node_tuner
 
 name_path = os.path.basename(name_path)

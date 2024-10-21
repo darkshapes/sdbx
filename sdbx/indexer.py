@@ -370,7 +370,8 @@ class ReadMeta:
     def __repr__(self):
         return f"ReadMeta(data={self.data()})"
 
-class IndexManager:
+
+class ModelIndexer:
 
     all_data = {
         "DIF": defaultdict(dict),
@@ -384,7 +385,6 @@ class IndexManager:
         # Collect all data to write at once
         self.directories =  config.get_default("directories","models") #multi read
         self.delete_flag = True
-        config.write_spec()
         for each in self.directories:
             self.path_name = config.get_path(f"models.{each}")
             index_file = os.path.join(config_source_location, index_file)
@@ -540,5 +540,6 @@ class IndexManager:
         else:
             logger.debug("Compatible models not found")
             return "∅"
-    
+
+
 

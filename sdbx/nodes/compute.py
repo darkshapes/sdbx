@@ -26,16 +26,15 @@ from diffusers import AutoencoderKL, AutoPipelineForText2Image
 from transformers import CLIPTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 import accelerate
 
-from sdbx import logger
+from sdbx.config import logging
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter
 
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
 
-    config_path = config.get_path("models.metadata")
-    spec = config.get_default("spec","data")
-    device = next(iter(spec.get("devices",None)),None)
+    capacity         = config.sys_cap
+    device =  capacity["device"]
 
 ############## STFU HUGGINGFACE
     def hf_log(self, on=False, fatal=False):
@@ -76,12 +75,12 @@ class T2IPipe:
 ############## SET DEVICE
     def set_device(self, device=None):
         if device is None:
-            self.device = next(iter(self.spec.get("devices",None)),None)
+            self.device = self.capacity.get("device","cpu")
         else:
             self.device = device
-        tf32 = self.spec.get("allow_tf32",False)
-        fasdp = self.spec.get("flash_attention",False)
-        mps_as = self.spec.get("enable_attention_slicing",False)
+        tf32 = self.capacity.get("allow_tf32",False)
+        fasdp = self.capacity.get("flash_attention",False)
+        mps_as = self.capacity.get("attention_slicing",False)
         if self.device == "cuda":
             torch.backends.cudnn.allow_tf32 = tf32
             torch.backends.cuda.enable_flash_sdp = fasdp
@@ -93,8 +92,7 @@ class T2IPipe:
     def metrics(self):
         if "cuda" in self.device:
             memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
-            logger.debug(f"Total mem use: {memory}.", exc_info=True)
-            print('Total. memory used:', memory, 'GB')
+            logging.debug(f"Total mem use: {memory}.", exc_info=True)
 
 ############## ENCODERS
     def declare_encoders(self, model_symlinks, tk_expressions, te_expressions):
@@ -195,7 +193,7 @@ class T2IPipe:
         pipe = AutoPipelineForText2Image.from_pretrained(model, **pipe_data).to(self.device)
 
         if self.device == "mps":
-            if self.spec.get("enable_attention_slicing",False) == True:
+            if self.capacity.get("attention_slicing",False) == True:
                 pipe.enable_attention_slicing()
         return pipe
 
@@ -261,7 +259,7 @@ class T2IPipe:
             try:
                 raise ValueError(f"Scheduler '{scheduler_in}' not supported")
             except ValueError as error_log:
-                logger.debug(f"Scheduler error {error_log}.", exc_info=True)
+                logging.debug(f"Scheduler error {error_log}.", exc_info=True)
 
 
 ############## MEMORY OFFLOADING
@@ -295,8 +293,8 @@ class T2IPipe:
                 gen_data["pooled_prompt_embeds"] = generation["embeddings"][2]
                 gen_data["negative_pooled_prompt_embeds"] = generation["embeddings"][3]
             else:
-                if self.spec["xformers"] == True: pipe.enable_xformers_memory_efficient_attention()
-            if self.spec.get("dynamo",False) == True:
+                pipe.enable_xformers_memory_efficient_attention() = self.capacity.get("xformers",False)
+            if self.capacity.get("dynamo",False) == True:
                 generation['latents'] = pipe(generator=generator,**gen_data)[0] # return individual for compiled
             else:
                 generation['latents'] = pipe(generator=generator,**gen_data).images # return entire batch at once

@@ -1,6 +1,5 @@
 import os
 import numbers
-from sdbx.indexer import IndexManager
 from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
 from sdbx.nodes.helpers import soft_random
@@ -48,18 +47,18 @@ class NodeTuner:
         File sizes are in bytes.
         Return dict with flags for appropriate workflow. """
 
-        total_size = sum(file_sizes.values())
+        total_size = sum(file_sizes.values())   #see if everything fits all at once first (lucky, this person)
         if total_size <= peak_gpu:
             return {"fit": "all", "memory": "gpu"}
 
-        file_list = list(file_sizes.items())
+        file_list = list(file_sizes.items())    ## try to fit on gpu
         for i in range(len(file_list) - 1, 0, -1):
             total_size = sum(size for _, size in file_list[:i])
             if total_size <= peak_gpu:
                 threshold = {"fit": file_list[i-1][0], "memory": "gpu"}
                 return threshold
 
-        import shutil
+        import shutil              ##try to expand memory available other than gpu
         disk_utilization = shutil.disk_usage(config.get_path("output"))
         disk_free = disk_utilization[2]
         model, model_size = file_list[-1]
@@ -274,7 +273,7 @@ class NodeTuner:
                         "seed" : soft_random(),
                         "batch": 4,
                     }
-                self._vae, self._tra, self._lora =  IndexManager().fetch_compatible(self.info["model_class"])
+                self._vae, self._tra, self._lora =  config.model_indexer.fetch_compatible(self.info["model_class"])
 
                 if self._tra != "∅" and self._tra != {}:
                     i=0

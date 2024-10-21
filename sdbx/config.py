@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import tomllib
@@ -52,45 +53,6 @@ class VRAM(str, Enum):
             order = [VRAM.NONE, VRAM.LOW, VRAM.NORMAL, VRAM.HIGH]
             return order.index(self) < order.index(other)
         return NotImplemented
-
-# class SD_ASPECT(str, Enum):
-#         "1:1___ 512x512"= (512, 512)
-#         "4:3___ 682x512"= (682, 512)
-#         "3:2___ 768x512"= (768, 512)
-#         "16:9__ 910x512"= (910, 512)
-#         "1:85:1 952x512"= (952, 512)
-#         "2:1__ 1024x512"= (1024, 512)
-
-# class SD21_ASPECT(str,Enum):
-#         "1:1_ 768x768"= (768, 768)
-
-# class SVD_ASPECT(str, Enum):
-#         "1:1__ 576x576" = (576, 576)
-#         "16:9 1024X576"= (1024, 576)
-
-# class XL_ASPECT(str, Enum):
-#         "1:1_ 1024x1024"= (1024, 1024)
-#         "16:15 1024x960"= (1024, 960)
-#         "17:15 1088x960"= (1088, 960)
-#         "17:14 1088x896"= (1088, 896)
-#         "4:3__ 1152x896"= (1152, 896)
-#         "18:13 1152x832"= (1152, 832)
-#         "3:2__ 1216x832"= (1216, 832)
-#         "5:3__ 1280x768"= (1280, 768)
-#         "7:4__ 1344x768"= (1344, 768)
-#         "21:11 1344x704"= (1344, 704)
-#         "2:1__ 1408x704"= (1408, 704)
-#         "23:11 1472x704"= (1472, 704)
-#         "21:9_ 1536x640"= (1536, 640)
-#         "5:2__ 1600x640"= (1600, 640)
-#         "26:9_ 1664x576"= (1664, 576)
-#         "3:1__ 1728x576"= (1728, 576)
-#         "28:9_ 1792x576"= (1792, 576)
-#         "29:8_ 1856x512"= (1856, 512)
-#         "15:4_ 1920x512"= (1920, 512)
-#         "31:8_ 1984x512"= (1984, 512)
-#         "4:1__ 2048x512"= (2048, 512)
-
 
 class Precision(str, Enum):
     MIXED = "mixed"
@@ -211,7 +173,7 @@ class Config(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return (TomlConfigSettingsSource(settings_cls),)
-        
+
     def generate_new_config(self):
         logging.info(f"Creating config directory at {self.path}...")
 
@@ -220,17 +182,17 @@ class Config(BaseSettings):
         for subdir in self._path_dict.values():
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
-        
+
         from shutil import copytree
         copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
 
     def rewrite(self, key, value):
         # rewrites the config.toml key to value
         pass
-    
+
     def get_path(self, name):
         return self._path_dict[name]
-    
+
     def get_path_contents(self, name, extension="", path_name=True, base_name=False):  # List contents of a directory
         p = self.get_path(name) if path_name else name
 
@@ -240,7 +202,7 @@ class Config(BaseSettings):
             format_path = lambda p, g: os.path.basename(g)  # Only return base name
 
         return [format_path(p, g) for g in glob(f"**.{extension}", root_dir=p, recursive=True)]
-    
+
     def get_path_tree(self, name, extension="", path_name=True, file_callback=lambda e: e, visited=None):
         p = self.get_path(name) if path_name else name
         visited = visited or set()
@@ -278,7 +240,7 @@ class Config(BaseSettings):
         models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
 
         return {**root, **models}
-    
+
     def load_data(self, path):
         _, ext = os.path.splitext(path)
         loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
@@ -288,7 +250,7 @@ class Config(BaseSettings):
             except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
                 raise SyntaxError(f"Couldn't read file {path}") from e
         return fd
-    
+
     def get_default(self, name, prop):
         return self._defaults_dict[name][prop]
 
@@ -300,7 +262,7 @@ class Config(BaseSettings):
             fp = os.path.join(config_source_location, filename)
             name, _ = os.path.splitext(filename)
             d[name] = self.load_data(fp)
-        
+
         return d
 
     @cached_property
@@ -322,7 +284,7 @@ class Config(BaseSettings):
     def executor(self):
         from sdbx.executor import Executor
         return Executor(self.node_manager)
-    
+
     @cached_property
     def model_indexer(self):
         from sdbx.indexer import IndexManager
@@ -337,59 +299,13 @@ class Config(BaseSettings):
     def node_tuner(self):
         from sdbx.nodes.tuner import NodeTuner
         return NodeTuner()
-    
-    def write_spec(self):
-        import psutil
-        from collections import defaultdict
-        from platform import system
-        spec = defaultdict(dict)
-        spec["data"]["dynamo"]  = False if system().lower() == "windows" else True
-        spec["data"]["devices"] = {}
-        if torch.cuda.is_available():
-            spec["data"]["devices"]["cuda"] = torch.cuda.mem_get_info()[1]
-            spec["data"]["flash_attention"] = False #str(torch.backends.cuda.flash_sdp_enabled()).title()
-            spec["data"]["allow_tf32"]      = False
-            spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
-            if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
-                spec["data"]["enable_attention_slicing"] = False
-        if torch.backends.mps.is_available() & torch.backends.mps.is_built():
-            spec["data"]["devices"]["mps"] = torch.mps.driver_allocated_memory()
-            try: 
-                import flash_attn
-            except: 
-                spec["data"]["flash_attention"]          = False
-                spec["data"]["enable_attention_slicing"] = True
-            else:
-                spec["data"]["flash_attention"] = True  # hope for the best that user set this up
-            #set USE_FLASH_ATTENTION=1 in console
-            # ? https                       : //pytorch.org/docs/master/notes/mps.html
-            # ? memory_fraction = 0.5  https: //iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
-            # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
-        if torch.xpu.is_available():
-            # todo: code for xpu total memory, possibly code for mkl
-            """ spec["data"]["devices"]["xps"] = ram"""
-        spec["data"]["devices"]["cpu"] = psutil.virtual_memory().total # set all floats = fp32
-        spec_file = os.path.join(config_source_location, "spec.json")
-        if os.path.exists(spec_file):
-            try:
-                os.remove(spec_file)
-            except FileNotFoundError as error_log:
-                logging.debug(f"'Spec file absent at write time: {spec_file}.'{error_log}", exc_info=True)
-        if spec:
-            try:
-                with open(spec_file, "w+", encoding="utf8") as file_out:
-                    """ try opening file"""
-            except Exception as error_log:
-                logging.debug(f"Error writing spec file '{spec_file}': {error_log}", exc_info=True)
-            else:
-                with open(spec_file, "w+", encoding="utf8") as file_out:
-                    json.dump(spec, file_out, ensure_ascii=False, indent=4, sort_keys=False)
-        else:
-            logging.debug("No data to write to spec file.", exc_info=True)
-        #return data
 
+    @cached_property
+    def sys_cap(self):
+        from sdbx.cap import SystemCapacity
+        return SystemCapacity()
 
-def parse() -> Config:
+def parse(testing: bool = False) -> Config:
     parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument('-c', '--config', type=str, default=get_config_location(), help='Location of the config file.')
@@ -399,16 +315,16 @@ def parse() -> Config:
     parser.add_argument('-h', '--help', action='help', help='See config.toml for more configuration options.')
     # parser.add_argument('--setup', action='store_true', help='Setup and exit.')
 
-    args = parser.parse_args()
+    args = parser.parse_args() if not testing else parser.parse_args([])
 
     level = logging.INFO
     if args.verbose:
         level = logging.DEBUG
     if args.silent:
         level = logging.ERROR
-    
+
     logging.basicConfig(encoding='utf-8', level=level)
-    
+
     return Config(path=args.config)
 
-config = parse()
+config = parse(testing=hasattr(sys, '_called_from_test'))

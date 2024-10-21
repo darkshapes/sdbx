@@ -1,8 +1,9 @@
 from enum import Enum
 from functools import partial
-from dataclasses import dataclass, field
+from operator import lt, le, eq, ne, ge, gt
+from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
-from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
+from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -32,9 +33,8 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
 
     fn.generator = isgeneratorfunction(fn)
 
-    #commented for speed
-    #from sdbx.nodes.info import NodeInfo  # Avoid circular import
-    #fn.info = NodeInfo(fn, **kwargs)
+    from sdbx.nodes.info import NodeInfo
+    fn.info = NodeInfo(fn, **kwargs)
 
     # from sdbx.nodes.tuner import NodeTuner
     # fn.tuner = NodeTuner(fn)
@@ -88,9 +88,26 @@ from collections.abc import Iterator as I
 
 
 ## Annotation classes ##
+class AnnotationMeta(type):
+    def __getitem__(cls, item):
+        if not isinstance(item, tuple):
+            item = (item,)
+        return type('AnnotationInstance', (Annotation,), {'__args__': item})
+
+class Annotation(metaclass=AnnotationMeta):
+    def check(self, t):
+        args = getattr(self, '__args__', ())
+        return Any in args or any(issubclass(t, arg) for arg in args)
+
+    def serialize(self):
+        return { "constraints": asdict(self) }
+
 @dataclass
-class Name:
+class Name(Annotation[Any]):
     name: str = ""
+
+    def serialize(self):  # special
+        pass
 
 @dataclass
 class Condition:
@@ -121,7 +138,7 @@ class Dependent(Annotation[Any]):
         else:
             if len(self.when) == 0:
                 self.when = [Condition(operator=ne, value=None)]
-        
+
         self.when = [
             w if isinstance(w, Condition) else
             Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
@@ -129,8 +146,8 @@ class Dependent(Annotation[Any]):
         ]
 
     def serialize(self):
-        return { 
-            "dependent": { 
+        return {
+            "dependent": {
                 "on": self.on,
                 "when": [asdict(w) for w in self.when]
             }
@@ -148,21 +165,18 @@ class Slider(Annotation[int, float]):
     step: Union[int, float] = 1.0
     round: bool = False
 
+    def serialize(self):
+        return { **super().serialize(), "display": type(self).__name__.lower() }
+
 @dataclass
 class Numerical(Slider):
     randomizable: bool = False
 
 @dataclass
-class Text:
+class Text(Annotation[str]):
     multiline: bool = False
     dynamic_prompts: bool = False
 
 @dataclass
-class Dependent:
-    on: str
-    when: Any
-
-@dataclass
-class Validator:
-    condition: Callable[[Any], bool]
-    error_message: str
+class EqualLength(Annotation[List]):
+    to: str

@@ -54,23 +54,22 @@ def format_name(name):
 
 ### NODE INFO TIMING ###
 
-from functools import wraps
-from time import time
-
-def timing(callback):
-    def decorator(f):
-        @wraps(f)
-        def wrap(instance, *args, **kwargs):
-            ts = time()
-            result = f(instance, *args, **kwargs)
-            te = time()
-            elapsed_time = te - ts
-            # Use the class attribute 'name' for timing log
-            print(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
-            callback(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
-            return result
-        return wrap
-    return decorator
+# from functools import wraps
+# from time import time
+# def timing(callback):
+#     def decorator(f):
+#         @wraps(f)
+#         def wrap(instance, *args, **kwargs):
+#             ts = time()
+#             result = f(instance, *args, **kwargs)
+#             te = time()
+#             elapsed_time = te - ts
+#             # Use the class attribute 'name' for timing log
+#             print(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+#             callback(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+#             return result
+#         return wrap
+#     return decorator
 
 ### RANDOM ROUTINES ###
 

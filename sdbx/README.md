@@ -60,7 +60,7 @@ evaluate = ('DIF', ('noosphere_v42.safetensors', 'STA-15', 2132626794, 'C:\\User
 
 <hr>
 
-## CLASS IndexManager
+## CLASS ModelIndexer
 ##### IMPORT from sdbx.indexer import IndexManager
 ##### METHODS write_index, fetch_compatible
 ##### PURPOSE manage model type lookups, search for compatibility data
