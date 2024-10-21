@@ -3,7 +3,7 @@ from functools import partial
 from operator import lt, le, eq, ne, ge, gt
 from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
-from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_type_hints
+from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_origin, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -97,7 +97,7 @@ class AnnotationMeta(type):
 class Annotation(metaclass=AnnotationMeta):
     def check(self, t):
         args = getattr(self, '__args__', ())
-        return Any in args or any(issubclass(t, arg) for arg in args)
+        return Any in args or any(issubclass(get_origin(t) or t, arg) for arg in args)
     
     def serialize(self):
         return { "constraints": asdict(self) }

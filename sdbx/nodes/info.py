@@ -107,6 +107,7 @@ class NodeInfo:
         if vt is typing.Annotated:
             base_type, *metadata = typing.get_args(v)
 
+            info, name = self._get_info(base_type)
             info["type"] = base_type.__name__.capitalize()
 
             for item in metadata:

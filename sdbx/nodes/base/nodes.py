@@ -342,7 +342,7 @@ def encode_prompt(
     padding       : Literal['max_length']                              = "max_length",
     truncation    : bool                                               = True,
     return_tensors: Literal["pt"]                                      = 'pt',
-) ->  A[TensorType, Name("Embeddings")]:
+) -> A[TensorType, Name("Embeddings")]:
 
     conditioning = {
         "padding"   : padding,
