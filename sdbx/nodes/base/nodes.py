@@ -172,7 +172,7 @@ def text_input(
     prompt        : A[str,
         Text(multiline=True, dynamic_prompts=True)] = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
     negative_terms: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
-    seed          : A[int, Dependent(on="prompt", not=True, when=None),
+    seed          : A[int, Dependent(on="prompt"),
         Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = soft_random(),  # cross compatible with ComfyUI and A1111 seeds
     batch         : A[int, Numerical(min=0, max=512, step=1)]          = 1,
 ) -> A[tuple, Name("Queue")]:
@@ -216,7 +216,7 @@ def load_transformer(
 @node(path="transform/", name="Force Device", display=True)
 def force_device(
     device_name: Literal[*spec] = None, # type: ignore
-    gpu_id     : A[int, Dependent(on="device", when=not None), Slider(min=0, max=100)] = 0,
+    gpu_id     : A[int, Dependent(on="device"), Slider(min=0, max=100)] = 0,
 ) ->  A[iter, Name("Device")]:
     device_name = next(iter(spec),"cuda")
     if gpu_id != 0:
@@ -252,14 +252,14 @@ def diffusion_pipe(
     vae                 : ModelType                                                                = None,
     model               : Literal[*diffusion_models.keys()]                                        = None,         # type: ignore
     use_model_to_encode : bool                                                                     = False,
-    transformer_models : ModelType                                                                 = None,
+    transformer_models  : ModelType                                                                = None,
     precision           : Literal[*variant_list]                                                   = "F16",        # type: ignore
     device              : A[iter,Literal[*spec]]                                                   = None,         # type: ignore
     low_cpu_mem_usage   : bool                                                                     = True,
     safety_checker      : bool                                                                     = False,
     fuse                : bool                                                                     = False,
     padding             : A[Literal['max_length'], Dependent(on="use_model_to_encode", when=True)] = None,
-    truncation          : A[bool,Dependent(on="use_model_to_encode", when=True)]                   = None,
+    truncation          : A[bool, Dependent(on="use_model_to_encode", when=True)]                  = None,
     return_tensors      : A[Literal["pt"],Dependent(on="use_model_to_encode", when=True)]          = None,
     add_watermarker     : bool                                                                     = False,
 ) -> A[ModelType, Name("Model")]:
@@ -305,16 +305,10 @@ def diffusion_pipe(
 
 @node(path="load/", name="Load LoRA", display=True)
 def load_lora(
-    pipe  : ModelType                     = None,
-    lora_0 : Literal[*lora_models.keys()] = next(iter(lora_models.keys()),None), # type: ignore
-        fuse_0  : A[bool,  Dependent(on="lora_0", when=(not None))]                                   = False,
-        scale_0 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_0", when=True)] = 1.0,
-        lora_1  : A[Literal[*lora_models.keys()],  Dependent(on="lora_0", when=(not None))]      = None,  # type: ignore
-        fuse_1  : A[bool,  Dependent(on="lora_1", when=(not None))]                                   = False,
-        scale_1 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_1", when=True)] = None,
-        lora_2  : A[Literal[*lora_models.keys()],  Dependent(on="lora_1", when=(not None))]      = None,  # type: ignore
-        fuse_2  : A[bool,  Dependent(on="lora_2", when=(not None))]                                   = False,
-        scale_2 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_2", when=True)] = None,
+    pipe  : ModelType                           = None,
+    lora: List[Literal[*lora_models.keys()]]    = None,
+    fuse: A[List[bool], EqualLength(to="lora")] = False,
+    scale: A[List[A[float, Numerical(min=0.0, max=1.0, step=0.01)]], EqualLength(to="lora")] = 1.0,
 ) ->  A[ModelType, Name("LoRA")]:
     for i in range(3):
         lora_data = locals().get(f"lora_{i}", None)
@@ -348,7 +342,7 @@ def encode_prompt(
     padding       : Literal['max_length']                              = "max_length",
     truncation    : bool                                               = True,
     return_tensors: Literal["pt"]                                      = 'pt',
-) ->  A[TensorType,Name("Embeddings")]:
+) ->  A[TensorType, Name("Embeddings")]:
 
     conditioning = {
         "padding"   : padding,
@@ -449,8 +443,8 @@ def autodecode(
     latent : TensorType = None,
     upcast : bool       = True,
     file_prefix   : A[str, Text(multiline=False, dynamic_prompts=True)]                                  = "Shadowbox-",
-    file_format   : A[Literal["png","jpg","optimize"], Dependent(on="temp", when="False")]               = "optimize",
-    compress_level: A[int, Slider(min=1, max=9, step=1),  Dependent(on="format", when=(not "optimize"))] = 7,
+    file_format   : A[Literal["png", "jpg", "optimize"], Dependent(on="temp", when=False)]               = "optimize",
+    compress_level: A[int, Slider(min=1, max=9, step=1), Dependent(on="format", when=(ne, "optimize"))]  = 7,
     temp: bool = False,
 ) -> I[Any]:
     pipe, queue = latent

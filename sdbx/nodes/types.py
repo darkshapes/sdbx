@@ -140,8 +140,8 @@ class Dependent(Annotation[Any]):
                 self.when = [Condition(operator=ne, value=None)]
         
         self.when = [
-            w if isinstance(w, Condition) 
-            else Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
+            w if isinstance(w, Condition) else 
+            Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
             for w in self.when
         ]
 
