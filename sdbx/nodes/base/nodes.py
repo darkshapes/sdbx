@@ -171,7 +171,7 @@ def diffusion_prompt(
     prompt        : A[str,
         Text(multiline=True, dynamic_prompts=True)] = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
     negative_terms: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
-    seed          : A[int, Dependent(on="prompt", when=(not None)),
+    seed          : A[int, Dependent(on="prompt"),
         Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = soft_random(),  # cross compatible with ComfyUI and A1111 seeds
     batch         : A[int, Numerical(min=0, max=512, step=1)]          = 1,
 ) -> A[list, Name("Queue")]:
@@ -234,7 +234,7 @@ def load_transformer(
 @node(path="transform/", name="Force Device", display=True)
 def force_device(
     device_name: Literal[*spec] = None, # type: ignore
-    gpu_id     : A[int, Dependent(on="device", when=not None), Slider(min=0, max=100)] = 0,
+    gpu_id     : A[int, Dependent(on="device"), Slider(min=0, max=100)] = 0,
 ) ->  A[iter, Name("Device")]:
     device_name = next(iter(spec),"cuda")
     if gpu_id != 0:
@@ -280,7 +280,7 @@ def diffusion_pipe(
     safety_checker      : bool                                                                     = False,
     fuse                : bool                                                                     = False,
     padding             : A[Literal['max_length'], Dependent(on="use_model_to_encode", when=True)] = None,
-    truncation          : A[bool,Dependent(on="use_model_to_encode", when=True)]                   = None,
+    truncation          : A[bool, Dependent(on="use_model_to_encode", when=True)]                  = None,
     return_tensors      : A[Literal["pt"],Dependent(on="use_model_to_encode", when=True)]          = None,
     add_watermarker     : bool                                                                     = False,
 ) -> A[TensorType, Name("Model")]:
@@ -332,26 +332,20 @@ def diffusion_pipe(
 
 @node(path="load/", name="Load LoRA", display=True)
 def load_lora(
-    pipe  : ModelType                     = None,
-    lora_0 : Literal[*lora_models.keys()] = next(iter(lora_models.keys()),None), # type: ignore
-        fuse_0  : A[bool,  Dependent(on="lora_0", when=(not None))]                                   = None,
-        scale_0 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_0", when=True)] = None,
-        lora_1  : A[Literal[*lora_models.keys()],  Dependent(on="lora_0", when=(not None))]      = None,  # type: ignore
-        fuse_1  : A[bool,  Dependent(on="lora_1", when=(not None))]                                   = False,
-        scale_1 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_1", when=True)] = None,
-        lora_2  : A[Literal[*lora_models.keys()],  Dependent(on="lora_1", when=(not None))]      = None,  # type: ignore
-        fuse_2  : A[bool,  Dependent(on="lora_2", when=(not None))]                                   = False,
-        scale_2 : A[float, Numerical(min=0.0, max=1.0, step=0.01), Dependent(on="fuse_2", when=True)] = None,
-) ->  A[TensorType, Name("LoRA")]:
+    pipe  : ModelType                           = None,
+    lora: List[Literal[*lora_models.keys()]]    = None,
+    fuse: A[List[bool], EqualLength(to="lora")] = False,
+    scale: A[List[A[float, Numerical(min=0.0, max=1.0, step=0.01)]], EqualLength(to="lora")] = 1.0,
+) ->  A[ModelType, Name("LoRA")]:
     for i in range(3):
         lora_data = globals().get(f"lora_{i}", None)
         if lora_data is not None:
             weight_name = os.path.basename(lora_data)
             model_class = next(iter(lora_models[weight_name]))
             lora        = lora_data.replace(weight_name,"")
-            fuse_data   = globals().get(f"fuse_{i}", False)
-            scale_data  = globals().get(f"scale_{i}", None)
-            if scale_data is not None: 
+            fuse_data   = locals().get(f"fuse_{i}", False)
+            scale_data  = locals().get(f"scale_{i}", None)
+            if scale_data is not None:
                 lora_scale  = {"lora_scale": scale_data }
             pipe = insta.add_lora(pipe, lora, weight_name, fuse_data, lora_scale)
 
@@ -377,8 +371,8 @@ def encode_prompt(
     padding          : Literal['max_length']   = "max_length",
     truncation       : bool                    = True,
     return_tensors   : Literal["pt"]           = 'pt',
-    device           :  A[iter,Literal[*spec]] = None,
-) ->  A[TensorType,Name("Embeddings")]:
+    device           :  Literal[*spec]         = None,
+) ->  A[TensorType, Name("Embeddings")]:
     if device is not None:
         insta.set_device(device)
     conditioning = {
@@ -468,11 +462,11 @@ def generate_image(
     if eta is not None: gen_input["eta"] = eta
     gen_input["variant"] = precision
     gen_input["output_type"] = output_type
-    if offload_method != "none": 
+    if offload_method != "none":
         pipe = insta.offload_to(pipe, offload_method)
     if dynamo != False:
         gen_input["return_dict"]   = False
-    if dynamic_guidance is True: 
+    if dynamic_guidance is True:
         gen_input["callback_on_step_end"] = insta._dynamic_guidance
         gen_input["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds','add_time_ids']
     pipe, latent = insta.diffuse_latent(pipe, queue, gen_input)
@@ -485,17 +479,20 @@ def autodecode(
     upcast      : bool                                                = True,
     file_prefix : A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox",
     device      : A[iter,Literal[*spec]]                              = None,        # type: ignore
-    # file_format    : A[Literal["png","jpg","optimize"], Dependent(on="temp", when="False")]              = "optimize",
-    # compress_level: A[int, Slider(min=1, max=9, step=1),  Dependent(on="format", when=(not "optimize"))] = 7,
-    # temp          : bool                                                                                 = False,
-) -> img:
+    file_format   : A[Literal["png", "jpg", "optimize"], Dependent(on="temp", when=False)]            pipe        : ModelType                                          = None,
+    queue       : TensorType                                          = None,
+    upcast      : bool                                                = True,
+    file_prefix : A[str, Text(multiline=False, dynamic_prompts=True)] = "Shadowbox",
+    device      : A[iter,Literal[*spec]]                              = None,        # type: ignore      = "optimize",
+    compress_level: A[int, Slider(min=1, max=9, step=1), Dependent(on="format", when=(not "optimize"))]  = 7,
+    temp: bool = False,
+) -> I[Any]:
     print("decoding")
     if device is not None:
         insta.set_device(device)
     image = insta.decode_latent(pipe, queue, upcast, file_prefix)
-    return image
-    for image in range(output):
-        yield image
+    for img in range(image):
+        yield img
 
 @node(path="generate/", name="Timecode", display=True)
 def tc() -> I[Any]:

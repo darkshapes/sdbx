@@ -20,7 +20,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
 
     Parameters
     ----------
-        path : str 
+        path : str
             The path that the node will appear in.
         name : str
             The display name of the node.
@@ -29,7 +29,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     """
     if fn is None:
         return partial(node, **kwargs)
-    
+
     fn.generator = isgeneratorfunction(fn)
 
     #commented for speed
@@ -93,7 +93,56 @@ class Name:
     name: str = ""
 
 @dataclass
-class Slider:
+class Condition:
+    operator: Union[lt, le, eq, ne, ge, gt]
+    value: Any
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:  # If only one positional argument, assume it's the value
+            self.operator = eq  # default operator to 'equal'
+            self.value = args[0]
+        elif len(args) == 2:  # If two positional arguments, they should be (operator, value)
+            self.operator, self.value = args
+        else:
+            self.operator = kwargs.get('operator', eq)
+            try:
+                self.value = kwargs.get('value')
+            except KeyError:
+                raise KeyError("Value not specified for Condition.")
+
+@dataclass
+class Dependent(Annotation[Any]):
+    on: str
+    when: Union[Condition, List[Condition]] = field(default_factory=list)  # OR, not AND
+
+    def __post_init__(self):
+        if not isinstance(self.when, list):
+            self.when = [self.when]  # If 'when' is a singleton, wrap it in a list
+        else:
+            if len(self.when) == 0:
+                self.when = [Condition(operator=ne, value=None)]
+        
+        self.when = [
+            w if isinstance(w, Condition) else
+            Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
+            for w in self.when
+        ]
+
+    def serialize(self):
+        return { 
+            "dependent": { 
+                "on": self.on,
+                "when": [asdict(w) for w in self.when]
+            }
+        }
+
+@dataclass
+class Validator(Annotation[Any]):
+    condition: Callable[[Any], bool]
+    error_message: str
+
+@dataclass
+class Slider(Annotation[int, float]):
     min: Union[int, float]
     max: Union[int, float]
     step: Union[int, float] = 1.0
