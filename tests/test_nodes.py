@@ -97,7 +97,7 @@ class TestNodeInfo(unittest.TestCase):
         @node
         def test_node(
             param1: int,
-            param2: A[int, Dependent(on='param1', when=2)]
+            param2: A[int, Dependent(on='param1', when=Condition(eq, 2))]
         ):
             pass
 
@@ -107,6 +107,31 @@ class TestNodeInfo(unittest.TestCase):
         param2_info = inputs['required']['Param2']
         self.assertIn('dependent', param2_info)
         self.assertEqual(param2_info['dependent']['on'], 'param1')
+        when = param2_info['dependent']['when'][0]
+        self.assertEqual(when['operator'], eq)
+        self.assertEqual(when['value'], 2)
+    
+    def test_node_with_dependent_using_mutiple_tuple_conditions(self):
+        @node
+        def test_node(
+            param1: int,
+            param2: A[int, Dependent(on='param1', when=[(ne, None), (lt, 3)])]
+        ):
+            pass
+
+        inputs = test_node.info.inputs
+        self.assertIn('Param1', inputs['required'])
+        self.assertIn('Param2', inputs['required'])
+        param2_info = inputs['required']['Param2']
+        self.assertIn('dependent', param2_info)
+        self.assertEqual(param2_info['dependent']['on'], 'param1')
+        self.assertEqual(len(param2_info['dependent']['when']), 2)
+        when1 = param2_info['dependent']['when'][0]
+        self.assertEqual(when1['operator'], ne)
+        self.assertEqual(when1['value'], None)
+        when2 = param2_info['dependent']['when'][1]
+        self.assertEqual(when2['operator'], lt)
+        self.assertEqual(when2['value'], 3)
 
     def test_node_with_validator(self):
         @node
@@ -140,7 +165,7 @@ class TestNodeInfo(unittest.TestCase):
             pass
 
         self.assertEqual(len(test_node.info.outputs), 0)
-        self.assertTrue(getattr(test_node.info, 'terminal', False))
+        self.assertTrue(getattr(test_node.info, 'terminal'))
 
     def test_terminal_node(self):
         @node
@@ -148,7 +173,7 @@ class TestNodeInfo(unittest.TestCase):
             pass
 
         self.assertEqual(len(test_node.info.outputs), 0)
-        self.assertTrue(getattr(test_node.info, 'terminal', False))
+        self.assertTrue(getattr(test_node.info, 'terminal'))
 
     def test_list_and_tuple_input_node(self):
         @node

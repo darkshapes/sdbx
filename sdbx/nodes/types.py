@@ -1,5 +1,6 @@
 from enum import Enum
 from functools import partial
+from operator import lt, le, eq, ne, ge, gt
 from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
 from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_type_hints
@@ -109,12 +110,27 @@ class Name(Annotation[Any]):
         pass
 
 @dataclass
+class Condition:
+    operator: Union[lt, le, eq, ne, ge, gt]
+    value: Any
+
+@dataclass
 class Dependent(Annotation[Any]):
     on: str
-    when: Any
+    when: Union[Condition, List[Condition]] = field(default_factory=list)  # OR, not AND
+
+    def __post_init__(self):
+        if isinstance(self.when, (Condition, tuple)):
+            self.when = [self.when]  # If 'when' is a singleton, wrap it in a list
+        self.when = [Condition(*w) if isinstance(w, tuple) else w for w in self.when]
 
     def serialize(self):
-        return { "dependent": asdict(self) }
+        return { 
+            "dependent": { 
+                "on": self.on,
+                "when": [asdict(w) for w in self.when]
+            }
+        }
 
 @dataclass
 class Validator(Annotation[Any]):

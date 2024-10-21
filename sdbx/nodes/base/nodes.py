@@ -172,7 +172,7 @@ def text_input(
     prompt        : A[str,
         Text(multiline=True, dynamic_prompts=True)] = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
     negative_terms: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
-    seed          : A[int, Dependent(on="prompt", when=(not None)),
+    seed          : A[int, Dependent(on="prompt", not=True, when=None),
         Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = soft_random(),  # cross compatible with ComfyUI and A1111 seeds
     batch         : A[int, Numerical(min=0, max=512, step=1)]          = 1,
 ) -> A[tuple, Name("Queue")]:
