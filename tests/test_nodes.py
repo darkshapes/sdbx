@@ -111,7 +111,7 @@ class TestNodeInfo(unittest.TestCase):
         self.assertEqual(when['operator'], eq)
         self.assertEqual(when['value'], 2)
 
-    def test_node_with_dependent_tuple_condition(self):
+    def test_node_with_dependent_condition_varieties(self):
         @node
         def test_node_condition(
             param1: int,
@@ -125,8 +125,34 @@ class TestNodeInfo(unittest.TestCase):
             param2: A[int, Dependent(on='param1', when=(eq, 2))]
         ):
             pass
+            
+        @node
+        def test_node_singleton(
+            param1: int,
+            param2: A[int, Dependent(on='param1', when=2)]
+        ):
+            pass
 
         self.assertEqual(test_node_condition.info.inputs, test_node_tuple.info.inputs)
+        self.assertEqual(test_node_tuple.info.inputs, test_node_singleton.info.inputs)
+    
+    def test_node_with_dependent_no_when(self):
+        @node
+        def test_node(
+            param1: int,
+            param2: A[int, Dependent(on='param1')]  # should be when param1 not equals None
+        ):
+            pass
+
+        inputs = test_node.info.inputs
+        self.assertIn('Param1', inputs['required'])
+        self.assertIn('Param2', inputs['required'])
+        param2_info = inputs['required']['Param2']
+        self.assertIn('dependent', param2_info)
+        self.assertEqual(param2_info['dependent']['on'], 'param1')
+        when = param2_info['dependent']['when'][0]
+        self.assertEqual(when['operator'], ne)
+        self.assertEqual(when['value'], None)
     
     def test_node_with_dependent_using_mutiple_tuple_conditions(self):
         @node

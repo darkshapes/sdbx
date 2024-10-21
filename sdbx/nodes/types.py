@@ -114,15 +114,36 @@ class Condition:
     operator: Union[lt, le, eq, ne, ge, gt]
     value: Any
 
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:  # If only one positional argument, assume it's the value
+            self.operator = eq  # default operator to 'equal'
+            self.value = args[0]
+        elif len(args) == 2:  # If two positional arguments, they should be (operator, value)
+            self.operator, self.value = args
+        else:
+            self.operator = kwargs.get('operator', eq)
+            try:
+                self.value = kwargs.get('value')
+            except KeyError:
+                raise KeyError("Value not specified for Condition.")
+
 @dataclass
 class Dependent(Annotation[Any]):
     on: str
     when: Union[Condition, List[Condition]] = field(default_factory=list)  # OR, not AND
 
     def __post_init__(self):
-        if isinstance(self.when, (Condition, tuple)):
+        if not isinstance(self.when, list):
             self.when = [self.when]  # If 'when' is a singleton, wrap it in a list
-        self.when = [Condition(*w) if isinstance(w, tuple) else w for w in self.when]
+        else:
+            if len(self.when) == 0:
+                self.when = [Condition(operator=ne, value=None)]
+        
+        self.when = [
+            w if isinstance(w, Condition) 
+            else Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
+            for w in self.when
+        ]
 
     def serialize(self):
         return { 
