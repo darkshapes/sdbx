@@ -110,6 +110,23 @@ class TestNodeInfo(unittest.TestCase):
         when = param2_info['dependent']['when'][0]
         self.assertEqual(when['operator'], eq)
         self.assertEqual(when['value'], 2)
+
+    def test_node_with_dependent_tuple_condition(self):
+        @node
+        def test_node_condition(
+            param1: int,
+            param2: A[int, Dependent(on='param1', when=Condition(eq, 2))]
+        ):
+            pass
+            
+        @node
+        def test_node_tuple(
+            param1: int,
+            param2: A[int, Dependent(on='param1', when=(eq, 2))]
+        ):
+            pass
+
+        self.assertEqual(test_node_condition.info.inputs, test_node_tuple.info.inputs)
     
     def test_node_with_dependent_using_mutiple_tuple_conditions(self):
         @node
