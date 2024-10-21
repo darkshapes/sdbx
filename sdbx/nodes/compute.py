@@ -98,65 +98,55 @@ class T2IPipe:
 
 ############## ENCODERS
     def declare_encoders(self, model_symlinks, tk_expressions, te_expressions):
-        tokenizer_list = []
-        text_encoder_list = []
+        model_class = os.path.basename(model_symlinks)
 
-        for i in model_symlinks:
-            model_class = os.path.basename(model_symlinks[i])
-            if te_expressions[i].get("variant",0) != 0:
-                var, dtype = self.float_converter(te_expressions[i]["variant"])
-                te_expressions[i]["variant"] = var
-                te_expressions[i].setdefault("torch_dtype", dtype)
+        if te_expressions.get("variant",0) != 0:
+            var, dtype = self.float_converter(te_expressions["variant"])
+            te_expressions["variant"] = var
+            te_expressions.setdefault("torch_dtype", dtype)
 
-            self.hf_log(fatal=True) #suppress layer skip messages
+        self.hf_log(fatal=True) #suppress layer skip messages
 
-            if model_class == "CLI-VL":
-                tokenizer = CLIPTokenizer.from_pretrained(
-                    model_symlinks[i],
-                    **tk_expressions[i]
-                    )
-                tokenizer_list.append(tokenizer)
+        if model_class == "CLI-VL":
+            tokenizer = CLIPTokenizer.from_pretrained(
+                model_symlinks,
+                **tk_expressions
+                )
 
-                text_encoder = CLIPTextModel.from_pretrained(
-                    model_symlinks[i],
-                    **te_expressions[i]
-                ).to(self.device)
-                text_encoder_list.append(text_encoder)
+            text_encoder = CLIPTextModel.from_pretrained(
+                model_symlinks,
+                **te_expressions
+            ).to(self.device)
 
-            elif model_class == "CLI-VG":
-                tokenizer = CLIPTokenizerFast.from_pretrained(
-                    model_symlinks[i],
-                    **tk_expressions[i]
-                    )
-                tokenizer_list.append(tokenizer)
+        elif model_class == "CLI-VG":
+            tokenizer = CLIPTokenizerFast.from_pretrained(
+                model_symlinks,
+                **tk_expressions
+                )
 
-                text_encoder = CLIPTextModelWithProjection.from_pretrained(
-                    model_symlinks[i],
-                    **te_expressions[i]
-                ).to(self.device)
-                text_encoder_list.append(text_encoder)
+            text_encoder = CLIPTextModelWithProjection.from_pretrained(
+                model_symlinks,
+                **te_expressions
+            ).to(self.device)
 
-            elif "T5" in model_class:
-                tokenizer = T5Tokenizer.from_pretrained(
-                    model_symlinks[i],
-                    **tk_expressions[i]
-                    )
-                tokenizer_list.append(tokenizer)
+        elif "T5" in model_class:
+            tokenizer = T5Tokenizer.from_pretrained(
+                model_symlinks,
+                **tk_expressions
+                )
 
-                text_encoder = T5EncoderModel.from_pretrained(
-                    model_symlinks[i],
-                    **te_expressions[i]
-                ).to(self.device)
-                text_encoder_list.append(text_encoder)
+            text_encoder = T5EncoderModel.from_pretrained(
+                model_symlinks,
+                **te_expressions
+            ).to(self.device)
 
-            self.hf_log(on=True) #return to normal
+        self.hf_log(on=True) #return to normal
 
-        return tokenizer_list, text_encoder_list
+        return tokenizer, text_encoder
 
 ############## EMBEDDINGS
     def generate_embeddings(self, prompts, tokenizers_in, text_encoders_in, conditioning):
         embeddings_list = []
-        self.hf_log(fatal=True) #suppress layer skip messages
 
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers_in, text_encoders_in):
             cond_input = tokenizer(
@@ -170,8 +160,6 @@ class T2IPipe:
             embeddings_list.append(prompt_embeds.hidden_states[-2])
 
             prompt_embeds = torch.concat(embeddings_list, dim=-1)
-
-        self.hf_log(on=True) #return to normal
 
         negative_prompt_embeds = torch.zeros_like(prompt_embeds)
         negative_pooled_prompt_embeds = torch.zeros_like(pooled_prompt_embeds)
@@ -195,8 +183,6 @@ class T2IPipe:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
-        else:
-            vae_in.setdefault("torch_dtype", "auto")
         autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
         return autoencoder
 
@@ -206,9 +192,6 @@ class T2IPipe:
             var, dtype = self.float_converter(pipe_data["variant"])
             pipe_data["variant"] = var
             pipe_data.setdefault("torch_dtype", dtype)
-        else:
-            pipe_data.setdefault("torch_dtype", "auto")
-
         pipe = AutoPipelineForText2Image.from_pretrained(model, **pipe_data).to(self.device)
 
         if self.device == "mps":
@@ -229,10 +212,13 @@ class T2IPipe:
             for generation in queue:
                 generation['embeddings'] = self.generate_embeddings(
                     [generation['prompt'], generation['prompt']],
-                    tokenizers, text_encoders, conditioning
+                    tokenizers, text_encoders, conditioning,
                     )
         self.metrics()
-        del tokenizers, text_encoders
+        for i in tokenizers:
+            del i
+        for i in text_encoders:
+            del i
         self.cache_jettison()
         return queue
 
@@ -304,10 +290,10 @@ class T2IPipe:
             seed_planter(generation['seed'])
             generator.manual_seed(generation['seed'])
             if generation.get("embeddings",False) is not False:
-                gen_data.setdefault("prompt_embeds",generation["embeddings"][0])
-                gen_data.setdefault("negative_prompt_embeds",generation["embeddings"][1])
-                gen_data.setdefault("pooled_prompt_embeds",generation["embeddings"][2])
-                gen_data.setdefault("negative_pooled_prompt_embeds",generation["embeddings"][3])
+                gen_data["prompt_embeds"] = generation["embeddings"][0]
+                gen_data["negative_prompt_embeds"] = generation["embeddings"][1]
+                gen_data["pooled_prompt_embeds"] = generation["embeddings"][2]
+                gen_data["negative_pooled_prompt_embeds"] = generation["embeddings"][3]
             else:
                 if self.spec["xformers"] == True: pipe.enable_xformers_memory_efficient_attention()
             if self.spec.get("dynamo",False) == True:
@@ -318,12 +304,14 @@ class T2IPipe:
         if queue[0].get("embeddings", False) is not False:
             #pipe.unload_lora_weights()
             #del pipe.unet
+            del generator
             pipe = self.cache_jettison(pipe)
         self.metrics()
         return pipe, queue
 
 ############## AUTODECODE
     def decode_latent(self, pipe, queue, upcast, file_prefix, counter):
+        self.pipe = pipe
         if upcast == True:
             pipe.upcast_vae()
         output_dir = config.get_path("output")

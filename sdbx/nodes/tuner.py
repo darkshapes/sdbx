@@ -101,6 +101,8 @@ class NodeTuner:
             self.vae_data["torch_dtype"]  = "auto"
             self.pipe_data["torch_dtype"] = "auto"
             self.pipe_data["low_cpu_mem_usage"] = True
+            self.transformers_data["low_cpu_mem_usage"] = True
+            self.vae_data["low_cpu_mem_usage"] = True
 
         if threshold.get("fit", None) in ["vae", "all"]:
             self.pipe_data["padding"]        = "max_length"
@@ -282,7 +284,6 @@ class NodeTuner:
                         self.transformers_data["clip_skip"]         = 2
                         self.transformers_data["device"]            = self.first_device
                         self.transformers_data["flash_attention"]   = self.spec.get("flash_attention",False) #dont add param unless necessary
-                        self.transformers_data["low_cpu_mem_usage"] = True
                         self.info["tra_size"][i] = self._tra[each][0]
                         i += 1
                 else:
