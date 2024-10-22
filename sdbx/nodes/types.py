@@ -3,7 +3,7 @@ from functools import partial
 from operator import lt, le, eq, ne, ge, gt
 from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
-from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_type_hints
+from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_origin, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -21,7 +21,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
 
     Parameters
     ----------
-        path : str
+        path : str 
             The path that the node will appear in.
         name : str
             The display name of the node.
@@ -30,7 +30,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     """
     if fn is None:
         return partial(node, **kwargs)
-
+    
     fn.generator = isgeneratorfunction(fn)
 
     from sdbx.nodes.info import NodeInfo
@@ -97,8 +97,8 @@ class AnnotationMeta(type):
 class Annotation(metaclass=AnnotationMeta):
     def check(self, t):
         args = getattr(self, '__args__', ())
-        return Any in args or any(issubclass(t, arg) for arg in args)
-
+        return Any in args or any(issubclass(get_origin(t) or t, arg) for arg in args)
+    
     def serialize(self):
         return { "constraints": asdict(self) }
 
@@ -138,16 +138,16 @@ class Dependent(Annotation[Any]):
         else:
             if len(self.when) == 0:
                 self.when = [Condition(operator=ne, value=None)]
-
+        
         self.when = [
-            w if isinstance(w, Condition) else
+            w if isinstance(w, Condition) else 
             Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
             for w in self.when
         ]
 
     def serialize(self):
-        return {
-            "dependent": {
+        return { 
+            "dependent": { 
                 "on": self.on,
                 "when": [asdict(w) for w in self.when]
             }

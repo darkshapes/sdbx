@@ -33,9 +33,6 @@ from sdbx.nodes.helpers import seed_planter
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
 
-    capacity         = config.sys_cap
-    device =  capacity["device"]
-
 ############## STFU HUGGINGFACE
     def hf_log(self, on=False, fatal=False):
         if on is True:
@@ -74,10 +71,8 @@ class T2IPipe:
 
 ############## SET DEVICE
     def set_device(self, device=None):
-        if device is None:
-            self.device = self.capacity.get("device","cpu")
-        else:
-            self.device = device
+        self.capacity         = config.get_default("spec","data")
+        self.device = device
         tf32 = self.capacity.get("allow_tf32",False)
         fasdp = self.capacity.get("flash_attention",False)
         mps_as = self.capacity.get("attention_slicing",False)
@@ -88,11 +83,19 @@ class T2IPipe:
                 torch.backends.mps.enable_attention_slicing = mps_as
         return self.device
 
+############## QUEUE
+    def queue_manager(self, prompt, negative_terms, seed):
+        self.prompt = prompt
+        self.negative_terms = negative_terms
+        self.seed = seed
+        return
+
 ############## MEM USE
     def metrics(self):
         if "cuda" in self.device:
             memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
-            logging.debug(f"Total mem use: {memory}.", exc_info=True)
+            logging.debug(f"vram use: {memory}.", exc_info=True)
+            print(f"RAM use: {memory}.")
 
 ############## ENCODERS
     def declare_encoders(self, model_symlinks, tk_expressions, te_expressions):
@@ -198,10 +201,14 @@ class T2IPipe:
         return pipe
 
 ############## LORA
-    def add_lora(self, pipe, lora, weight_name, fuse, scale):
-        pipe.load_lora_weights(lora, weight_name=weight_name)
+    def add_lora(self, pipe, lora, weight_name, lora_class, unet_only, fuse, scale):
+        self.lora_class = lora_class #add to metadata
+        if unet_only:
+            pipe.unet.load_attn_procs(lora, weight_name=weight_name)
+        else:
+            pipe.load_lora_weights(lora, weight_name=weight_name)
         if fuse:
-            pipe.fuse_lora(**scale) #add unet only possibility
+            pipe.fuse_lora(scale=scale)
         return pipe
 
 ############## ENCODE
@@ -215,8 +222,10 @@ class T2IPipe:
         self.metrics()
         for i in tokenizers:
             del i
+        del tokenizers
         for i in text_encoders:
             del i
+        del text_encoders
         self.cache_jettison()
         return queue
 
@@ -237,6 +246,7 @@ class T2IPipe:
 
 ############## SCHEDULER
     def add_scheduler(self, pipe, scheduler_in, scheduler_data):
+        self.scheduler_in = scheduler_in # add to metadata
         self.schedule_chart = {
             "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
@@ -292,42 +302,41 @@ class T2IPipe:
                 gen_data["negative_prompt_embeds"] = generation["embeddings"][1]
                 gen_data["pooled_prompt_embeds"] = generation["embeddings"][2]
                 gen_data["negative_pooled_prompt_embeds"] = generation["embeddings"][3]
-            else:
-                pipe.enable_xformers_memory_efficient_attention() = self.capacity.get("xformers",False)
             if self.capacity.get("dynamo",False) == True:
                 generation['latents'] = pipe(generator=generator,**gen_data)[0] # return individual for compiled
             else:
                 generation['latents'] = pipe(generator=generator,**gen_data).images # return entire batch at once
                 #  pipe ends with image, but really its a latent...
         if queue[0].get("embeddings", False) is not False:
-            #pipe.unload_lora_weights()
-            #del pipe.unet
+            pipe.unload_lora_weights()
+            del pipe.unet
             del generator
             pipe = self.cache_jettison(pipe)
         self.metrics()
         return pipe, queue
 
 ############## AUTODECODE
-    def decode_latent(self, pipe, queue, upcast, file_prefix, counter):
-        self.pipe = pipe
-        if upcast == True:
-            pipe.upcast_vae()
+    def decode_latent(self, pipe, queue, file_prefix, upcast, tile, slicing):
+        if upcast == True: pipe.upcast_vae()
+        if tile == True: pipe.enable_vae_tiling()
+        if slicing == True: pipe.enable_vae_slicing()
         output_dir = config.get_path("output")
+        counter = [s.endswith('png') for s in output_dir].count(True) # get existing images
+        file_prefix = f"{file_prefix}-{self.lora_class[0]}-{self.scheduler_in}-{self.seed}"
+        filename = []
         with torch.no_grad():
-            counter = [s.endswith('png') for s in output_dir].count(True) # get existing images
             for i, generation in enumerate(queue, start=1):
+                counter += 1
                 generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
 
-                image = pipe.vae.decode(
+                image = pipe.vae.decode(          #latent gets processed here
                     generation['latents'] / pipe.vae.config.scaling_factor,
                     return_dict=False,
                 )[0]
 
                 image = pipe.image_processor.postprocess(image, output_type='pil')[0]
+                filename.append(f"{file_prefix}-{counter}-batch-{i}.png")
 
-                counter += 1
-                filename = f"{file_prefix}-{counter}-batch-{i}.png"
+                image.save(os.path.join(config.get_path("output"), filename[i-1])) # optimize=True,
 
-                image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
-
-                return image.save(os.path.join(config.get_path("output"), filename))
+        return image

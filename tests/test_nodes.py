@@ -238,3 +238,24 @@ class TestNodeInfo(unittest.TestCase):
         self.assertEqual(param2_info['type'], 'List')
         self.assertEqual(param2_info['sub']['type'], 'Str')
         self.assertEqual(param2_info['constraints']['length'], 4)
+    
+    def test_annotated_list_type(self):
+        @node
+        def test_node(
+            param1: List[int],
+            param2: A[List[str], EqualLength(to="param1")]
+        ):
+            pass
+        inputs = test_node.info.inputs
+        self.assertIn('Param1', inputs['required'])
+        param1_info = inputs['required']['Param1']
+        self.assertEqual(param1_info['type'], 'List')
+        print(param1_info)
+        self.assertEqual(param1_info['sub']['type'], 'Int')
+        self.assertFalse(hasattr(param1_info, "constraints"))
+        self.assertIn('Param2', inputs['required'])
+        param2_info = inputs['required']['Param2']
+        self.assertEqual(param2_info['type'], 'List')
+        print(param2_info)
+        self.assertEqual(param2_info['sub']['type'], 'Str')
+        self.assertEqual(param2_info['constraints']['to'], "param1")

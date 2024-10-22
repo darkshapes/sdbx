@@ -1,13 +1,17 @@
 import os
 import json
-from sdbx.config import config, logging, config_source_location
+import psutil
+from collections import defaultdict
+from platform import system
+from sdbx.config import config, cache, logging, config_source_location
 import torch
 
+
 class SystemCapacity:
-    def main(self):
-        import psutil
-        from collections import defaultdict
-        from platform import system
+
+    @cache
+    def write_capacity(self):
+
         spec = defaultdict(dict)
         spec["data"]["dynamo"]  = False if system().lower() == "windows" else True
         spec["data"]["devices"] = {}
@@ -54,16 +58,17 @@ class SystemCapacity:
             logging.debug("No data to write to spec file.", exc_info=True)
         #return data
 
+    @cache
     def get_capacity(self):
-        system           = config.get_default("spec","data") #needs to be set by system @ launch
-
+        self.system           = config.get_default("spec","data") #needs to be set by system @ launch
+        system = self.system
         capacity = {
-            "spec":system.get("devices",0),
-            "flash_attention":system.get("flash_attention",0),
-            "xformers":system.get("xformers",0),
-            "dynamo":system.get("dynamo",0),
-            "device" :next(iter(system.get("devices",0))),
-            "tf32": system.get("allow_tf32",0),
+            "devices"          : system.get("devices",0),
+            "flash_attention"  : system.get("flash_attention",0),
+            "xformers"         : system.get("xformers",0),
+            "dynamo"           : system.get("dynamo",0),
+            "device"           : next(iter(system.get("devices",0))),
+            "tf32"             : system.get("allow_tf32",0),
             "attention_slicing": system.get("attention_slicing",0),
         }
 

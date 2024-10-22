@@ -2,7 +2,6 @@ import os
 import numbers
 from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
-from sdbx.nodes.helpers import soft_random
 from collections import defaultdict
 from diffusers.schedulers.scheduling_utils import AysSchedules
 
@@ -24,7 +23,7 @@ from diffusers.schedulers.scheduling_utils import AysSchedules
 #     return tuned
 # @cache
 #     def get_tuned_parameters(self, widget_inputs, model_types, metadata):
-#       
+#
 #     def tuned_parameters(self, node_manager, graph: MultiDiGraph, node_id: str):
 #         predecessors = graph.predecessors(node_id)
 #         node = graph.nodes[node_id]
@@ -33,13 +32,14 @@ from diffusers.schedulers.scheduling_utils import AysSchedules
 #             pnd = graph.nodes[p]  # predecessor node data
 #             pfn = node_manager.registry[pnd['fname']]  # predecessor function
 
+
 class NodeTuner:
 
     spec = config.get_default("spec","data")
+    first_device = next(iter(spec.get("devices","cpu")),"cpu")
     algorithms = list(config.get_default("algorithms","schedulers"))
     solvers = list(config.get_default("algorithms","solvers"))
     metadata_path = config.get_path("models.metadata")
-    first_device = next(iter(spec.get("devices","cpu")),"cpu")
 
     @cache
     def check_memory_fit(self, peak_gpu, **file_sizes):
@@ -92,9 +92,10 @@ class NodeTuner:
             if main_model_size > peak_cpu:
                 threshold = {"memory": "disk"}
             self.pipe_data["precision"]        = "F32"
-            self.transformer_data["precision"] = "F32"
             self.vae_data["precision"]         = "F32"
             self.pipe_data["low_cpu_mem_usage"] = True
+            for i in range(len(self._tra)):
+                self.transformers_data["precisions"][i] = "F32"
 
         if threshold.get("fit",None) == "all":
             self.vae_data["torch_dtype"]  = "auto"
@@ -107,6 +108,8 @@ class NodeTuner:
             self.pipe_data["padding"]        = "max_length"
             self.pipe_data["truncation"]     = True
             self.pipe_data["return_tensors"] = 'pt'
+            if self.spec.get("flash_attention",False)  == True:
+                self.pipe_data["attn_implementation"] = "flash_attention"
 
         if threshold.get("fit", None) == "vae":
             self.vae_data["low_cpu_mem_usage"] = True
@@ -122,23 +125,33 @@ class NodeTuner:
             self.encode_data["return_tensors"]   = 'pt'
             if self.transformers_data is not None:
                 for i in range(len(self._tra)):
-                    self.transformers_data[f"precision_{i}"] = "F16"
+                    self.transformers_data["precisions"][i] = "F16"
+            if self.spec.get("flash_attention", 0) == True:
+                self.transformers_data["flash_attention"] = True
 
         if threshold.get("memory","gpu") != "gpu":
             self.gen_data["offload_method"] = threshold.get("memory","none")
             if  self.gen_data["offload_method"] == "cpu":
-                self.vae_data["tiling"]  = True
-                self.vae_data["slicing"] = False
+                self.image_data["tiling"]  = True
+                self.image_data["slicing"] = False
             elif  self.gen_data["offload_method"] == "disk":
-                self.vae_data["tiling"]  = True
-                self.vae_data["slicing"] = True
+                self.image_data["tiling"]  = True
+                self.image_data["slicing"] = True
             else: #if it equals sequential
-                self.vae_data["tiling"]  = True
-                self.vae_data["slicing"] = False
+                self.image_data["tiling"]  = True
+                self.image_data["slicing"] = False
         else:
             self.gen_data["offload_method"] = "none"
-            self.vae_data["tiling"]  = False
-            self.vae_data["slicing"] = False
+            self.image_data["tiling"]  = False
+            self.image_data["slicing"] = False
+
+        if self.spec.get("dynamo",False):
+            self.scheduler_data["sigmas"]  = [] # custom sigma data
+            self.gen_data["return_dict"]   = False
+            self.compile_data["fullgraph"] = True
+            self.compile_data["mode"]      = "reduce-overhead" #switches to max-autotune if cuda device
+        else:
+            self.compile_data = None
 
     def _get_step_from_filename(self, key, val):
         try:
@@ -232,7 +245,6 @@ class NodeTuner:
         self.pipe_data["add_watermarker"]   = False
         self.device_data["device_name"]     = self.first_device
         self.device_data["gpu_id"]          = 0
-        self.lora_data["fuse_0"]            = True
         self.image_data["file_prefix"]      = "Shadowbox"
         self.image_data["upcast"]       = True if self.info["model_class"] == "STA-XL" else False # f32, fp16 broken by default
         #self.pipe["device_map"] = None    #todo: work on use case
@@ -248,15 +260,6 @@ class NodeTuner:
         # self.pipe_data["fuse_unet_only"] = False # todo - add conditions where this is useful
         #self.pipe_data["unet_file"]    = list(self.info["model_details"])[1] full path to file
         self.refiner_data["model"] = config.model_indexer.fetch_refiner()
-        # if self.spec.get("flash_attention", 0) == True:
-        #     self.transformers_data["flash_attention"] = True
-        if self.spec.get("dynamo",False):
-            self.scheduler_data["sigmas"]  = [] # custom sigma data
-            self.gen_data["return_dict"]   = False
-            self.compile_data["fullgraph"] = True
-            self.compile_data["mode"]      = "reduce-overhead" #switches to max-autotune if cuda device
-        else:
-            self.compile_data = None
 
         if self.info["model_details"] != "∅" and self.info["model_details"] != None:
             if self.info["model_category"] == "LLM":
@@ -270,7 +273,7 @@ class NodeTuner:
             else:
                 self.queue_data = {
                         "prompt":"A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
-                        "seed" : soft_random(),
+                        "seed" : None,
                         "batch": 4,
                     }
                 self._vae, self._tra, self._lora =  config.model_indexer.fetch_compatible(self.info["model_class"])
@@ -278,19 +281,17 @@ class NodeTuner:
                 if self._tra != "∅" and self._tra != {}:
                     i=0
                     for each in self._tra:
-                        self.transformers_data[f"transformer_{i}"]  = os.path.basename(self._tra[each][1])
-                        self.transformers_data[f"precision_{i}"]    = self._tra[each][2]
+                        self.transformers_data[f"transformer_models"][i]  = os.path.basename(self._tra[each][1])
+                        self.transformers_data[f"precisions"][i]    = self._tra[each][2]
                         self.transformers_data["clip_skip"]         = 2
                         self.transformers_data["device"]            = self.first_device
-                        self.transformers_data["flash_attention"]   = self.spec.get("flash_attention",False) #dont add param unless necessary
                         self.info["tra_size"][i] = self._tra[each][0]
                         i += 1
                 else:
                         self.transformers_data = None
                         self.pipe_data["use_model_to_encode"] = True
                         self.pipe_data["num_hidden_layers"]   = self.skip
-                        if self.spec.get("flash_attention",False)  == True:
-                            self.pipe_data["attn_implementation"] = "flash_attention"
+
 
                 if self._vae != "∅":
                     self.vae_data["vae"]               = self._vae[0][0][0]
@@ -300,7 +301,9 @@ class NodeTuner:
                     self.vae_data = None
 
         if next(iter(self._lora.items()),0) != 0:
-            self.lora_data["lora_0"], self.info["lora_class"] = self.prioritize_loras()
+            i = 0
+            self.lora_data["lora"][i], self.info["lora_class"] = self.prioritize_loras()
+            self.lora_data["fuse"][i]            = True
             # cfg enabled here
             if "PCM" in self.info["lora_class"]:
                 self.scheduler_data["scheduler"]        = self.algorithms[5] #DDIM
@@ -326,7 +329,7 @@ class NodeTuner:
                     self.scheduler_data["interpolation_type"] = "linear" #sgm_uniform/simple
                     self.scheduler_data["timestep_spacing"]   = "trailing"
                 elif "DMD" in self.info["lora_class"]:
-                    self.lora_data["fuse_0"]               = False
+                    self.lora_data["fuse"][i]               = False
                     self.scheduler_data["scheduler"]       = self.algorithms[6] #LCM
                     self.scheduler_data["timesteps"]       = [999, 749, 499, 249]
                     self.scheduler_data["use_beta_sigmas"] = True
@@ -349,7 +352,7 @@ class NodeTuner:
                 elif "HYP" in self.info["lora_class"]:
                     if self.gen_data["num_inference_steps"] == 1:
                         self.scheduler_data["scheduler"] = self.algorithms[7] #TCD FOR ONE STEP
-                        self.lora_data["scale_0"]        = 1.0
+                        self.lora_data["scale"][i]        = 1.0
                         self.gen_data["eta"]             = 1.0
                         if "STA-XL" in self.info["lora_class"]: #unet only
                             self.scheduler_data["timesteps"] = 800
@@ -361,10 +364,11 @@ class NodeTuner:
                                 self.gen_data["guidance_scale"] = 7.5
                         if ("FLU" in self.info["lora_class"]
                         or "STA-3" in self.info["lora_class"]):
-                            self.lora_data["scale_0"] = 0.125
+                            self.lora_data["scale"][i] = 0.125
                         self.scheduler_data["scheduler"]        = self.algorithms[5] #DDIM
                         self.scheduler_data["timestep_spacing"] = "trailing"
         else :   #if no lora
+
             self.lora_data = None
             self.gen_data["num_inference_steps"]     = 20
             self.gen_data["guidance_scale"]          = 7

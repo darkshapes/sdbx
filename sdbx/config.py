@@ -173,7 +173,7 @@ class Config(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return (TomlConfigSettingsSource(settings_cls),)
-
+        
     def generate_new_config(self):
         logging.info(f"Creating config directory at {self.path}...")
 
@@ -182,17 +182,17 @@ class Config(BaseSettings):
         for subdir in self._path_dict.values():
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
-
+        
         from shutil import copytree
         copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
 
     def rewrite(self, key, value):
         # rewrites the config.toml key to value
         pass
-
+    
     def get_path(self, name):
         return self._path_dict[name]
-
+    
     def get_path_contents(self, name, extension="", path_name=True, base_name=False):  # List contents of a directory
         p = self.get_path(name) if path_name else name
 
@@ -202,7 +202,7 @@ class Config(BaseSettings):
             format_path = lambda p, g: os.path.basename(g)  # Only return base name
 
         return [format_path(p, g) for g in glob(f"**.{extension}", root_dir=p, recursive=True)]
-
+    
     def get_path_tree(self, name, extension="", path_name=True, file_callback=lambda e: e, visited=None):
         p = self.get_path(name) if path_name else name
         visited = visited or set()
@@ -240,7 +240,7 @@ class Config(BaseSettings):
         models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
 
         return {**root, **models}
-
+    
     def load_data(self, path):
         _, ext = os.path.splitext(path)
         loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
@@ -250,7 +250,7 @@ class Config(BaseSettings):
             except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
                 raise SyntaxError(f"Couldn't read file {path}") from e
         return fd
-
+    
     def get_default(self, name, prop):
         return self._defaults_dict[name][prop]
 
@@ -262,7 +262,7 @@ class Config(BaseSettings):
             fp = os.path.join(config_source_location, filename)
             name, _ = os.path.splitext(filename)
             d[name] = self.load_data(fp)
-
+        
         return d
 
     @cached_property
@@ -284,11 +284,11 @@ class Config(BaseSettings):
     def executor(self):
         from sdbx.executor import Executor
         return Executor(self.node_manager)
-
+    
     @cached_property
     def model_indexer(self):
-        from sdbx.indexer import IndexManager
-        return IndexManager()
+        from sdbx.indexer import ModelIndexer
+        return ModelIndexer()
 
     @cached_property
     def t2i_pipe(self):
@@ -302,7 +302,7 @@ class Config(BaseSettings):
 
     @cached_property
     def sys_cap(self):
-        from sdbx.cap import SystemCapacity
+        from sdbx.capacity import SystemCapacity
         return SystemCapacity()
 
 def parse(testing: bool = False) -> Config:
