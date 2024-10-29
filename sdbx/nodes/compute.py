@@ -2,10 +2,12 @@
 Credits:
 Felixsans
 """
+import re
 import gc
 import os
 import torch
 from PIL import Image
+from collections import defaultdict
 
 from diffusers.schedulers.scheduling_euler_discrete import EulerDiscreteScheduler
 from diffusers.schedulers.scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
@@ -20,9 +22,11 @@ from diffusers.schedulers.scheduling_heun_discrete import HeunDiscreteScheduler
 from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler
 from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
 from diffusers.schedulers.scheduling_deis_multistep import DEISMultistepScheduler
+
+#from hidiffusion import apply_hidiffusion, remove_hidiffusion
 from diffusers.utils import logging as df_log
 from transformers import logging as tf_log
-from diffusers import AutoencoderKL, AutoPipelineForText2Image
+from diffusers import AutoencoderKL, StableDiffusionXLPipeline, AutoPipelineForText2Image, AutoencoderTiny
 from transformers import CLIPTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 import accelerate
 
@@ -33,7 +37,7 @@ from sdbx.nodes.helpers import seed_planter
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
 
-############## STFU HUGGINGFACE
+############## MUTE LOGGING TEMPORARILY
     def hf_log(self, on=False, fatal=False):
         if on is True:
             tf_log.enable_default_handler()
@@ -84,9 +88,9 @@ class T2IPipe:
         return self.device
 
 ############## QUEUE
-    def queue_manager(self, prompt, negative_terms, seed):
+    def queue_manager(self, prompt, seed, negative_terms=None):
         self.prompt = prompt
-        self.negative_terms = negative_terms
+        self.negative_prompt = negative_terms
         self.seed = seed
         return
 
@@ -184,20 +188,25 @@ class T2IPipe:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
+        # model = "C:\\Users\\Public\\models\\image\\taesdxl_diffusion_pytorch_model.safetensors"
         autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
         return autoencoder
-
+# pipe.enable_vae_slicing()
 ############## PIPE
     def construct_pipe(self, model, pipe_data):
         if pipe_data.get("variant",0) != 0:
             var, dtype = self.float_converter(pipe_data["variant"])
             pipe_data["variant"] = var
             pipe_data.setdefault("torch_dtype", dtype)
-        pipe = AutoPipelineForText2Image.from_pretrained(model, **pipe_data).to(self.device)
+        model = "C:\\Users\\Public\\models\\image\\ponyFaetality_v11.safetensors"
+        original_config = "C:\\Users\\Public\\models\\metadata\\STA-XL\\sdxl_base.yaml"
+        pipe = StableDiffusionXLPipeline.from_single_file(model, original_config=original_config, **pipe_data).to(self.device)
 
         if self.device == "mps":
             if self.capacity.get("attention_slicing",False) == True:
-                pipe.enable_attention_slicing()
+                pipe.enable_attention_slicing(True)
+        # elif self.capacity.get("xformers",False) == True:
+        #         pipe.set_use_memory_efficient_attention_xformers(True)
         return pipe
 
 ############## LORA
@@ -247,7 +256,8 @@ class T2IPipe:
 ############## SCHEDULER
     def add_scheduler(self, pipe, scheduler_in, scheduler_data):
         self.scheduler_in = scheduler_in # add to metadata
-        self.schedule_chart = {
+        scheduler_data = defaultdict(dict)
+        schedule_chart = {
             "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
@@ -256,20 +266,20 @@ class T2IPipe:
             "DDIMScheduler" : DDIMScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "LCMScheduler" : LCMScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "TCDScheduler" : TCDScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "AysSchedules": AysSchedules,
             "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
             "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
         }
-        if scheduler_in in self.schedule_chart:
-            pipe.scheduler = self.schedule_chart[scheduler_in]
+
+        if scheduler_in in schedule_chart:
+            pipe.scheduler = schedule_chart[scheduler_in]
             return pipe
         else:
             try:
                 raise ValueError(f"Scheduler '{scheduler_in}' not supported")
             except ValueError as error_log:
-                logging.debug(f"Scheduler error {error_log}.", exc_info=True)
+                 logging.debug(f"Scheduler error {error_log}.", exc_info=True)
 
 
 ############## MEMORY OFFLOADING
@@ -292,8 +302,8 @@ class T2IPipe:
 ############## INFERENCE
     def diffuse_latent(self, pipe, queue, gen_data):
         self.metrics()
+        #apply_hidiffusion(pipe)
         generator = torch.Generator(device=self.device)
-
         for i, generation in enumerate(queue, start=1):
             seed_planter(generation['seed'])
             generator.manual_seed(generation['seed'])
@@ -311,6 +321,10 @@ class T2IPipe:
             pipe.unload_lora_weights()
             del pipe.unet
             del generator
+            gen_data["prompt_embeds"] = None
+            gen_data["negative_prompt_embeds"] = None
+            gen_data["pooled_prompt_embeds"] = None
+            gen_data["negative_pooled_prompt_embds"] = None
             pipe = self.cache_jettison(pipe)
         self.metrics()
         return pipe, queue
@@ -322,11 +336,11 @@ class T2IPipe:
         if slicing == True: pipe.enable_vae_slicing()
         output_dir = config.get_path("output")
         counter = [s.endswith('png') for s in output_dir].count(True) # get existing images
-        file_prefix = f"{file_prefix}-{self.lora_class[0]}-{self.scheduler_in}-{self.seed}"
         filename = []
+        #pipe.vae.set_use_memory_efficient_attention_xformers(True)
         with torch.no_grad():
             for i, generation in enumerate(queue, start=1):
-                counter += 1
+                counter += i
                 generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
 
                 image = pipe.vae.decode(          #latent gets processed here
@@ -335,7 +349,7 @@ class T2IPipe:
                 )[0]
 
                 image = pipe.image_processor.postprocess(image, output_type='pil')[0]
-                filename.append(f"{file_prefix}-{counter}-batch-{i}.png")
+                filename.append(f"{file_prefix}-{generation['seed']}-{counter}-batch-{i}.png")
 
                 image.save(os.path.join(config.get_path("output"), filename[i-1])) # optimize=True,
 

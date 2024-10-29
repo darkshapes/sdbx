@@ -142,7 +142,7 @@ class NodeTuner:
                 self.image_data["slicing"] = False
         else:
             self.gen_data["offload_method"] = "none"
-            self.image_data["tiling"]  = False
+            self.image_data["tiling"]  = True
             self.image_data["slicing"] = False
 
         if self.spec.get("dynamo",False):
@@ -170,7 +170,6 @@ class NodeTuner:
                 return 0
     @cache
     def prioritize_loras(self):
-        self.info["lora_priority"] = config.get_default("algorithms", "lora_priority")
         self.info["step_priority"] = config.get_default("algorithms", "step_priority")
         for items in self.info["lora_priority"]:
             for each in self.info["step_priority"]:
@@ -241,16 +240,17 @@ class NodeTuner:
         self.info["model_category"], self.info["model_class"], self.info["model_details"] = config.model_indexer.fetch_id(self.pipe_data["model"])
         self.info["model_size"]             = self.info["model_details"][0]
 
+        self.gen_data["eta"]                = 0.3
         self.gen_data["dynamic_guidance"]   = False
         self.pipe_data["add_watermarker"]   = False
         self.device_data["device_name"]     = self.first_device
-        self.device_data["gpu_id"]          = 0
+        #self.device_data["gpu_id"]          = 0
         self.image_data["file_prefix"]      = "Shadowbox"
         self.image_data["upcast"]       = True if self.info["model_class"] == "STA-XL" else False # f32, fp16 broken by default
         #self.pipe["device_map"] = None    #todo: work on use case
         if self.info["model_class"] in ["STA-15", "STA-XL", "STA-3M", "STA-3C", "STA-3Q"]:
-            self.pipe_data["safety_checker"] = False
-
+            self.gen_data["safety_checker"] = False
+        self.info["lora_priority"] = config.get_default("algorithms", "lora_priority")
         self.cache_data["stage"]["head"]  = None
         self.cache_data["stage"]["encoder"]  = None
         self.cache_data["stage"]["generate"] = None
@@ -274,23 +274,23 @@ class NodeTuner:
                 self.queue_data = {
                         "prompt":"A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
                         "seed" : None,
-                        "batch": 4,
+                        "batch": 1,
                     }
                 self._vae, self._tra, self._lora =  config.model_indexer.fetch_compatible(self.info["model_class"])
-
+                if next(iter(self.info.get("lora_priority","None")),"None") in ["AYS", "None"]: self._lora = None
                 if self._tra != "∅" and self._tra != {}:
                     i=0
                     for each in self._tra:
                         self.transformers_data[f"transformer_models"][i]  = os.path.basename(self._tra[each][1])
                         self.transformers_data[f"precisions"][i]    = self._tra[each][2]
-                        self.transformers_data["clip_skip"]         = 2
+                        #self.transformers_data["clip_skip"]         = 2
                         self.transformers_data["device"]            = self.first_device
                         self.info["tra_size"][i] = self._tra[each][0]
                         i += 1
                 else:
                         self.transformers_data = None
                         self.pipe_data["use_model_to_encode"] = True
-                        self.pipe_data["num_hidden_layers"]   = self.skip
+                        ##self.pipe_data["num_hidden_layers"]   = self.skip
 
 
                 if self._vae != "∅":
@@ -300,7 +300,34 @@ class NodeTuner:
                 else:
                     self.vae_data = None
 
-        if next(iter(self._lora.items()),0) != 0:
+        if self._lora == None:
+            self.lora_data = None
+            self.gen_data["num_inference_steps"]     = 20
+            self.gen_data["guidance_scale"]          = 7
+            self.scheduler_data["use_karras_sigmas"] = True
+            if ("LUM" in self.info["model_class"]
+            or "STA-3" in self.info["model_class"]):
+                self.scheduler_data["interpolation type"] = "linear" #sgm_uniform/simple
+                self.scheduler_data["timestep_spacing"]   = "trailing"
+            if self.info["model_class"] in ["STA-15", "STA-XL", "STA3"]:
+                self.scheduler_data["scheduler"]      = self.algorithms[4] #DPMAlignYourSteps
+                self.scheduler_data["algorithm_type"]       = self.solvers[0]
+                self.scheduler_data["euler_at_final"] = True
+                if next(iter(self.info.get("lora_priority","None")),"None")  == "AYS":
+                    self.gen_data["num_inference_steps"]  = 10
+                    if "STA-15" == self.info["model_class"]:
+                        self.scheduler_data["timesteps"] = AysSchedules[ "StableDiffusionTimesteps"]
+                    elif "STA-XL" == self.info["model_class"]:
+                        self.scheduler_data["timesteps"] = AysSchedules["StableDiffusionXLTimesteps"]
+                    elif "STA-3" in self.info["model_class"]:
+                        self.gen_data["guidance_scale"] = 4
+                        self.scheduler_data["timesteps"] = AysSchedules["StableDiffusion3Timesteps"]
+            elif "PLA" in self.info["model_class"]:
+                self.scheduler_data["scheduler"] = self.algorithms[3] #EDMDPM
+            elif ("FLU" in self.info["model_class"]
+            or "AUR" in self.info["model_class"]):
+                self.scheduler_data["scheduler"] = self.algorithms[2] #EulerAncestralAliens
+        else:
             i = 0
             self.lora_data["lora"][i], self.info["lora_class"] = self.prioritize_loras()
             self.lora_data["fuse"][i]            = True
@@ -310,7 +337,7 @@ class NodeTuner:
                 self.scheduler_data["timestep_spacing"] = "trailing"
                 self.scheduler_data["set_alpha_to_one"] = False  # [compatibility]PCM False
                 self.scheduler_data["clip_sample"]      = False
-                self.gen_data["guidance_scale"]         = 5 if "normal" in str(self.lora_data["lora_0"]).lower() else 2
+                self.gen_data["guidance_scale"]         = 5 if "normal" in str(self.lora_data["lora"]).lower() else 2
             elif "SPO" in self.info["lora_class"]:
                 if "STA-15" in self.info["lora_class"]:
                     self.gen_data["guidance_scale"] = 7.5
@@ -323,7 +350,7 @@ class NodeTuner:
                 if "TCD" in self.info["lora_class"]:
                     self.gen_data["num_inference_steps"] = 8
                     self.scheduler_data["scheduler"]     = self.algorithms[7] #TCD sampler
-                    self.gen_data["eta"]                 = 0.3
+                    self.gen_data["eta"]                 = 1.0
                 elif "LIG" in self.info["lora_class"]: #4 step model pref
                     self.scheduler_data["scheduler"]          = self.algorithms[0] #Euler sampler
                     self.scheduler_data["interpolation_type"] = "linear" #sgm_uniform/simple
@@ -357,7 +384,7 @@ class NodeTuner:
                         if "STA-XL" in self.info["lora_class"]: #unet only
                             self.scheduler_data["timesteps"] = 800
                     else:
-                        if "CFG" in str(self.lora_data["lora_0"]).upper():
+                        if "CFG" in str(self.lora_data["lora"]).upper():
                             if self.info["model_class"] == "STA-XL":
                                 self.gen_data["guidance_scale"] = 5
                             elif self.info["model_class"] == "STA-15":
@@ -367,33 +394,6 @@ class NodeTuner:
                             self.lora_data["scale"][i] = 0.125
                         self.scheduler_data["scheduler"]        = self.algorithms[5] #DDIM
                         self.scheduler_data["timestep_spacing"] = "trailing"
-        else :   #if no lora
-
-            self.lora_data = None
-            self.gen_data["num_inference_steps"]     = 20
-            self.gen_data["guidance_scale"]          = 7
-            self.scheduler_data["use_karras_sigmas"] = True
-            if ("LUM" in self.info["model_class"]
-            or "STA-3" in self.info["model_class"]):
-                self.scheduler_data["interpolation type"] = "linear" #sgm_uniform/simple
-                self.scheduler_data["timestep_spacing"]   = "trailing"
-            if self.info["model_class"] in ["STA-15", "STA-XL", "STA3"]:
-                self.scheduler_data["scheduler"]      = self.algorithms[4] #DPMAlignYourSteps
-                self.gen_data["algorithm_type"]       = self.solvers[0]
-                self.scheduler_data["euler_at_final"] = True
-                self.gen_data["num_inference_steps"]  = 10
-                if "STA-15" == self.info["model_class"]:
-                    self.scheduler_data["timesteps"] = AysSchedules[ "StableDiffusionTimesteps"]
-                elif "STA-XL" == self.info["model_class"]:
-                    self.scheduler_data["timesteps"] = AysSchedules["StableDiffusionXLTimesteps"]
-                elif "STA-3" in self.info["model_class"]:
-                    self.gen_data["guidance_scale"] = 4
-                    self.scheduler_data["timesteps"] = AysSchedules["StableDiffusion3Timesteps"]
-            elif "PLA" in self.info["model_class"]:
-                self.scheduler_data["scheduler"] = self.algorithms[3] #EDMDPM
-            elif ("FLU" in self.info["model_class"]
-            or "AUR" in self.info["model_class"]):
-                self.scheduler_data["scheduler"] = self.algorithms[2] #EulerAncestralAliens
 
         if self.scheduler_data.get("scheduler",0) == 0: self.scheduler_data["scheduler"] = self.algorithms[0] #Euler
 
@@ -406,10 +406,10 @@ class NodeTuner:
         else:
             self.refiner_data = None
 
-            manual_profile = False #todo: make this a system flag in config.toml
-            if manual_profile == False:
-                tra_size = sum(self.info["tra_size"].values())
-                profile = self.system_profile(self.first_device, int(self.info["model_size"]), int(self.info["vae_size"]), tra_size=tra_size)
+        manual_profile = False #todo: make this a system flag in config.toml
+        if manual_profile == False:
+            tra_size = sum(self.info["tra_size"].values())
+            profile = self.system_profile(self.first_device, int(self.info["model_size"]), int(self.info["vae_size"]), tra_size=tra_size)
 
         self.tuned_defaults = {
             "noise_scheduler" : self.scheduler_data,
