@@ -68,6 +68,7 @@ class T2IPipe:
                 "I8": ["i8", torch.int8],
                 "U8": ["u8", torch.uint8],
                 "NF4": ["nf4", "nf4"],
+                "AUTO": ["auto", "auto"]
         }
         for key, val in float_chart.items():
             if old_index is key:
@@ -109,6 +110,7 @@ class T2IPipe:
             var, dtype = self.float_converter(te_expressions["variant"])
             te_expressions["variant"] = var
             te_expressions.setdefault("torch_dtype", dtype)
+
 
         self.hf_log(fatal=True) #suppress layer skip messages
 
@@ -188,18 +190,16 @@ class T2IPipe:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
-        # model = "C:\\Users\\Public\\models\\image\\taesdxl_diffusion_pytorch_model.safetensors"
         autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
         return autoencoder
-# pipe.enable_vae_slicing()
+
 ############## PIPE
     def construct_pipe(self, model, pipe_data):
         if pipe_data.get("variant",0) != 0:
             var, dtype = self.float_converter(pipe_data["variant"])
             pipe_data["variant"] = var
             pipe_data.setdefault("torch_dtype", dtype)
-        model = "C:\\Users\\Public\\models\\image\\ponyFaetality_v11.safetensors"
-        original_config = "C:\\Users\\Public\\models\\metadata\\STA-XL\\sdxl_base.yaml"
+        original_config = "/home/maxtretikov/.config/shadowbox/models/metadata/STA-XL/sdxl_base.yaml"
         pipe = StableDiffusionXLPipeline.from_single_file(model, original_config=original_config, **pipe_data).to(self.device)
 
         if self.device == "mps":

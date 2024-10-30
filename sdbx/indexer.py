@@ -508,12 +508,15 @@ class ModelIndexer:
                 tra_sorted = {}
         vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
         lora_sorted = self.filter_compatible(query, self.model_indexes["lor"])
-        lora_sorted = dict(lora_sorted)
-        if vae_sorted == []: 
+        if len(lora_sorted) >1:
+            lora_sorted = dict(lora_sorted)
+        else:
+            lora_sorted = []
+        if vae_sorted == []:
             vae_sorted =str("∅")
             print(query)
             logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
-        if lora_sorted == []: 
+        if lora_sorted == []:
             lora_sorted =str("∅")
             logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
 

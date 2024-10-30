@@ -1,5 +1,6 @@
 import os
 import numbers
+import re
 from sdbx import logger
 from sdbx.config import config, Precision, cache, TensorDataType as D
 from collections import defaultdict
@@ -98,8 +99,6 @@ class NodeTuner:
                 self.transformers_data["precisions"][i] = "F32"
 
         if threshold.get("fit",None) == "all":
-            self.vae_data["torch_dtype"]  = "auto"
-            self.pipe_data["torch_dtype"] = "auto"
             self.pipe_data["low_cpu_mem_usage"] = True
             self.transformers_data["low_cpu_mem_usage"] = True
             self.vae_data["low_cpu_mem_usage"] = True
@@ -109,7 +108,8 @@ class NodeTuner:
             self.pipe_data["truncation"]     = True
             self.pipe_data["return_tensors"] = 'pt'
             if self.spec.get("flash_attention",False)  == True:
-                self.pipe_data["attn_implementation"] = "flash_attention"
+                for i in range(len(self._tra)):
+                    self.transformers_data["attn_implementation"][i] = "flash_attention_2"
 
         if threshold.get("fit", None) == "vae":
             self.vae_data["low_cpu_mem_usage"] = True
@@ -147,7 +147,7 @@ class NodeTuner:
 
         if self.spec.get("dynamo",False):
             self.scheduler_data["sigmas"]  = [] # custom sigma data
-            self.gen_data["return_dict"]   = False
+            # self.gen_data["return_dict"]   = False
             self.compile_data["fullgraph"] = True
             self.compile_data["mode"]      = "reduce-overhead" #switches to max-autotune if cuda device
         else:
@@ -164,6 +164,7 @@ class NodeTuner:
         else:
             if self.step_num_index is not None:
                 self.crop_steps = str(self.get_filename[self.step_num_index - 2:self.step_num_index])
+                self.crop_steps = re.sub(r"^\W+|\W+$", "", self.crop_steps)
                 self.steps_val  = int(self.crop_steps) if self.crop_steps.isdigit() else int(self.crop_steps[1:])
                 return self.steps_val
             else:

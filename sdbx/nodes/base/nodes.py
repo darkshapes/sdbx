@@ -19,6 +19,7 @@ solvers          = config.get_default("algorithms","solvers")
 metadata         = config.get_path("models.metadata")
 model_symlinks   = defaultdict(dict)
 queue_data       = []
+attn_list        = ["none","sdpa","flash_attention_2","flash_attention","xformers"]
 compile_list     = ["max-autotune","reduce-overhead"]
 timestep_list    = ["trailing", "linear"]
 offload_list     = ["none","sequential", "cpu", "disk"]
@@ -199,7 +200,7 @@ def load_transformer(
     precisions        : List[Literal[*variant_list]]                                                      = "F16", # type: ignore
     #clip_skip         : A[int, Numerical(min=0, max=12, step=1)]                                        = 2,
     device            : Literal[*capacity.get("devices","cpu")]                                         = None, # type: ignore
-    flash_attention   : bool                                                                            = False,
+    attn_implementation : List[Literal[*attn_list]]                                                = False,
     low_cpu_mem_usage : bool                                                                            = False,
     safety_checker      : bool                                                                          = False,
     add_watermarker     : bool                                                                          = False,
@@ -224,7 +225,7 @@ def load_transformer(
         tk_expressions[i]["add_watermarker"] = add_watermarker
         #expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"  may need for later cases of model symlinking
         #tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
-        if flash_attention == True: te_expressions[i]["attn_implementation"] = "flash_attention_2"
+        te_expressions[i]["attn_implementation"] = attn_implementation
         model_symlinks["transformer"][i] = symlink_prepare(transformer_models[i])# expressions[i]["subfolder"])
         tk, te = insta.declare_encoders(model_symlinks["transformer"][i], tk_expressions[i], te_expressions[i])
         token_data.insert(i,tk)
@@ -290,7 +291,7 @@ def diffusion_pipe(
     pipe_input["local_files_only"]  = True
 
     model_class = index.fetch_id(model)[1]
-    model_symlinks["model"] = symlink_prepare(model, "unet")
+    model_symlinks["model"] = symlink_prepare(model, "unet",)
     model_symlinks["unet"] = os.path.join(model_symlinks["model"], "unet")
 
     transformer_classes = index.fetch_compatible(model_class)
@@ -316,8 +317,8 @@ def diffusion_pipe(
             else:
                 pipe_input["text_encoder"] = None
                 pipe_input["tokenizer"]    = None
-
-    pipe = insta.construct_pipe(model_symlinks["model"], pipe_input)
+    model_path = index.fetch_id(model)[2][1]
+    pipe = insta.construct_pipe(model_path, pipe_input) #model_symlinks["model"]
     return pipe
 
 @node(path="load/", name="Load LoRA", display=True)
@@ -465,8 +466,8 @@ def generate_image(
     gen_input["output_type"] = output_type
     if offload_method != "none":
         pipe = insta.offload_to(pipe, offload_method)
-    if capacity.get("dynamo",False) != False:
-        gen_input["return_dict"]   = False
+    # if capacity.get("dynamo",False) != False:
+    #     gen_input["return_dict"]   = False
     if dynamic_guidance is True:
         gen_input["callback_on_step_end"]               = insta._dynamic_guidance
         gen_input["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds','add_time_ids']

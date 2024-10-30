@@ -17,7 +17,7 @@ class SystemCapacity:
         spec["data"]["devices"] = {}
         if torch.cuda.is_available():
             spec["data"]["devices"]["cuda"] = torch.cuda.mem_get_info()[1]
-            spec["data"]["flash_attention"] = False #str(torch.backends.cuda.flash_sdp_enabled()).title()
+            spec["data"]["flash_attention"] = torch.backends.cuda.flash_sdp_enabled() if system().lower() == "linux" else False
             spec["data"]["allow_tf32"]      = False
             spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
             if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:

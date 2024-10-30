@@ -328,3 +328,4 @@ def parse(testing: bool = False) -> Config:
     return Config(path=args.config)
 
 config = parse(testing=hasattr(sys, '_called_from_test'))
+

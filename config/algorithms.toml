@@ -25,9 +25,9 @@ schedulers = [
 ]
 
 # #arrange this order as you like. default :  ["HYP", "DMD", "TCD", "LIG", "SPO", "PCM", "LCM", "FLA"]
-lora_priority = ["None", "AYS", "SPO", "TCD", "HYP", "DMD", "LIG", "PCM", "LCM", "FLA"]
+lora_priority = ["AYS", "TCD", "SPO", "AYS", "HYP", "DMD", "LIG", "PCM", "LCM", "FLA"]
 
-step_priority = [4, 8, 10, 12, 2, 16, 1] #default [2, 4, 8, 10, 12, 16, 1]
+step_priority = [10, 8, 12, 2, 4, 16, 8] #default [2, 4, 8, 10, 12, 16, 1]
 
 # this order does not need to be changed
 solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver", "None"]

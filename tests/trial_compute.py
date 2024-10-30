@@ -1,19 +1,50 @@
 import os
+import logging
+from sdbx import logger
+from sdbx.capacity import SystemCapacity as sys_cap
 from sdbx.config import config
+from rich.logging import RichHandler
+from rich.console import Console
+from rich.logging import RichHandler
 
-index            = config.model_indexer
-optimize         = config.node_tuner
-sys_cap          = config.sys_cap
+log_level = "INFO"
+msg_init = None
+handler = RichHandler(console=Console(stderr=True))
 
-# print("\nAnalyzing model & system capacity\n  Please wait...")
+if handler is None:
+    handler = logging.StreamHandler(sys.stdout)  # same as print
+    handler.propagate = False
+
+formatter = logging.Formatter(
+    fmt="%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+handler.setFormatter(formatter)
+logging.root.setLevel(log_level)
+logging.root.addHandler(handler)
+
+if msg_init is not None:
+    logger = logging.getLogger(__name__)
+    logger.info(msg_init)
+
+log_level = getattr(logging, log_level)
+logger = logging.getLogger(__name__)
+
+logger.info("\nAnalyzing model & system capacity\n  Please wait...")
+
+create_capacity = sys_cap().write_capacity()
+index    = config.model_indexer
+optimize = config.node_tuner
+log_level = "INFO"
+msg_init = None
+
 create_index = index.write_index()     # (defaults to config/index.json)
-# spec = sys_cap.write_capacity()
-# print(f"Ready.")
-# name_path = input("""
-# Please type the file of an available checkpoint.
-# Path will be detected.
-# (default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
-name_path = "ponyFaetality_v11.safetensors"
+
+logger.info(f"Ready.")
+name_path = input("""
+Please type the file of an available checkpoint.
+Path will be detected.
+(default:duchaitenAiartSDXLV335.A6GO.safetensors):""" or "duchaitenAiartSDXLV335.A6GO.safetensors")
 
 name_path = os.path.basename(name_path)
 diffusion_index = config.get_default("index","DIF")
@@ -28,8 +59,8 @@ for key,val in diffusion_index.items():
 
 defaults = optimize.determine_tuning(model)
 defaults["generate_image"]["width"] = 832
-defaults["generate_image"]["height"] = 1216
-defaults["load_vae_model"]["vae"] = "sdxl.vae.safetensors"
+defaults["generate_image"]["height"] = 1152
+defaults["diffusion_prompt"]["batch"] = 50
 from sdbx.nodes.base import nodes
 
 #pipe = nodes.empty_cache(transformer_models, lora_pipe, unet_pipe, vae_pipe)
