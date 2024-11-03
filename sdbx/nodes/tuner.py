@@ -244,6 +244,7 @@ class NodeTuner:
         self.gen_data["eta"]                = 0.3
         self.gen_data["dynamic_guidance"]   = False
         self.pipe_data["add_watermarker"]   = False
+        self.pipe_data["original_config"]   = os.path.join(self.metadata_path, self.info["model_class"], "base.yaml")
         self.device_data["device_name"]     = self.first_device
         #self.device_data["gpu_id"]          = 0
         self.image_data["file_prefix"]      = "Shadowbox"
@@ -257,7 +258,7 @@ class NodeTuner:
         self.cache_data["stage"]["generate"] = None
         self.cache_data["stage"]["tail"] = None
 
-        # self.pipe_data["fuse_pipe"]     = True # todo: pipe.fuse_qkv_projections(), untested
+        # self.pipe_data["fuse_pipe"]    all ma = True # todo: pipe.fuse_qkv_projections(), untested
         # self.pipe_data["fuse_unet_only"] = False # todo - add conditions where this is useful
         #self.pipe_data["unet_file"]    = list(self.info["model_details"])[1] full path to file
         self.refiner_data["model"] = config.model_indexer.fetch_refiner()

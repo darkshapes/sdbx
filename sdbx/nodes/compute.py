@@ -190,6 +190,7 @@ class T2IPipe:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
+        #model = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae"
         autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
         return autoencoder
 
@@ -199,8 +200,7 @@ class T2IPipe:
             var, dtype = self.float_converter(pipe_data["variant"])
             pipe_data["variant"] = var
             pipe_data.setdefault("torch_dtype", dtype)
-        original_config = "/home/maxtretikov/.config/shadowbox/models/metadata/STA-XL/sdxl_base.yaml"
-        pipe = StableDiffusionXLPipeline.from_single_file(model, original_config=original_config, **pipe_data).to(self.device)
+        pipe = StableDiffusionXLPipeline.from_single_file(model, **pipe_data).to(self.device)
 
         if self.device == "mps":
             if self.capacity.get("attention_slicing",False) == True:
@@ -217,7 +217,9 @@ class T2IPipe:
         else:
             pipe.load_lora_weights(lora, weight_name=weight_name)
         if fuse:
+            self.fuse = True
             pipe.fuse_lora(scale=scale)
+            pipe.unload_lora_weights()
         return pipe
 
 ############## ENCODE
@@ -318,7 +320,7 @@ class T2IPipe:
                 generation['latents'] = pipe(generator=generator,**gen_data).images # return entire batch at once
                 #  pipe ends with image, but really its a latent...
         if queue[0].get("embeddings", False) is not False:
-            pipe.unload_lora_weights()
+            if self.fuse == True: pipe.unload_lora_weights()
             del pipe.unet
             del generator
             gen_data["prompt_embeds"] = None

@@ -1,96 +1,143 @@
 {
-    "model_formats": {
+    "model_format": {
         "compvis": [
             "input_blocks.",
             "out_blocks."
         ],
         "diffusers": [
             "down_blocks.",
-            "up_blocks."
+            "up_blocks.",
+            "lora_down.weight"
         ],
         "lora": [
             "lora_down",
             "lora_up"
         ],
-        "taesd": [
-            "decoder.layers.",
-            "encoder.layers."
-        ],
-        "x4mer": [
+        "transformer": [
             "self_attention",
             "SelfAttention",
             "self_attn"
+        ],
+        "taesd": [
+            "r'decoder.layers.d+'",
+            "r'encoder.layers.d+'"
         ],
         "unet": "model_diffusion_model",
         "vae ": [
             "decoder.up",
             "encoder.down"
-        ]
-    },
-    "compvis_format": {
-        "sd1": "model.diffusion_model.output_blocks.9.1.transformer_blocks.0.norm3.weight",
-        "sdxl-b": "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.bias",
-        "sdxl-r": "conditioner.embedders.0.model.transformer.resblocks.9.mlp.c_proj.bias",
-        "play-2": "edm_mean",
-        "clip_l": "text_model.encoder.layers.11.self_attn.v_proj.weight",
-        "clip-l-sd1": "cond_stage_model.transformer.text_model.embeddings.position_embedding.weight",
-        "clip-l-sdxl-b": "conditioner.embedders.0.transformer.text_model.embeddings.position_embedding.weight",
-        "clip-l-sd3": "text_encoders.clip_l.transformer.text_model.embeddings.position_embedding.weight",
-        "clip-op-g": "text_model.encoder.layers.12.layer_norm1.weight",
-        "clip-op-sd1": "text_model.embeddings.token_embedding.weight",
-        "clip-op-sdxl-b": "conditioner.embedders.1.model.positional_embedding",
-        "clip-op-sdxl-r": "conditioner.embedders.0.model.text_projection",
-        "clip-op-sd3": "text_encoders.clip_g.transformer.text_model.embeddings.position_embedding.weight",
-        "stablecascade-b": "down_blocks.1.0.channelwise.0.weight",
-        "stablecascade-c": "clip_txt_mapper.weight",
-        "sd3": "model.diffusion_model.joint_blocks.0.context_block.adaLN_modulation.1.bias",
-        "flux": [
-            "double_blocks.0.img_attn.norm.key_norm.scale",
-            "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
-        ]
-    },
-    "llama_format": {
-        "flux": [
-            "txt_attn.qkv",
-            "img_attn.proj",
-            "ModelFlux"
         ],
-        "sd3": [
-            "ModelSD3"
+        "auraflow": [
+            "double_layers.0.attn.w1q.weight",
+            "model.register_tokens",
+            "model.positional_encoding",
+            "model.init_x_linear",
+            "model.double_layers.3.mlpX.c_proj.weight"
         ],
-        "sdxl-b": [
+        "flux": [
+            "double_blocks.12.img_attn.norm.key_norm.scale",
+            "r'model.diffusion_model.double_blocks.d+.img_attn.norm.key_norm.scale'",
+            "r'single_transformer_blocks.d+.proj_mlp.weight'"
+        ],
+        "hunyuan": [
+            "blocks.11.ff.net.2.weight",
+            "blocks.39.skip_norm.weight"
+        ],
+        "kolors": [
+            "down_blocks.2.attentions.1.transformer_blocks.9.norm3.weight",
+            "encoder_hid_proj.weight"
+        ],
+        "pixart-sigma": [
+            "transformer_blocks.12.scale_shift_table",
+            "adaln_single.emb.timestep_embedder.linear_1.weight"
+        ],
+        "playground-25": [
+            "edm_mean",
+            "edm_std"
+        ],
+        "sd1": "r'model.diffusion_model.output_blocks.d+.d+.transformer_blocks.d+.norm3.weight'",
+        "sdxl-base": [
+            "r'conditioner.embedders.1.model.transformer.resblocks.d+.mlp.c_proj.bias'",
+            "conditioner.embedders.0.transformer.text_model.encoder.layers.0.self_attn.k_proj.weight",
             "ModelSDXL"
         ],
-        "sd1": [
-            "ModelSD1"
+        "sdxl-refiner": [
+            "r'conditioner.embedders.0.model.transformer.resblocks.d+.mlp.c_proj.bias'"
+        ],
+        "sd3": [
+            "r'model.diffusion_model.joint_blocks.d+.context_block.adaLN_modulation.d+.bias'",
+            "r'transformer_blocks.0.attn.add_q_proj.weight'",
+            "ModelSD3"
+        ],
+        "bert": [
+            "r'encoder.layer.d+.output.dense.weight'",
+            "encoder.layer.0.attention.self.key.bias",
+            "pooler.dense.bias"
+        ],
+        "chatglm": "chatglm",
+        "clip": "text_model.encoder.layers.0.mlp.fc1.weight",
+        "clip-vit-l": "vision_model.embeddings.patch_embedding.weight",
+        "clip-h": "text_model.encoder.layers.22.mlp.fc1.weight",
+        "clip-g": [
+            "text_model.encoder.layers.12.self_attn.v_proj.weight",
+            "text_projection.weight"
+        ],
+        "open-clip": [
+            "logit_scale",
+            "visual.trunk.stages.0.blocks.0.layer_scale.gamma"
+        ],
+        "open-clip-g": "r'text_model.encoder.layers.d+.layer_norm1.weight'",
+        "umt5": [
+            "encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight"
+        ],
+        "t5": [
+            "encoder.block.0.layer.1.DenseReluDense.wi.weight",
+            "t5encoder."
+        ],
+        "t5-xxl": [
+            "text_encoders.t5xxl.transformer.shared.weight",
+            "encoder.embed_tokens.weight"
         ]
     },
-    "diffusers_format": {
-        "sd35": [
-            "transformer_blocks.19.norm1_context.linear.weight",
-            "transformer_blocks.0.attn.add_q_proj.weight"
+    "vae_format": {
+        "sd1": [
+            "model_ema.decay",
+            "loss.perceptual_loss.net.slice5.28.weight"
         ],
-        "flux": "single_transformer_blocks.0.proj_mlp.weight",
-        "sdxl-b": [
-            "down_blocks.0.downsamplers.0.conv.weight",
-            "add_embedding.linear_1.weight"
+        "sdxl-base": "post_quant_conv.bias",
+        "playground-2": "num_updates",
+        "kolors": "decoder.conv_norm_out.bias",
+        "pixart-sigma": "decoder.mid_block.attentions.0.group_norm.bias",
+        "huanyundit": "decoder.mid_block.resnets.0.conv1.bias",
+        "auraflow": "decoder.mid_block.resnets.1.norm2.weight"
+    },
+    "model_tensors": {
+        "diffusers": 1680,
+        "taesd": "134",
+        "vae": 248,
+        "sdxl-b": 2516,
+        "open_clip": [
+            782,
+            "1408"
         ],
-        "sd1": "down_blocks.0.downsamplers.0.conv.weight",
-        "auraflow": "joint_transformer_blocks.0.ff.out_projection.weight"
+        "openchat": [
+            290,
+            4096
+        ]
     },
     "pdxl_format": {
         "pdxl": [
             [
-                249600156,
-                376084636
+                507287196,
+                520394396
             ],
             [
                 1635440796,
                 1635441820
             ],
             [
-                507287196,
-                520394396
+                249600156,
+                376084636
             ]
         ]
     },

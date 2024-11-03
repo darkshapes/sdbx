@@ -44,8 +44,8 @@ logger.info(f"Ready.")
 name_path = input("""
 Please type the file of an available checkpoint.
 Path will be detected.
-(default:duchaitenAiartSDXLV335.A6GO.safetensors):""" or "duchaitenAiartSDXLV335.A6GO.safetensors")
-
+(default:hellaineMixPDXL_v45.safetensors):""" or "hellaineMixPDXL_v45.safetensors")
+# "virtualDiffusionPony_25B3C4N3.safetensors"
 name_path = os.path.basename(name_path)
 diffusion_index = config.get_default("index","DIF")
 name_path = name_path.strip()
@@ -60,7 +60,7 @@ for key,val in diffusion_index.items():
 defaults = optimize.determine_tuning(model)
 defaults["generate_image"]["width"] = 832
 defaults["generate_image"]["height"] = 1152
-defaults["diffusion_prompt"]["batch"] = 50
+defaults["diffusion_prompt"]["batch"] = 1
 from sdbx.nodes.base import nodes
 
 #pipe = nodes.empty_cache(transformer_models, lora_pipe, unet_pipe, vae_pipe)

@@ -174,10 +174,10 @@ from transformers import models as ModelType
 
 @node(path="prompt/", name="Diffusion Prompt", display=True)
 def diffusion_prompt(
-    prompt        : A[str, Text(multiline=True, dynamic_prompts=True)] = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
-    negative_terms: A[str, Text(multiline=True, dynamic_prompts=True)] = None,
-    seed   : A[int, Dependent(on="prompt"), Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = None,  # cross compatible with ComfyUI and A1111 seeds
-    batch         : A[int, Numerical(min=0, max=512, step=1)]          = 1,
+    prompt         : A[str, Text(multiline=True, dynamic_prompts=True)]                                                = "A slice of a rich and delicious chocolate cake presented on a table in a palace reminiscent of Versailles",
+    negative_terms: A[str, Text(multiline=True, dynamic_prompts=True)]                                                 = None,
+    seed           : A[int, Dependent(on="prompt"), Numerical(min=0, max=0xFFFFFFFFFFFFFF, step=1, randomizable=True)] = None,                                                                                                        # cross compatible with ComfyUI and A1111 seeds
+    batch          : A[int, Numerical(min=0, max=512, step=1)]                                                         = 1,
 ) -> A[str, Name("Queue")]:
     full_prompt = []
     #if pony == True # todo: active pony detection
@@ -196,14 +196,14 @@ def diffusion_prompt(
 
 @node(path="load/", name="Load Transformers", display=True)
 def load_transformer(
-    transformer_models: List[Literal[*model_store("TRA")]]                                              = None, # type: ignore
-    precisions        : List[Literal[*variant_list]]                                                      = "F16", # type: ignore
-    #clip_skip         : A[int, Numerical(min=0, max=12, step=1)]                                        = 2,
-    device            : Literal[*capacity.get("devices","cpu")]                                         = None, # type: ignore
-    attn_implementation : List[Literal[*attn_list]]                                                = False,
-    low_cpu_mem_usage : bool                                                                            = False,
-    safety_checker      : bool                                                                          = False,
-    add_watermarker     : bool                                                                          = False,
+    transformer_models : List[Literal[*model_store("TRA")]]        = None,  # type: ignore
+    precisions          : List[Literal[*variant_list]]             = "F16", # type: ignore
+    #clip_skip          : A[int, Numerical(min=0, max=12, step=1)] = 2,
+    device              : Literal[*capacity.get("devices","cpu")]  = None,  # type: ignore
+    attn_implementation : List[Literal[*attn_list]]                = False,
+    low_cpu_mem_usage   : bool                                     = False,
+    safety_checker      : bool                                     = False,
+    add_watermarker     : bool                                     = False,
 ) -> (A[ModelType,Name("Tokenizer")], A[ModelType,Name("Text_Encoder")]):
     tk_expressions   = defaultdict(dict)
     te_expressions   = defaultdict(dict)
@@ -225,7 +225,7 @@ def load_transformer(
         tk_expressions[i]["add_watermarker"] = add_watermarker
         #expressions[i]["subfolder"] = f"text_encoder_{i + 1}" if i > 0 else "text_encoder"  may need for later cases of model symlinking
         #tokenizers[i]["subfolder"]  = f"tokenizer_{i + 1}" if i > 0 else "tokenizer"
-        te_expressions[i]["attn_implementation"] = attn_implementation
+        if attn_implementation != False: te_expressions[i]["attn_implementation"] = attn_implementation
         model_symlinks["transformer"][i] = symlink_prepare(transformer_models[i])# expressions[i]["subfolder"])
         tk, te = insta.declare_encoders(model_symlinks["transformer"][i], tk_expressions[i], te_expressions[i])
         token_data.insert(i,tk)
@@ -243,18 +243,20 @@ def force_device(
 
 @node(path="load/", name="Load Vae Model", display=True)
 def load_vae_model(
-    vae              : Literal[*model_store("VAE")],                  # type: ignore
-    precision        : Literal[*variant_list] = "F16",               # type: ignore
+    vae              : Literal[*model_store("VAE")],                    # type: ignore
+    precision        : Literal[*variant_list] = "F16",                  # type: ignore
     low_cpu_mem_usage: bool = False,
-    device           :Literal[*capacity.get("devices","cpu")] = None         # type: ignore
+    device           : Literal[*capacity.get("devices","cpu")] = None,  # type: ignore
+    config           : Literal[*os.listdir(metadata)]          = None,
+
 ) -> A[TensorType, Name("VAE")]:
     vae_input        = defaultdict(dict)
     if device is not None:
         insta.set_device(device)
     vae_input["vae"] = vae
     vae_class = index.fetch_id(vae)[1]
-    vae_input["config"]           = os.path.join(metadata, vae_class, "vae","config.json")
-    vae_input["variant"]          = precision
+    vae_input["config"] = os.path.join(metadata, "STA-XL", "vae","config.json") #config
+    vae_input["variant"] = precision
     if low_cpu_mem_usage == True:
         vae_input["low_cpu_mem_usage"] = low_cpu_mem_usage
     vae_input["local_files_only"]  = True
@@ -278,6 +280,7 @@ def diffusion_pipe(
     return_tensors      : A[Literal["pt"],Dependent(on="use_model_to_encode", when=True)]                     = None,
     safety_checker      : bool                                                                                = False,
     add_watermarker     : bool                                                                                = False,
+    original_config     : Literal[*os.listdir(metadata)]                                                      = None,
 ) -> A[TensorType, Name("Model")]:
     pipe_input       = defaultdict(dict)
     if device is not None:
@@ -289,6 +292,7 @@ def diffusion_pipe(
     if safety_checker == False: pipe_input["safety_checker"] = None
     pipe_input["add_watermarker"] = add_watermarker
     pipe_input["local_files_only"]  = True
+    pipe_input["original_config"] = original_config
 
     model_class = index.fetch_id(model)[1]
     model_symlinks["model"] = symlink_prepare(model, "unet",)
@@ -359,13 +363,13 @@ def compile_pipe(
 
 @node(path="prompt/", name="Encode Vision Prompt", display=True)
 def encode_prompt(
-    queue            : str                   = None,
-    tokenizers_in    : ModelType               = None,
-    text_encoders_in: ModelType                = None,
-    padding          : Literal['max_length']   = "max_length",
-    truncation       : bool                    = True,
-    return_tensors   : Literal["pt"]           = 'pt',
-    device           : Literal[*capacity.get("devices","cpu")]     = None, # type: ignore
+    queue            : str                                     = None,
+    tokenizers_in    : ModelType                               = None,
+    text_encoders_in: ModelType                                = None,
+    padding          : Literal['max_length']                   = "max_length",
+    truncation       : bool                                    = True,
+    return_tensors   : Literal["pt"]                           = 'pt',
+    device           : Literal[*capacity.get("devices","cpu")] = None,         # type: ignore
 ) ->  A[TensorType, Name("Embeddings")]:
     if device is not None:
         insta.set_device(device)
@@ -466,8 +470,8 @@ def generate_image(
     gen_input["output_type"] = output_type
     if offload_method != "none":
         pipe = insta.offload_to(pipe, offload_method)
-    # if capacity.get("dynamo",False) != False:
-    #     gen_input["return_dict"]   = False
+    if capacity.get("dynamo",False) != False:
+        gen_input["return_dict"]   = False
     if dynamic_guidance is True:
         gen_input["callback_on_step_end"]               = insta._dynamic_guidance
         gen_input["callback_on_step_end_tensor_inputs"] = ['prompt_embeds', 'add_text_embeds','add_time_ids']
