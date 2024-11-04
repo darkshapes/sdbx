@@ -1,28 +1,13 @@
 {
     "model_format": {
-        "compvis": [
-            "input_blocks.",
-            "out_blocks."
-        ],
-        "diffusers": [
-            "down_blocks.",
-            "up_blocks.",
-            "lora_down.weight"
-        ],
         "lora": [
             "lora_down",
             "lora_up"
-        ],
-        "transformer": [
-            "self_attention",
-            "SelfAttention",
-            "self_attn"
         ],
         "taesd": [
             "r'decoder.layers.d+'",
             "r'encoder.layers.d+'"
         ],
-        "unet": "model_diffusion_model",
         "vae ": [
             "decoder.up",
             "encoder.down"
@@ -124,6 +109,23 @@
             290,
             4096
         ]
+    },
+    "subcategories": {
+        "compvis": [
+            "input_blocks.",
+            "out_blocks."
+        ],
+        "diffusers": [
+            "down_blocks.",
+            "up_blocks.",
+            "lora_down.weight"
+        ],
+        "transformer": [
+            "self_attention",
+            "SelfAttention",
+            "self_attn"
+        ],
+        "unet": "model.diffusion_model"
     },
     "pdxl_format": {
         "pdxl": [

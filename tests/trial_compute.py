@@ -32,19 +32,19 @@ logger = logging.getLogger(__name__)
 
 logger.info("\nAnalyzing model & system capacity\n  Please wait...")
 
-create_capacity = sys_cap().write_capacity()
+#create_capacity = sys_cap().write_capacity()
 index    = config.model_indexer
 optimize = config.node_tuner
 log_level = "INFO"
 msg_init = None
 
-create_index = index.write_index()     # (defaults to config/index.json)
+#create_index = index.write_index()     # (defaults to config/index.json)
 
 logger.info(f"Ready.")
 name_path = input("""
 Please type the file of an available checkpoint.
 Path will be detected.
-(default:hellaineMixPDXL_v45.safetensors):""" or "hellaineMixPDXL_v45.safetensors")
+(default:virtualDiffusionPony_25B3C4N3.safetensors):""" or "virtualDiffusionPony_25B3C4N3.safetensors")
 # "virtualDiffusionPony_25B3C4N3.safetensors"
 name_path = os.path.basename(name_path)
 diffusion_index = config.get_default("index","DIF")

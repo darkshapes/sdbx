@@ -3,7 +3,8 @@ import struct
 import json
 import torch
 import re
-from tqdm import tqdm
+import sys
+from tqdm.auto import tqdm
 from pathlib import Path
 from collections import defaultdict, Counter
 
@@ -15,7 +16,7 @@ class Domain:
 
     def __init__(self, domain_name):
         self.domain_name = domain_name
-        self.architectures = {}  # Stores Architecture objects
+        self.architectures = {}  # Achitecture objects
 
     def add_architecture(self, architecture_name, architecture_obj):
         self.architectures[architecture_name] = architecture_obj
@@ -34,7 +35,7 @@ class Domain:
 
         def __init__(self, architecture):
             self.architecture = architecture
-            self.components = {}  # Stores Component objects
+            self.components = {}  # Component objects
 
         def add_component(self, component_name, component_obj):
             self.components[component_name] = component_obj
@@ -65,165 +66,167 @@ class Domain:
                     'distinction': self.distinction
                 }
 
+
 class BlockIndex:
-
-    def main(self, file_name: str, path: str): # 重みを確認するモデルファイル
-
-        logger.info(f"loading: {os.path.basename(file_name)}")
+    # 重みを確認するモデルファイル
+    def main(self, file_name: str, path: str):
 
         self.id_values = defaultdict(dict)
         file_suffix = Path(file_name).suffix
         if file_suffix == "": return
-        self.id_values["extension"] = Path(file_name).suffix.lower()
-        deserialized_model = defaultdict(dict)
+        self.id_values["extension"] = Path(file_name).suffix.lower() # extension is metadata
+        model_header = defaultdict(dict)
+
+        # Process file by method indicated by extension, usually struct unpacking, except for pt files which are memmap
+        if self.id_values["extension"] in [".safetensors", ".sft"]: model_header: dict = self.__unsafetensors(file_name, self.id_values["extension"])
+        elif self.id_values["extension"] == ".gguf": model_header: dict = self.__ungguf(file_name, self.id_values["extension"])
+        elif self.id_values["extension"] in [".pt", ".pth"]: model_header: dict = self.__unpickle(file_name, self.id_values["extension"])
 
 
-        if self.id_values["extension"] in [".safetensors", ".sft"]: deserialized_model: dict = self.__unsafetensors(file_name, self.id_values["extension"])
-        elif self.id_values["extension"] == ".gguf": deserialized_model: dict = self.__ungguf(file_name, self.id_values["extension"])
-        elif self.id_values["extension"] in [".pt", ".pth"]: deserialized_model: dict = self.__unpickle(file_name, self.id_values["extension"])
-
-
-        if deserialized_model:
-            self.neural_net = Domain("nn")
+        if model_header:
+            self.neural_net = Domain("nn") #create the domain only when we know its a model
 
             self.MODEL_FORMAT = config.get_default("tuning","model_format")
             self.PDXL_FORMAT  = config.get_default("tuning","pdxl_format")
 
-            self.id_values["tensors"] = len(deserialized_model)
-            self.block_count(deserialized_model, self.MODEL_FORMAT) # Check for matches in the keys of deserialized_model against MODEL_FORMAT
-            if self.id_values.get("dtype") is None:
-                self.block_details(deserialized_model) # Check for matches in the keys of deserialized_model against MODEL_FORMAT
-
-            key_value_length = len(self.id_values.values())
-            info_format = "{:<5} | " * key_value_length
-            value = tuple(self.id_values.keys())
-            print(info_format.format(*value))
-            print("-" * 80)
-            data = tuple(self.id_values.values())
-            print(info_format.format(*data))
+            self.id_values["tensors"] = len(model_header)
+            self.block_count(model_header, self.MODEL_FORMAT) # Check for matches in the keys of model_header against MODEL_FORMAT
+            self._pretty_output(file_name)
             filename = os.path.join(path, os.path.basename(file_name) + ".json")
             with open(filename, "w", encoding="UTF-8") as index: # todo: make 'a' type before release
-                data = self.id_values | deserialized_model
+                data = self.id_values | model_header
                 json.dump(data ,index, ensure_ascii=False, indent=4, sort_keys=True)
 
-    def error_handler(self, kind:str, error_log:str, file_name:str=None, parse_type:str=None):
+    def error_handler(self, kind:str, error_log:str, obj_name:str=None, error_source:str=None):
         if kind == "retry":
-            logger.info(f"Error reading metadata, switching read method ", exc_info=False)
+            self.id_progress("Error reading metadata, switching read method")
         elif kind == "fail":
-            logger.info(f"Metadata read attempts exhasted for:'{file_name}'", exc_info=False)
-        logger.debug(f"Could not read : '{file_name}' Recognized as {parse_type}: {error_log}", exc_info=True)
+            self.id_progress("Metadata read attempts exhasted for:'", obj_name)
+        logger.debug(f"Could not read : '{obj_name}' In {error_source}: {error_log}", exc_info=True)
         return
 
 #SAFETENSORS
     def __unsafetensors(self, file_name:str, extension: str):
         self.id_values["extension"] = "safetensors"
         self.id_values["file_size"] = os.path.getsize(file_name)
-        #from safetensors.torch import load_file
         with open(file_path, 'rb') as file:
             try:
-                first_8_bytes = file.read(8)
+                first_8_bytes    = file.read(8)
                 length_of_header = struct.unpack('<Q', first_8_bytes)[0]
-                header_bytes = file.read(length_of_header)
-                header = json.loads(header_bytes.decode('utf-8'))
-                if header.get("__metadata__",0 ) != 0:
-                    header.pop("__metadata__")
+                header_bytes     = file.read(length_of_header)
+                header           = json.loads(header_bytes.decode('utf-8'))
+                if header.get("__metadata__",0 ) != 0:  # we want to remove this metadata so its not counted as tensors
+                    header.pop("__metadata__")  # it is usally empty on safetensors ._.
                 return header
             except Exception as error_log:  #couldn't open file
-                self.error_handler(kind="fail", error_log=error_log, file_name=file_name, parse_type=extension)
+                self.error_handler(kind="fail", error_log=error_log, obj_name=file_name, error_source=extension)
 
 # GGUF
     def __ungguf(self, file_name:str, extension:str):
-        self.id_values["file_size"] = os.path.getsize(file_name)
+        self.id_values["file_size"] = os.path.getsize(file_name) # how big will be important for memory management
         file_data = defaultdict(dict)
         from llama_cpp import Llama
         try:
             with open(file_name, "rb") as file:
                 magic = file.read(4)
                 if magic != b"GGUF":
-                    logger.debug(f"Invalid GGUF magic number in '{file_name}'")
+                    logger.debug(f"Invalid GGUF magic number in '{file_name}'") # uh uh uh, you didn't say the magic word
                     return
                 version = struct.unpack("<I", file.read(4))[0]
                 if version < 2:
                     logger.debug(f"Unsupported GGUF version {version} in '{file_name}'")
                     return
-            parser = Llama(model_path=file_name, vocab_only=True, verbose=False)
-            arch = parser.metadata.get("general.architecture")
-            name = parser.metadata.get("general.name")
-            self.id_values["name"] = name if name is not None else arch
+            parser                  = Llama(model_path=file_name, vocab_only=True, verbose=False) #  fails image quants, but dramatically faster vs ggufreader
+            arch                    = parser.metadata.get("general.architecture") # with gguf we can directly request the model name but it isnt always written in full
+            name                    = parser.metadata.get("general.name") # sometimes this field is better than arch
+            self.id_values["name"]  = name if name is not None else arch
             self.id_values["dtype"] = parser.scores.dtype.name #outputs as full name eg: 'float32 rather than f32'
-            return
+            return # todo: handle none return better
         except ValueError as error_log:
-            self.error_handler(kind="retry", error_log=error_log, file_name=file_name, parse_type=extension)
+            self.error_handler(kind="retry", error_log=error_log, obj_name=file_name, error_source=extension) # the aforementioned failing
         from gguf import GGUFReader
-        try: # Method using gguf library, better for LDM conversions
-            reader = GGUFReader(file_name, 'r')
-            self.id_values["dtype"] = reader.data.dtype.name
-            arch = reader.fields["general.architecture"]
-            self.id_values["name"] = str(bytes(arch.parts[arch.data[0]]), encoding='utf-8')
+        try: # method using gguf library, better for LDM conversions
+            reader                  = GGUFReader(file_name, 'r')
+            self.id_values["dtype"] = reader.data.dtype.name # get dtype from metadata
+            arch                    = reader.fields["general.architecture"] # model type category, usually prevents the need  toblock scan for llms
+            self.id_values["name"]  = str(bytes(arch.parts[arch.data[0]]), encoding='utf-8') # retrieve model name from the dict data
             if len(arch.types) > 1:
-                self.id_values["name"] = arch.types
+                self.id_values["name"] = arch.types #if we get a result, save it
             for tensor in reader.tensors:
-                file_data[str(tensor.name)] = f"{str(tensor.shape), str(tensor.tensor_type.name)}"
+                file_data[str(tensor.name)] = {"shape": str(tensor.shape), "dtype": str(tensor.tensor_type.name)} # create dict similar to safetensors/pt results
             return file_data
         except ValueError as error_log:
-            self.error_handler(kind="fail", error_log=error_log, file_name=file_name, parse_type=extension)
+            self.error_handler(kind="fail", error_log=error_log, obj_name=file_name, error_source=extension) # >:V
 
 # PICKLETENSOR FILE
     def __unpickle(self, file_name:str, extension:str):
-        self.id_values["file_size"] = os.path.getsize(file_name)
+        self.id_values["file_size"] = os.path.getsize(file_name) #
         import mmap
         import pickle
         try:
             return torch.load(file_name, map_location="cpu") #this method seems outdated
         except TypeError as error_log:
-            self.error_handler(kind="retry", error_log=error_log, file_name=file_name, parse_type=extension)
+            self.error_handler(kind="retry", error_log=error_log, obj_name=file_name, error_source=extension)
             try:
                 with open(file_name, "r+b") as file_obj:
                     mm = mmap.mmap(file_obj.fileno(), 0)
                     return pickle.loads(memoryview(mm))
-            except Exception as error_log: #throws a _pickle error
-                self.error_handler(kind="fail", error_log=error_log, file_name=file_name, parse_type=extension)
+            except Exception as error_log: #throws a _pickle error (so salty...)
+                self.error_handler(kind="fail", error_log=error_log, obj_name=file_name, error_source=extension)
 
     def block_count(self, source_data:dict, format_dict:dict):
         """
         Generalized function to check either the keys or values of a source dictionary
-        against a format dictionary. If check_values is True, match against the values, otherwise keys.
+        against a format dictionary.
         """
-        target_data    = source_data.keys()  # model dict to process
-        flattened_data = ' '.join(map(str, target_data)) # list to string for easier processing
-        for label, block_key in format_dict.items(): #  count occurrences of each block_key in the flattened data
-            block_key = block_key if isinstance(block_key, list) else [block_key]
-            for each in block_key:
-                if str(each).startswith("r'"):
-                    raw_block_name = (str(each)
+        target_data    = source_data.keys()  # The model dict keys to process
+        flattened_data = ' '.join(map(str, target_data)) # Convert the key list to a string for easier processing
+        for label, known_block in format_dict.items(): #  Begin to count all occurrences of each known key inside the flattened model data
+            known_block = known_block if isinstance(known_block, list) else [known_block] # Normalize known_blocks as list
+            for list_string in known_block:  # Process tuning.json as either regex or literal string
+                list_string = str(list_string)
+                if list_string.startswith("r'"): # Regex conversion
+                    raw_block_name = (list_string
                         .replace("d+", r"\d+")  # Replace 'd+' with '\d+' for digits
                         .replace(".", r"\.")    # Escape literal dots with '\.'
                         .strip("r'")            # Strip the 'r' and quotes from the string
                     )
                     block_name = re.compile(raw_block_name)
-                    total_matches = len(list(block_name.finditer(flattened_data)))
-                else:
-                    total_matches = flattened_data.count(str(each))
-                if total_matches > 0:
-                    self.id_values[label] = self.id_values.get(label, 0) + total_matches # Update count_values with the result
+                    match      = block_name.search(flattened_data)
+                    if match:  # If a match is found, Find the corresponding key in source_data by searching for the actual key substring
+                        matched_key = next((key for key in source_data.keys() if block_name.search(key)), None)
+                        self.block_details(source_data[matched_key], label)  # Send matched key's data to block_details
+                else: # When our block string is not regex
+                     if list_string in flattened_data:  # Check for the string directly in flattened_data
+                        matched_key = next((key for key in source_data.keys() if list_string in key), None)
+                        self.block_details(source_data[matched_key], label)  # Send matched key's data to block_details
 
-    def block_details(self, deserialized_model:dict):
-        for value in deserialized_model.values():         # Additionally, handle any specific logic for "dtype" and "data_offsets"
-            self.id_values["dtype"] = []
-            self.id_values["shape"] = []
-            if isinstance(value, dict):
-                search_items = ["dtype", "shape"]
-                for field_name in search_items:
-                    field_value = value.get(field_name)
-                    if isinstance(field_value, list):
-                        field_value = ", ".join(map(str, field_value))
-                    elif field_value is not None:
-                        field_value = str(field_value)
-                    self.id_values[field_name].append(field_value)
-                    self.id_values[field_name] = self.id_values[field_name][0]
+    def block_details(self, model_header:dict, label: str):
+        self.id_values[label] = self.id_values.get(label, 0) + 1  # Increment the count for the match
+        search_items = ["dtype", "shape"]
+        for field_name in search_items:
+            field_value = model_header.get(field_name)
+            if field_value:
+                if isinstance(field_value, list):
+                    field_value = str(field_value).strip("\r").strip("\n")  # We only need the first two numbers of 'shape'
+                if field_value not in self.id_values.get(field_name,""):
+                    self.id_values[field_name] = " ".join([self.id_values.get(field_name, ""),field_value]) # Prevent data duplication
 
-                # if str(value.get("data_offsets")) in self.PDXL_FORMAT.get("pdxl"):
-                #         self.id_values["pdxl"] = self.id_values.get("pdxl", 0) + 1
+    def _pretty_output(self, file_name): #pretty printer
+        key_value_length = len(self.id_values.values())  # number of items detected in the scan
+        info_format      = "{:<1} | " * key_value_length # shrink print columns to data width
+        value            = tuple(self.id_values.keys()) # use to create table
+        horizontal_bar   = ("  " + "-" * (10*key_value_length)) # horizontal divider of arbitrary length. could use shutil to dynamically create but eh. already overkill
+        formatted_data   = tuple(self.id_values.values()) # data extracted from the scan
+        self.id_progress(file_name, info_format.format(*value), horizontal_bar, info_format.format(*formatted_data)) #send to print function
+
+    def id_progress(*args):
+        sys.stdout.write("\033[F" *len(args))  # ANSI escape codes to move the cursor up 3 lines
+        for line_data in args:
+            sys.stdout.write(" " * 175 + "\x1b[1K\r")
+            sys.stdout.write(f"{line_data}\n")  # Print the lines
+        sys.stdout.flush()              # Empty output buffer to ensure the changes are shown
+
 
 if __name__ == "__main__":
     file = config.get_path("models.image")
@@ -231,7 +234,8 @@ if __name__ == "__main__":
     save_location = os.path.join(config.get_path("models.dev"),"metadata")
     if Path(file).is_dir() == True:
         path_data = os.listdir(file)
-        for each_file in tqdm(path_data, total=len(path_data)):
+        print("\n\n\n\n")
+        for each_file in tqdm(path_data, total=len(path_data), position=0, leave=True):
             file_path = os.path.join(file,each_file)
             blocks.main(file_path, save_location)
     else:

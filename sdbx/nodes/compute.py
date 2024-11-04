@@ -217,7 +217,6 @@ class T2IPipe:
         else:
             pipe.load_lora_weights(lora, weight_name=weight_name)
         if fuse:
-            self.fuse = True
             pipe.fuse_lora(scale=scale)
             pipe.unload_lora_weights()
         return pipe
@@ -320,7 +319,6 @@ class T2IPipe:
                 generation['latents'] = pipe(generator=generator,**gen_data).images # return entire batch at once
                 #  pipe ends with image, but really its a latent...
         if queue[0].get("embeddings", False) is not False:
-            if self.fuse == True: pipe.unload_lora_weights()
             del pipe.unet
             del generator
             gen_data["prompt_embeds"] = None

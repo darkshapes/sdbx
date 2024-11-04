@@ -295,7 +295,7 @@ def diffusion_pipe(
     pipe_input["original_config"] = original_config
 
     model_class = index.fetch_id(model)[1]
-    model_symlinks["model"] = symlink_prepare(model, "unet",)
+    model_symlinks["model"] = symlink_prepare(model, "unet", full_path=True)
     model_symlinks["unet"] = os.path.join(model_symlinks["model"], "unet")
 
     transformer_classes = index.fetch_compatible(model_class)
