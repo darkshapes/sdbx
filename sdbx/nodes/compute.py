@@ -6,6 +6,7 @@ import re
 import gc
 import os
 import torch
+# import webp
 from PIL import Image
 from collections import defaultdict
 
@@ -207,11 +208,19 @@ class T2IPipe:
                 pipe.enable_attention_slicing(True)
         # elif self.capacity.get("xformers",False) == True:
         #         pipe.set_use_memory_efficient_attention_xformers(True)
+        # self.add_lora(pipe,
+        #               lora = "C:\\Users\\Public\\models\\lora\\",
+        #               weight_name = "f3mp0vXLP.safetensors",
+        #               lora_class="f3mp0vXLP.safetensors",
+        #               unet_only=False,
+        #               fuse = True,
+        #               scale = 1.0)
         return pipe
 
 ############## LORA
     def add_lora(self, pipe, lora, weight_name, lora_class, unet_only, fuse, scale):
         self.lora_class = lora_class #add to metadata
+
         if unet_only:
             pipe.unet.load_attn_procs(lora, weight_name=weight_name)
         else:
@@ -352,5 +361,7 @@ class T2IPipe:
                 filename.append(f"{file_prefix}-{generation['seed']}-{counter}-batch-{i}.png")
 
                 image.save(os.path.join(config.get_path("output"), filename[i-1])) # optimize=True,
+                # pic = webp.WebPPicture.from_pil(image)
+                # config = webp.WebPConfig.new(preset=webp.WebPPreset.DEFAULT, lossless=True)
 
         return image

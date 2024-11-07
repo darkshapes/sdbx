@@ -41,11 +41,12 @@ msg_init = None
 #create_index = index.write_index()     # (defaults to config/index.json)
 
 logger.info(f"Ready.")
-name_path = input("""
-Please type the file of an available checkpoint.
-Path will be detected.
-(default:virtualDiffusionPony_25B3C4N3.safetensors):""" or "virtualDiffusionPony_25B3C4N3.safetensors")
+#name_path = input("""
+#Please type the file of an available checkpoint.
+#Path will be detected.
+#(default:vividpdxl_realVAE.safetensors):""" or "vividpdxl_realVAE.safetensors")
 # "virtualDiffusionPony_25B3C4N3.safetensors"
+name_path = "vividpdxl_realVAE.safetensors"
 name_path = os.path.basename(name_path)
 diffusion_index = config.get_default("index","DIF")
 name_path = name_path.strip()
@@ -58,7 +59,7 @@ for key,val in diffusion_index.items():
         pass
 
 defaults = optimize.determine_tuning(model)
-defaults["generate_image"]["width"] = 832
+defaults["generate_image"]["width"] = 896
 defaults["generate_image"]["height"] = 1152
 defaults["diffusion_prompt"]["batch"] = 1
 from sdbx.nodes.base import nodes
