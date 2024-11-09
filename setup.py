@@ -32,7 +32,7 @@ amd_torch_index = ("https://download.pytorch.org/whl/rocm6.0", "https://download
 The package index to torch built with CUDA.
 Observe the CUDA version is in this URL.
 """
-nvidia_torch_index = ("https://download.pytorch.org/whl/cu121", "https://download.pytorch.org/whl/cu121")
+nvidia_torch_index = ("https://download.pytorch.org/whl/cu121", "https://download.pytorch.org/whl/nightly/cu124")
 
 """
 The package index to torch built against CPU features.

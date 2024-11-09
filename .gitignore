@@ -166,5 +166,3 @@ cython_debug/
 
 #microsoft
 .vscode
-config/spec.json
-config/index.json

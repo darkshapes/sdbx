@@ -370,8 +370,7 @@ class ReadMeta:
     def __repr__(self):
         return f"ReadMeta(data={self.data()})"
 
-
-class ModelIndexer:
+class IndexManager:
 
     all_data = {
         "DIF": defaultdict(dict),
@@ -385,6 +384,7 @@ class ModelIndexer:
         # Collect all data to write at once
         self.directories =  config.get_default("directories","models") #multi read
         self.delete_flag = True
+        config.write_spec()
         for each in self.directories:
             self.path_name = config.get_path(f"models.{each}")
             index_file = os.path.join(config_source_location, index_file)
@@ -508,15 +508,12 @@ class ModelIndexer:
                 tra_sorted = {}
         vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
         lora_sorted = self.filter_compatible(query, self.model_indexes["lor"])
-        if len(lora_sorted) >1:
-            lora_sorted = dict(lora_sorted)
-        else:
-            lora_sorted = []
-        if vae_sorted == []:
+        lora_sorted = dict(lora_sorted)
+        if vae_sorted == []: 
             vae_sorted =str("∅")
             print(query)
             logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
-        if lora_sorted == []:
+        if lora_sorted == []: 
             lora_sorted =str("∅")
             logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
 
@@ -543,6 +540,5 @@ class ModelIndexer:
         else:
             logger.debug("Compatible models not found")
             return "∅"
-
-
+    
 
