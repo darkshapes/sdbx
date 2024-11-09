@@ -213,16 +213,14 @@ class T2IPipe:
                     )
 
  ############## VAE PT1
-    def add_vae(self, model, vae):
-        self.vae = vae
-        if self.vae.get("variant",0) != 0:
-            var, dtype = self.float_converter(self.vae["variant"])
-            self.vae["variant"] = var
-            self.vae.setdefault("torch_dtype", dtype)
-        else:
-            self.vae.setdefault("torch_dtype", "auto")
-        self.autoencoder = AutoencoderKL.from_single_file(model,**self.vae).to(self.device)
-        return self.autoencoder
+    def add_vae(self, model, vae_in):
+        if vae_in.get("variant",0) != 0:
+            var, dtype = self.float_converter(vae_in["variant"])
+            vae_in["variant"] = var
+            vae_in.setdefault("torch_dtype", dtype)
+        model = "C:\\Users\\Public\\models\\image\\sdxl.vae.safetensors"
+        autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
+        return autoencoder
 
 ############## PIPE
     def construct_pipe(self, model, pipe_data):

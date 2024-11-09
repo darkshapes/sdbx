@@ -9,11 +9,9 @@ from sdbx.nodes.base import nodes
 #name_path = input("""
 #Please type the filename of an available checkpoint.
 #Path will be detected.
-#(default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
-
-name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors"
-optimize         = config.node_tuner
-
+#(default:vividpdxl_realVAE.safetensors):""" or "vividpdxl_realVAE.safetensors")
+# "virtualDiffusionPony_25B3C4N3.safetensors"
+name_path = "hellaineMixPDXL_v45.safetensors"
 name_path = os.path.basename(name_path)
 spec = config.get_default("index","DIF")
 name_path = name_path.strip()
@@ -26,6 +24,13 @@ for key,val in spec.items():
         pass
 
 defaults = optimize.determine_tuning(model)
+defaults["generate_image"]["width"] = 832
+defaults["generate_image"]["height"] = 1152
+defaults["diffusion_prompt"]["batch"] = 1
+defaults["diffusion_prompt"]["prompt"] = "score_9, score_8_up, 2.5d, a confident adult woman making eye contact with a come-hither look, pov, straddling, blush, soft features, juicy pussy, deep penetration, thighhighs, long hair, garter belt, arched back, partially nude"
+from sdbx.nodes.base import nodes
+
+#pipe = nodes.empty_cache(transformer_models, lora_pipe, unet_pipe, vae_pipe)
 
 device = nodes.force_device(**defaults.get("force_device"))
 if defaults["empty_cache"]["stage"].get("head", None) != None:
