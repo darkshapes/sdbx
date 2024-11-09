@@ -1,8 +1,9 @@
 from enum import Enum
 from functools import partial
-from dataclasses import dataclass, field
+from operator import lt, le, eq, ne, ge, gt
+from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
-from typing import Annotated, Any, Callable, Dict, Generic, Optional, Literal, List, Tuple, Union, get_type_hints
+from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_origin, get_type_hints
 
 # from torch import Tensor
 # from torch.nn import Module
@@ -32,9 +33,8 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     
     fn.generator = isgeneratorfunction(fn)
 
-    #commented for speed
-    #from sdbx.nodes.info import NodeInfo  # Avoid circular import
-    #fn.info = NodeInfo(fn, **kwargs)
+    from sdbx.nodes.info import NodeInfo
+    fn.info = NodeInfo(fn, **kwargs)
 
     # from sdbx.nodes.tuner import NodeTuner
     # fn.tuner = NodeTuner(fn)
@@ -88,32 +88,95 @@ from collections.abc import Iterator as I
 
 
 ## Annotation classes ##
-@dataclass
-class Name:
-    name: str = ""
+class AnnotationMeta(type):
+    def __getitem__(cls, item):
+        if not isinstance(item, tuple):
+            item = (item,)
+        return type('AnnotationInstance', (Annotation,), {'__args__': item})
+
+class Annotation(metaclass=AnnotationMeta):
+    def check(self, t):
+        args = getattr(self, '__args__', ())
+        return Any in args or any(issubclass(get_origin(t) or t, arg) for arg in args)
+    
+    def serialize(self):
+        return { "constraints": asdict(self) }
 
 @dataclass
-class Slider:
+class Name(Annotation[Any]):
+    name: str = ""
+
+    def serialize(self):  # special
+        pass
+
+@dataclass
+class Condition:
+    operator: Union[lt, le, eq, ne, ge, gt]
+    value: Any
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:  # If only one positional argument, assume it's the value
+            self.operator = eq  # default operator to 'equal'
+            self.value = args[0]
+        elif len(args) == 2:  # If two positional arguments, they should be (operator, value)
+            self.operator, self.value = args
+        else:
+            self.operator = kwargs.get('operator', eq)
+            try:
+                self.value = kwargs.get('value')
+            except KeyError:
+                raise KeyError("Value not specified for Condition.")
+
+@dataclass
+class Dependent(Annotation[Any]):
+    on: str
+    when: Union[Condition, List[Condition]] = field(default_factory=list)  # OR, not AND
+
+    def __post_init__(self):
+        if not isinstance(self.when, list):
+            self.when = [self.when]  # If 'when' is a singleton, wrap it in a list
+        else:
+            if len(self.when) == 0:
+                self.when = [Condition(operator=ne, value=None)]
+        
+        self.when = [
+            w if isinstance(w, Condition) else 
+            Condition(*(w if isinstance(w, tuple) or isinstance(w, list) else (w,)))
+            for w in self.when
+        ]
+
+    def serialize(self):
+        return { 
+            "dependent": { 
+                "on": self.on,
+                "when": [asdict(w) for w in self.when]
+            }
+        }
+
+@dataclass
+class Validator(Annotation[Any]):
+    condition: Callable[[Any], bool]
+    error_message: str
+
+@dataclass
+class Slider(Annotation[int, float]):
     min: Union[int, float]
     max: Union[int, float]
     step: Union[int, float] = 1.0
     round: bool = False
+
+    def serialize(self):
+        return { **super().serialize(), "display": type(self).__name__.lower() }
 
 @dataclass
 class Numerical(Slider):
     randomizable: bool = False
 
 @dataclass
-class Text:
+class Text(Annotation[str]):
     multiline: bool = False
     dynamic_prompts: bool = False
 
 @dataclass
-class Dependent:
-    on: str
-    when: Any
-
-@dataclass
-class Validator:
-    condition: Callable[[Any], bool]
-    error_message: str
+class EqualLength(Annotation[List]):
+    to: str

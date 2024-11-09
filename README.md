@@ -8,7 +8,8 @@
 ##
 
  ### [ [Darkshapes](https://github.com/darkshapes) ]
- ### [ discord :[ https://discord.gg/RYaJw9mPPe](https://discord.gg/RYaJw9mPPe) ]
+[ [Discord](https://discord.gg/RYaJw9mPPe) | [HuggingFace](https://huggingface.co/darkshapes) | [Maxtretikov](https://github.com/Maxtretikov/) | [EXDYSA](https://github.com/exdysa/) ]
+
 <hr>
 
 ### Visit the [Wiki](https://github.com/darkshapes/sdbx/wiki) for more information.

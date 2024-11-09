@@ -2,6 +2,8 @@ import gc
 import io
 import os
 import re
+import random
+import numpy
 import json
 import base64
 
@@ -54,23 +56,22 @@ def format_name(name):
 
 ### NODE INFO TIMING ###
 
-from functools import wraps
-from time import time
-
-def timing(callback):
-    def decorator(f):
-        @wraps(f)
-        def wrap(instance, *args, **kwargs):
-            ts = time()
-            result = f(instance, *args, **kwargs)
-            te = time()
-            elapsed_time = te - ts
-            # Use the class attribute 'name' for timing log
-            print(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
-            callback(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
-            return result
-        return wrap
-    return decorator
+# from functools import wraps
+# from time import time
+# def timing(callback):
+#     def decorator(f):
+#         @wraps(f)
+#         def wrap(instance, *args, **kwargs):
+#             ts = time()
+#             result = f(instance, *args, **kwargs)
+#             te = time()
+#             elapsed_time = te - ts
+#             # Use the class attribute 'name' for timing log
+#             print(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+#             callback(f'Class: {instance.__class__.__name__} - Instance: {instance.name} - Elapsed Time: {elapsed_time:.4f} sec')
+#             return result
+#         return wrap
+#     return decorator
 
 ### RANDOM ROUTINES ###
 
@@ -101,6 +102,7 @@ def tensorify(hard, size=4): # creates an array of default size 4x1 using either
 def seed_planter(seed, deterministic=True):
     from torch import torch
     torch.manual_seed(seed)
+    random.seed(seed)
     if torch.cuda.is_available()==True:
         if deterministic == True:
             return {'torch.backends.cudnn.deterministic': 'True','torch.backends.cudnn.benchmark': 'False'}
@@ -108,7 +110,8 @@ def seed_planter(seed, deterministic=True):
     elif torch.backends.mps.is_available()==True:
         return torch.mps.manual_seed(seed)
     # elif torch.xpu.is_available():
-    #    return torch.xpu.manual_seed(seed)
+    #     return torch.xpu.manual_seed(seed)
+
 
 ### SERVER INFORMATION ROUTINES ###
 

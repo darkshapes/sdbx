@@ -8,6 +8,7 @@ from pathlib import Path
 from collections import defaultdict, Counter
 from math import isclose
 from functools import reduce
+import hashlib
 
 from tqdm.auto import tqdm
 
@@ -108,12 +109,12 @@ class MatchMetadata:
         # Get the dict position indicated in depth
         get_nested = lambda d, keys: reduce(lambda d, key: d.get(key, None) if isinstance(d, dict) else None, keys, d)
         # Return the previous position indicated in depth
-        backtrack_depth = lambda depth: depth[:-1] if depth and depth[-1] in ["block_names", "tensors", "shape", "hash"] else depth
+        backtrack_depth = lambda depth: depth[:-1] if depth and depth[-1] in ["block_names", "tensors", "shape", "file_size", "hash"] else depth
 
         def advance_depth(depth: list, lateral: bool = False) -> list:
             """
-            Advances the depth either laterally (to the next key at the same level)
-            or falling back to vertically first (to the parent level, then the next key at parent level).
+            Attempts to advance through the tuning dict laterally (to the next key at the same level),
+            failing which retraces vertically (first to the parent level, then the next key at parent level).
             """
             if not depth:
                 return None  # Stop if we've reached the root or there's no further depth
@@ -147,10 +148,17 @@ class MatchMetadata:
             for name in criteria: # Descend dictionary structure
                 depth.append(name) # Append the current name to depth list
                 self.find_matching_metadata(known_values, source_data, id_values, depth)
-                depth = advance_depth(depth)  # Try to advance
                 if depth is None:  # Cannot advance, stop
                     return id_values
                 else:
+                    depth = backtrack_depth(depth)
+                    current_depth = get_nested(known_values, depth)
+                    if current_depth[-1] ==
+                        if len(current_depth) == id_values.get(depth[-1],0):
+                            id_values.get("type", set()).add(depth[-1])
+
+                        known_values[next(iter(known_values), "nn")].pop(depth[-1])
+                    advance_depth(depth)
                     self.find_matching_metadata(known_values, source_data, id_values, depth)
             return id_values
 
@@ -158,6 +166,8 @@ class MatchMetadata:
             for checklist in criteria:
                 if not isinstance(checklist, list): checklist = [checklist]  # normalize scalar to list
                 for list_entry in checklist: # the entries to match
+                    if depth[-1] == "hash":
+                         id_values["hash"] = hashlib.sha256(open(id_values["file_name"],'rb').read()).hexdigest()
                     list_entry = str(list_entry)
                     if list_entry.startswith("r'"): # Regex conversion
                         expression = (list_entry
@@ -169,7 +179,6 @@ class MatchMetadata:
                         match = next((regex_entry.search(k) for k in source_data), False)
                     else:
                         match = next((k for k in source_data if list_entry in k), False)
-
                     if match: # Found a match, based on keys
                         previous_depth = depth[-1]
                         depth = backtrack_depth(depth)
@@ -178,11 +187,13 @@ class MatchMetadata:
 
                         shape_key_data = self.extract_tensor_data(source_data[match], id_values)
                         id_values.update(shape_key_data)
+
                         depth.append(previous_depth) #if length depth = 2
                         depth = advance_depth(depth, lateral=True)
                         if depth is None:  # Cannot advance, stop
                             return id_values
                         self.find_matching_metadata(known_values, source_data, id_values, depth)  # Recurse
+
 
             return id_values
 
@@ -295,22 +306,25 @@ class BlockIndex:
                 self.error_handler(kind="fail", error_log=error_log, obj_name=file_name, error_source=extension)
 
     def _pretty_output(self, file_name): #pretty printer
-        key_value_length = len(self.id_values.values())  # number of items detected in the scan
+        print_values = self.id_values.copy()
+        if (k := next(iter(print_values), None)) is not None:
+            print_values.pop(k)  # Only pop if a valid key is found
+        key_value_length = len(print_values)  # number of items detected in the scan
         info_format      = "{:<5} | " * key_value_length # shrink print columns to data width
-        value            = tuple(self.id_values.keys()) # use to create table
+        header_keys      = tuple(print_values) # use to create table
         horizontal_bar   = ("  " + "-" * (10*key_value_length)) # horizontal divider of arbitrary length. could use shutil to dynamically create but eh. already overkill
-        formatted_data   = tuple(self.id_values.values()) # data extracted from the scan
-        return self.id_progress(file_name, info_format.format(*value), horizontal_bar, info_format.format(*formatted_data)) #send to print function
+        formatted_data   = tuple(print_values.values()) # data extracted from the scan
+        return self.id_progress(self.id_values.get("file_name", None), info_format.format(*header_keys), horizontal_bar, info_format.format(*formatted_data)) #send to print function
 
-    def id_progress(*args):
-        sys.stdout.write("\033[F" *len(args))  # ANSI escape codes to move the cursor up 3 lines
-        for line_data in args:
+    def id_progress(self, *formatted_data):
+        sys.stdout.write("\033[F" * len(formatted_data))  # ANSI escape codes to move the cursor up 3 lines
+        for line_data in formatted_data:
             sys.stdout.write(" " * 175 + "\x1b[1K\r")
-            sys.stdout.write(f"{line_data}\n")  # Print the lines
+            sys.stdout.write(f"{line_data}\r\n")  # Print the lines
         sys.stdout.flush()              # Empty output buffer to ensure the changes are shown
 
 if __name__ == "__main__":
-    file = config.get_path("models.image")
+    file = config.get_path("models.dev")
     blocks = BlockIndex()
     save_location = os.path.join(config.get_path("models.dev"),"metadata")
     if Path(file).is_dir() == True:

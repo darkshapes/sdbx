@@ -22,6 +22,8 @@ core = [
 
     # Other machine learning libraries
     "llama-cpp-python",
+    "sentencepiece",
+    "scipy",
 
     # Graph data structure
     "networkx",

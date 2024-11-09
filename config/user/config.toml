@@ -2,11 +2,11 @@
 disable = false # [default false] Toggle extensions. false | "clients" | "nodes" | true
 
 [location] # Assigned paths for loading and saving = "c:\\foo\\bar" or "..\\foo\\bar" | "/user/username/foo/bar" or "../foo/bar"
+output = "output"   # [default "output"]
 clients = "clients" # [default "clients"]
 nodes = "nodes"     # [default "nodes"]
 flows = "flows"     # [default "flows"]
 input = "input"     # [default "input"]
-output = "output"   # [default "output"]
 models = "models"   # [default "models]
 
 [web] # http: //listen:port and related settings. IPv4 format addresses.

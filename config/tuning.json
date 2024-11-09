@@ -22,468 +22,518 @@
                     "decoder.up",
                     "encoder.down"
                 ],
+                "stable-cascade-a": {
+                    "block_names": "0.channelwise.0",
+                    "tensors": 122
+                },
+                "taesd-sd1": {
+                    "block_names": [
+                        "r'decoder.layers.d+'",
+                        "r'encoder.layers.d+'"
+                    ],
+                    "tensors": "134",
+                    "file_size": 9793292,
+                    "hash": "db169d69145ec4ff064e49d99c95fa05d3eb04ee453de35824a6d0f325513549"
+                },
+                "taesd-sdxl-base": {
+                    "block_names": [
+                        "r'decoder.layers.d+'",
+                        "r'encoder.layers.d+'"
+                    ],
+                    "tensors": "134",
+                    "file_size": 9793292,
+                    "hash": "ff4824aca94dd6111e0340fa749347fb74101060d9712cb5ef1ca8f1cf17502f"
+                },
+                "taesd-flux": {
+                    "tensors": 248,
+                    "file_size": 9848636,
+                    "hash": "6f79c1397cb9ce1dac363722dbe70147aee0ccca75e28338f8482fe515891399"
+                },
                 "tensors": 248,
+                "taesd-sd3": {
+                    "file_size": 9848636,
+                    "hash": "6f79c1397cb9ce1dac363722dbe70147aee0ccca75e28338f8482fe515891399"
+                },
+                "auraflow": {
+                    "block_names": "decoder.up.0.block.0.nin_shortcut.bias",
+                    "tensors": 248,
+                    "hash": "be0eb1ca9b09d52cfb33fff95805f071155f3eda94fee16e323d32cdba3d003b"
+                },
+                "playground-2": {
+                    "block_names": "num_updates",
+                    "tensors": 248,
+                    "hash": [
+                        "e8aef7b00195ec3fa8caaa3434e7516eff7d658e1d30eafc9ad6b0e66e9e827e",
+                        "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68"
+                    ]
+                },
                 "sd1": {
+                    "block_names": [
+                        "model_ema.decay",
+                        "loss.perceptual_loss.net.slice5.28.weight"
+                    ],
+                    "file_size": [
+                        334641190,
+                        114560782,
+                        404581567
+                    ],
                     "hash": [
                         "735e4c3a447a3255760d7f86845f09f937809baa529c17370d83e4c3758f3c75",
                         "32db726da04f06c1b6b14c0043ce115cc87a501482945c5add89a40d838fcb46",
                         "4fbcf0ebe55a0984f5a5e00d8c4521d52359af7229bb4d81890039d2aa16dd7c"
-                    ],
-                    "block_names": [
-                        "model_ema.decay",
-                        "loss.perceptual_loss.net.slice5.28.weight"
                     ]
                 },
                 "sdxl-base": {
+                    "block_names": [
+                        "post_quant_conv.bias",
+                        "encoder.mid.attn_1.proj_out.bias"
+                    ],
+                    "tensors": 248,
                     "hash": [
                         "63aeecb90ff7bc1c115395962d3e803571385b61938377bc7089b36e81e92e2e",
                         "1598f3d24932bcfe6634e8b618ea1e30ab1d57f5aad13a6d2de446d2199f2341",
                         "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68"
-                    ],
-                    "block_names": "post_quant_conv.bias"
+                    ]
                 },
-                "stable-cascade-a": {
-                    "block_names": "0.channelwise.0"
+                "flux": {
+                    "block_names": [
+                        "encoder.down.3.block.1.norm1.bias"
+                    ],
+                    "tensors": 248,
+                    "hash": [
+                        "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38",
+                        "f5b59a26851551b67ae1fe58d32e76486e1e812def4696a4bea97f16604d40a3"
+                    ]
+                },
+                "kolors": {
+                    "block_names": "downsamplers",
+                    "tensors": 248,
+                    "hash": [
+                        "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68",
+                        "1598f3d24932bcfe6634e8b618ea1e30ab1d57f5aad13a6d2de446d2199f2341"
+                    ]
+                },
+                "pixart-sigma": {
+                    "block_names": "decoder.mid_block.attentions.0.group_norm.bias",
+                    "tensors": 248,
+                    "hash": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
+                },
+                "pixart-alpha": {
+                    "hash": "703abdcd7c389316b5128faa9b750a530ea1680b453170b27afebac5e4db30c4"
+                },
+                "huanyun-dit": {
+                    "block_names": "decoder.mid_block.resnets.0.conv1.bias",
+                    "tensors": 248,
+                    "hash": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
                 }
             },
-            "playground-2": {
-                "block_names": "num_updates",
-                "tensors": 248
-            },
-            "kolors": {
-                "block_names": "downsamplers",
-                "tensors": 248
-            },
-            "pixart-sigma": {
-                "block_names": "decoder.mid_block.attentions.0.group_norm.bias",
-                "tensors": 248
-            },
-            "huanyun-dit": {
-                "block_names": "decoder.mid_block.resnets.0.conv1.bias",
-                "tensors": 248
-            },
-            "auraflow": {
-                "block_names": "decoder.mid_block.resnets.1.norm2.weight",
-                "tensors": 248
-            },
-            "taesd": {
+            "lora": {
                 "block_names": [
-                    "r'decoder.layers.d+'",
-                    "r'encoder.layers.d+'"
+                    "lora_down",
+                    "lora_up"
                 ],
-                "tensors": "134"
-            }
-        },
-        "lora": {
-            "block_names": [
-                "lora_down",
-                "lora_up"
-            ],
-            "flux": {
-                "hyper": {
+                "flux.hyper": {
                     "tensors": 1008,
                     "hash": {
                         "16": "6461f67dfc1a967ae60344c3b3f350877149ccab758c273cc37f5e8a87b5842e",
                         "8": "e0ab0fdf569cd01a382f19bd87681f628879dea7ad51fe5a3799b6c18c7b2d03"
                     }
-                }
-            },
-            "pixart-alpha": {
-                "flash": {
+                },
+                "pixart-alpha.flash": {
                     "hash": "99ef037fe3c1fb6d6bbefdbb85ad60df434fcc0577d34c768d752d60cf69681b"
-                }
-            },
-            "sd1": {
-                "hyper": {
-                    "tensors": 834,
-                    "shape": "[64] [320]",
-                    "hash": {
-                        "cfg": {
-                            "12": "64b98437383537cd968fda6f87a05c33160ece9c79ff4757949a1e212ff78361",
-                            "8": "f6123d5b950d5250ab6c33600e27f4dcf71b3099ebf888685e01e9e8117ce482"
-                        },
-                        "none": {
-                            "1": "a04fd9a535c1e56d38f7590ee72a13fd5ca0409853b4fff021e5a9482cf1ca3b",
-                            "2": "2f26dcc1d883feb07557a552315baae2ca2a04ac08556b08a355a244547e8c3a",
-                            "4": "c5dd058616461ed5053e2b14eec4dbe3fa0eea3b13688642f6d6c80ea2ba5958",
-                            "8": "91fc3186236e956d64dbb4357f2e120c69b968b78af7d2db9884a5ca74d3cd13"
+                },
+                "sd1": {
+                    "sd1.hyper": {
+                        "tensors": 834,
+                        "shape": "[64] [320]",
+                        "hash": {
+                            "cfg": {
+                                "12": "64b98437383537cd968fda6f87a05c33160ece9c79ff4757949a1e212ff78361",
+                                "8": "f6123d5b950d5250ab6c33600e27f4dcf71b3099ebf888685e01e9e8117ce482"
+                            },
+                            "none": {
+                                "1": "a04fd9a535c1e56d38f7590ee72a13fd5ca0409853b4fff021e5a9482cf1ca3b",
+                                "2": "2f26dcc1d883feb07557a552315baae2ca2a04ac08556b08a355a244547e8c3a",
+                                "4": "c5dd058616461ed5053e2b14eec4dbe3fa0eea3b13688642f6d6c80ea2ba5958",
+                                "8": "91fc3186236e956d64dbb4357f2e120c69b968b78af7d2db9884a5ca74d3cd13"
+                            }
                         }
+                    },
+                    "sd1.pcm": {
+                        "tensors": 834,
+                        "shape": "[64] [320]",
+                        "hash": {
+                            "lcmlike": "b80b27dd6504f1c3a7637237dda86bc7e26fa5766da30c4fc853c0a1d46bad31",
+                            "normal": {
+                                "16": [
+                                    "8f605ffde3616592deb37ed8c6bacb83fe98963c1fd0883c2a4f93787098aa45",
+                                    "6c146b938198ffa66d8392a9b23c9232a26f9201287445d5d7c98ebd69aee956"
+                                ],
+                                "4": [
+                                    "fa6acb94f11dba3bf4120af5a12e3c88cd2b9572d43ec1a6fb04eede9f32829e",
+                                    "81e638e2af9a00856b315e8cf9d3ba45335e8f3e6fb2d677ef10a53d550c72f9"
+                                ],
+                                "8": [
+                                    "bff3d4499718b61455b0757b5f8d98fe23e73a768b538c82ecf91c693b69dbcd",
+                                    "ddf9b1daea4d65813dda452090fce4cd6074896e6477b6fb8073004cd9cea445"
+                                ]
+                            },
+                            "small": {
+                                "16": [
+                                    "c7ac2fa3df3a5b7080ebe63f259ab13630014f104c93c3c706d77b05cc48506b",
+                                    "2f5d5a90d7bd95ce26e86320305f0c69965b91fd580499a6e104104e64edcebc"
+                                ],
+                                "2": [
+                                    "4c5f27a727d12146de4b1d987cee3343bca89b085d12b03c45297af05ce88ef4",
+                                    "d9ac2496ed74e4e23dd43eac82d9bf90870e5b256aebbe7a9198d57350efc8c4"
+                                ],
+                                "4": [
+                                    "29278bc86274fdfc840961e3c250758ff5e2dc4666d940f103e78630d5b879d3",
+                                    "00bb760cf8a3889c83a8ef4162329d46fc02689fa10cf53de81f7500da7c4aba"
+                                ],
+                                "8": [
+                                    "41a7f0b966d18f643d16c4401f0b5ef6b9ef7362c20e17128322f17874709107",
+                                    "0640639c8b12120b2d2179cab7b24ac2454fdb95c14be197385920f6a4d9b9b8"
+                                ]
+                            }
+                        }
+                    },
+                    "sd1.spo": {
+                        "tensors": 686,
+                        "shape": "[320] [1280]"
+                    },
+                    "sd1.tcd": {
+                        "tensors": 834,
+                        "shape": "[64] [320]",
+                        "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
                     }
                 },
-                "pcm": {
-                    "tensors": 834,
-                    "shape": "[64] [320]",
-                    "hash": {
-                        "lcmlike": "b80b27dd6504f1c3a7637237dda86bc7e26fa5766da30c4fc853c0a1d46bad31",
-                        "normal": {
-                            "16": [
-                                "8f605ffde3616592deb37ed8c6bacb83fe98963c1fd0883c2a4f93787098aa45",
-                                "6c146b938198ffa66d8392a9b23c9232a26f9201287445d5d7c98ebd69aee956"
-                            ],
-                            "4": [
-                                "fa6acb94f11dba3bf4120af5a12e3c88cd2b9572d43ec1a6fb04eede9f32829e",
-                                "81e638e2af9a00856b315e8cf9d3ba45335e8f3e6fb2d677ef10a53d550c72f9"
-                            ],
-                            "8": [
-                                "bff3d4499718b61455b0757b5f8d98fe23e73a768b538c82ecf91c693b69dbcd",
-                                "ddf9b1daea4d65813dda452090fce4cd6074896e6477b6fb8073004cd9cea445"
-                            ]
-                        },
-                        "small": {
-                            "16": [
-                                "c7ac2fa3df3a5b7080ebe63f259ab13630014f104c93c3c706d77b05cc48506b",
-                                "2f5d5a90d7bd95ce26e86320305f0c69965b91fd580499a6e104104e64edcebc"
-                            ],
-                            "2": [
-                                "4c5f27a727d12146de4b1d987cee3343bca89b085d12b03c45297af05ce88ef4",
-                                "d9ac2496ed74e4e23dd43eac82d9bf90870e5b256aebbe7a9198d57350efc8c4"
-                            ],
-                            "4": [
-                                "29278bc86274fdfc840961e3c250758ff5e2dc4666d940f103e78630d5b879d3",
-                                "00bb760cf8a3889c83a8ef4162329d46fc02689fa10cf53de81f7500da7c4aba"
-                            ],
-                            "8": [
-                                "41a7f0b966d18f643d16c4401f0b5ef6b9ef7362c20e17128322f17874709107",
-                                "0640639c8b12120b2d2179cab7b24ac2454fdb95c14be197385920f6a4d9b9b8"
-                            ]
+                "sdxl-base": {
+                    "sdxl-base.dmd": {
+                        "tensors": 2364,
+                        "shape": "[64] [320]",
+                        "hash": [
+                            "a374289e9446d7f14d2037c4b3770756b7b52c292142a691377c3c755010a1bb",
+                            "b3d9173815a4b595991c3a7a0e0e63ad821080f314a0b2a3cc31ecd7fcf2cbb8"
+                        ]
+                    },
+                    "sdxl-base.flash": {
+                        "tensors": [
+                            1120,
+                            1680,
+                            3156
+                        ],
+                        "shape": [
+                            "[64, 640] [64, 1280]",
+                            "[64, 640] [640, 64]",
+                            "[64, 768] [3072, 64]"
+                        ],
+                        "hash": [
+                            "afe2ca6e27c4c6087f50ef42772c45d7b0efbc471b76e422492403f9cae724d7",
+                            "fd925177abbcf0a8e290f00e0264e1badbc292ef25cf99f455a5edb9c6b43c1b"
+                        ]
+                    },
+                    "sdxl-base.hyper": {
+                        "tensors": 2364,
+                        "shape": "[64] [320]",
+                        "hash": {
+                            "cfg": {
+                                "12": "0b97f447b5878323a28fbe7c51ba7acebd21f4d77552ba77b04b11c8911825b6",
+                                "8": "55b51334c85061afff5eff7c550b61963c8b8607a5868bbe4f26db49374719b1"
+                            },
+                            "none": {
+                                "1": "c912df184c5116792d2c604d26c6bc2aa916685f4a793755255cda1c43a3c78a",
+                                "2": "69b25c0187ced301c3603c599c0bc509ac99b8ac34db89a2aecc3d5f77a35187",
+                                "4": "12f81a27d00a751a40d68fd15597091896c5a90f3bd632fb6c475607cbdad76e",
+                                "8": "ca689190e8c46038550384b5675488526cfe5a40d35f82b27acb75c100f417c1"
+                            }
                         }
+                    },
+                    "sdxl-base.lightning": {
+                        "tensors": 2364,
+                        "shape": "[64] [320]",
+                        "file_size": 393854592
+                    },
+                    "sdxl-base.pcm": {
+                        "tensors": 2364,
+                        "shape": "[64] [320]",
+                        "hash": {
+                            "lcmlike": "0365f6107250a4fed1b83e8ae6a070065e026a2ba54bff65f55a50284232bbe6",
+                            "normal": {
+                                "16": [
+                                    "04ea827435d5750e63d113dc509174b4f6e8a069ff8f91970c3d25299c10b1f8",
+                                    "7eb353b2abcaabab6251ba4e17d6cbe2e763feb0674b0f950555552212b44621"
+                                ],
+                                "4": [
+                                    "a85cf70ac16ed42011630a5cd6b5927722cb7c40a2107eff85e2670f9a38c893",
+                                    "9f7f13bb019925eacd89aeff678e4fd831f7b60245b986855dff6634aee4eba9"
+                                ],
+                                "8": [
+                                    "3b9c970a3e4c0e182931e71b3f769c1956f16c6b06db98b4d67236790d4d0b1d",
+                                    "7f04ba8911b4c25ef2c7cbf74abcb6daa3b4f0e4bc6a03896bdae7601f2f180b"
+                                ]
+                            },
+                            "small": {
+                                "16": [
+                                    "13fb038025ce9dad93b8ee1b67fc81bac8affb59a77b67d408d286e0b0365a1d",
+                                    "3442eff271aa3b60a094fd6f9169d03e49e4051044a974f6fcf690507959191f"
+                                ],
+                                "2": [
+                                    "242cbe4695fe3f2e248faa71cf53f2ccbf248a316973e4b2f38ab9e34f35a5ab",
+                                    "e1f600491bb8e0cd94f41144321e44fdb2cb346447f31e71f6e53f1c24cccfbf"
+                                ],
+                                "4": [
+                                    "d0bf40a7f280829195563486bec7253f043a06b1f218602b20901c367641023e",
+                                    "212150d7953627fb89df99aad579d6763645a1cb2ef26b19fee8b398d5e5ff4d"
+                                ],
+                                "8": [
+                                    "e80fcf46d15f4d3821d3d9611bdb3022a4a8b647b2536833b168d317a91e4f74",
+                                    "56ed9dc9f51f4bb0d6172e13b7947f215c347fc0da341c8951b2c12b9507d09e"
+                                ]
+                            }
+                        }
+                    },
+                    "sdxl-base.tcd": {
+                        "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
                     }
                 },
-                "spo": {
-                    "tensors": 686,
-                    "shape": "[320] [1280]"
-                },
-                "tcd": {
-                    "tensors": 834,
-                    "shape": "[64] [320]",
-                    "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
+                "sd3": {
+                    "flash": {
+                        "tensors": 444,
+                        "hash": "85fce13c36e3739aa42930f745eb9fceb6c53d53fb17e2a687e3234c1a58ee15"
+                    },
+                    "sd3.hyper": {
+                        "hash": {
+                            "cfg": {
+                                "16": "5b4d0b99d58deb811bdbbe521a06f4dbf56a2e9148ff3211c594e0502b656bc9",
+                                "4": "0ee4e529abd17b06d4295e3bb91c0d4ddae393afad86b2b43c4f5eeb9e401602",
+                                "8": "fc6a3e73e14ed11e21e4820e960d7befcffe7e333850ada9545f239e9aa6027e"
+                            }
+                        }
+                    }
                 }
             },
-            "sdxl-base": {
-                "dmd": {
-                    "tensors": 2364,
-                    "shape": "[64] [320]",
-                    "hash": [
-                        "a374289e9446d7f14d2037c4b3770756b7b52c292142a691377c3c755010a1bb",
-                        "b3d9173815a4b595991c3a7a0e0e63ad821080f314a0b2a3cc31ecd7fcf2cbb8"
+            "language": {
+                "block_names": [
+                    "self_attention",
+                    "SelfAttention",
+                    "self_attn"
+                ],
+                "bert": {
+                    "block_names": [
+                        "r'encoder.layer.d+.output.dense.weight'",
+                        "encoder.layer.0.attention.self.key.bias",
+                        "pooler.dense.bias"
+                    ],
+                    "tensors": 391
+                },
+                "chatglm": {
+                    "block_names": "chatglm",
+                    "tensors": [
+                        200,
+                        312
                     ]
                 },
-                "flash": {
+                "clip-l": {
+                    "block_names": "text_model.encoder.layers.0.mlp.fc1.weight",
+                    "tensors": 196,
+                    "shape": 768
+                },
+                "clip-vit-l": {
+                    "block_names": "vision_model.embeddings.patch_embedding.weight"
+                },
+                "clip-g": {
+                    "block_names": [
+                        "text_model.encoder.layers.12.self_attn.v_proj.weight",
+                        "text_projection.weight"
+                    ],
+                    "tensors": 517,
+                    "shape": 1280
+                },
+                "clip-h": {
+                    "block_names": "text_model.encoder.layers.22.mlp.fc1.weight",
+                    "tensors": 520,
+                    "shape": 1024
+                },
+                "gemma": {
+                    "tensors": 160,
+                    "shape": " [256, 2048]"
+                },
+                "open-clip": {
+                    "block_names": [
+                        "logit_scale",
+                        "visual.trunk.stages.0.blocks.0.layer_scale.gamma"
+                    ]
+                },
+                "open-clip-g": {
+                    "block_names": "r'text_model.encoder.layers.d+.layer_norm1.weight'",
                     "tensors": [
-                        1120,
-                        1680,
-                        3156
+                        1722,
+                        782,
+                        1408
+                    ]
+                },
+                "umt5": {
+                    "block_names": "encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight"
+                },
+                "t5-base": {
+                    "block_names": [
+                        "encoder.block.0.layer.1.DenseReluDense.wi.weight",
+                        "t5encoder."
+                    ],
+                    "tensors": 258
+                },
+                "t5-xl": {
+                    "shape": "2048"
+                },
+                "t5-xxl": {
+                    "block_names": [
+                        "text_encoders.t5xxl.transformer.shared.weight",
+                        "encoder.embed_tokens.weight"
+                    ],
+                    "tensors": [
+                        242,
+                        220,
+                        218
+                    ],
+                    "shape": 4096
+                }
+            },
+            "unet": {
+                "block_names": [
+                    "diffusion_model",
+                    "img_",
+                    "img.",
+                    "mid.",
+                    "mid_"
+                ],
+                "auraflow": {
+                    "block_names": [
+                        "double_layers.0.attn.w1q.weight",
+                        "model.register_tokens",
+                        "model.positional_encoding",
+                        "model.init_x_linear",
+                        "model.double_layers.3.mlpX.c_proj.weight"
+                    ],
+                    "tensors": 824
+                },
+                "flux": {
+                    "block_names": [
+                        "double_blocks.12.img_attn.norm.key_norm.scale",
+                        "r'model.diffusion_model.double_blocks.d+.img_attn.norm.key_norm.scale'",
+                        "r'single_transformer_blocks.d+.proj_mlp.weight'"
+                    ],
+                    "tensors": [
+                        776,
+                        780,
+                        1722,
+                        2350
                     ],
                     "shape": [
-                        "[64, 640] [64, 1280]",
-                        "[64, 640] [640, 64]",
-                        "[64, 768] [3072, 64]"
-                    ],
-                    "hash": [
-                        "afe2ca6e27c4c6087f50ef42772c45d7b0efbc471b76e422492403f9cae724d7",
-                        "fd925177abbcf0a8e290f00e0264e1badbc292ef25cf99f455a5edb9c6b43c1b"
+                        3072,
+                        172
                     ]
                 },
-                "hyper": {
-                    "tensors": 2364,
-                    "shape": "[64] [320]",
-                    "hash": {
-                        "cfg": {
-                            "12": "0b97f447b5878323a28fbe7c51ba7acebd21f4d77552ba77b04b11c8911825b6",
-                            "8": "55b51334c85061afff5eff7c550b61963c8b8607a5868bbe4f26db49374719b1"
-                        },
-                        "none": {
-                            "1": "c912df184c5116792d2c604d26c6bc2aa916685f4a793755255cda1c43a3c78a",
-                            "2": "69b25c0187ced301c3603c599c0bc509ac99b8ac34db89a2aecc3d5f77a35187",
-                            "4": "12f81a27d00a751a40d68fd15597091896c5a90f3bd632fb6c475607cbdad76e",
-                            "8": "ca689190e8c46038550384b5675488526cfe5a40d35f82b27acb75c100f417c1"
-                        }
-                    }
+                "hunyuan": {
+                    "block_names": [
+                        "blocks.11.ff.net.2.weight",
+                        "blocks.39.skip_norm.weight"
+                    ],
+                    "shape": " [1408, 6144] [2816]",
+                    "tensors": [
+                        1544,
+                        2166
+                    ]
                 },
-                "lightning": {
-                    "tensors": 2364,
-                    "shape": "[64] [320]",
-                    "file_size": 393854592
+                "kolors": {
+                    "block_names": [
+                        "down_blocks.2.attentions.1.transformer_blocks.9.norm3.weight",
+                        "encoder_hid_proj.weight",
+                        "add_embedding.linear_1.bias"
+                    ],
+                    "tensors": 1682,
+                    "shape": " [320] [1280] [2048, 4096]"
                 },
-                "pcm": {
-                    "tensors": 2364,
-                    "shape": "[64] [320]",
-                    "hash": {
-                        "lcmlike": "0365f6107250a4fed1b83e8ae6a070065e026a2ba54bff65f55a50284232bbe6",
-                        "normal": {
-                            "16": [
-                                "04ea827435d5750e63d113dc509174b4f6e8a069ff8f91970c3d25299c10b1f8",
-                                "7eb353b2abcaabab6251ba4e17d6cbe2e763feb0674b0f950555552212b44621"
-                            ],
-                            "4": [
-                                "a85cf70ac16ed42011630a5cd6b5927722cb7c40a2107eff85e2670f9a38c893",
-                                "9f7f13bb019925eacd89aeff678e4fd831f7b60245b986855dff6634aee4eba9"
-                            ],
-                            "8": [
-                                "3b9c970a3e4c0e182931e71b3f769c1956f16c6b06db98b4d67236790d4d0b1d",
-                                "7f04ba8911b4c25ef2c7cbf74abcb6daa3b4f0e4bc6a03896bdae7601f2f180b"
-                            ]
-                        },
-                        "small": {
-                            "16": [
-                                "13fb038025ce9dad93b8ee1b67fc81bac8affb59a77b67d408d286e0b0365a1d",
-                                "3442eff271aa3b60a094fd6f9169d03e49e4051044a974f6fcf690507959191f"
-                            ],
-                            "2": [
-                                "242cbe4695fe3f2e248faa71cf53f2ccbf248a316973e4b2f38ab9e34f35a5ab",
-                                "e1f600491bb8e0cd94f41144321e44fdb2cb346447f31e71f6e53f1c24cccfbf"
-                            ],
-                            "4": [
-                                "d0bf40a7f280829195563486bec7253f043a06b1f218602b20901c367641023e",
-                                "212150d7953627fb89df99aad579d6763645a1cb2ef26b19fee8b398d5e5ff4d"
-                            ],
-                            "8": [
-                                "e80fcf46d15f4d3821d3d9611bdb3022a4a8b647b2536833b168d317a91e4f74",
-                                "56ed9dc9f51f4bb0d6172e13b7947f215c347fc0da341c8951b2c12b9507d09e"
-                            ]
-                        }
-                    }
+                "lumina-mgpt": {
+                    "block_names": "model.embed_tokens.weight",
+                    "shape": " [1, 128]",
+                    "tensors": [
+                        308,
+                        1220,
+                        222
+                    ]
                 },
-                "tcd": {
-                    "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
+                "lumina-next": {
+                    "tensors": 639
+                },
+                "pixart-alpha": {
+                    "tensors": 612
+                },
+                "pixart-sigma": {
+                    "block_names": [
+                        "transformer_blocks.12.scale_shift_table",
+                        "adaln_single.emb.timestep_embedder.linear_1.weight"
+                    ],
+                    "tensors": 437,
+                    "shape": "1152"
+                },
+                "playground-25": {
+                    "block_names": [
+                        "edm_mean",
+                        "edm_std"
+                    ]
+                },
+                "stable-cascade-b": {
+                    "tensors": 1454,
+                    "shape": 2094
+                },
+                "stable-cascade-b-lite": {
+                    "tensors": 826,
+                    "shape": 576
+                },
+                "stable-cascade-c": {
+                    "tensors": [
+                        3047,
+                        2094
+                    ],
+                    "shape": 2048
+                },
+                "stable-cascade-c-lite": {
+                    "tensors": 654,
+                    "shape": 1536
+                },
+                "sd1": {
+                    "block_names": "r'model.diffusion_model.output_blocks.d+.d+.transformer_blocks.d+.norm3.weight'",
+                    "tensors": [
+                        "1131",
+                        "1133"
+                    ],
+                    "shape": 1280
+                },
+                "sdxl-base": {
+                    "block_names": [
+                        "r'conditioner.embedders.1.model.transformer.resblocks.d+.mlp.c_proj.bias'",
+                        "conditioner.embedders.0.transformer.text_model.encoder.layers.0.self_attn.k_proj.weight",
+                        "ModelSDXL"
+                    ],
+                    "tensors": 2516,
+                    "shape": 1280
+                },
+                "sdxl-refiner": "r'conditioner.embedders.0.model.transformer.resblocks.d+.mlp.c_proj.bias'",
+                "sd3": {
+                    "block_names": [
+                        "r'model.diffusion_model.joint_blocks.d+.context_block.adaLN_modulation.d+.bias'",
+                        "r'transformer_blocks.0.attn.add_q_proj.weight'",
+                        "ModelSD3"
+                    ],
+                    "tensors": [
+                        735,
+                        1448,
+                        1668,
+                        1227
+                    ],
+                    "shape": 1536
                 }
-            },
-            "sd3": {
-                "hyper": {
-                    "hash": {
-                        "cfg": {
-                            "16": "5b4d0b99d58deb811bdbbe521a06f4dbf56a2e9148ff3211c594e0502b656bc9",
-                            "4": "0ee4e529abd17b06d4295e3bb91c0d4ddae393afad86b2b43c4f5eeb9e401602",
-                            "8": "fc6a3e73e14ed11e21e4820e960d7befcffe7e333850ada9545f239e9aa6027e"
-                        }
-                    }
-                },
-                "flash": {
-                    "tensors": 444,
-                    "hash": "85fce13c36e3739aa42930f745eb9fceb6c53d53fb17e2a687e3234c1a58ee15"
-                }
-            }
-        },
-        "language": {
-            "block_names": [
-                "self_attention",
-                "SelfAttention",
-                "self_attn"
-            ],
-            "bert": {
-                "block_names": [
-                    "r'encoder.layer.d+.output.dense.weight'",
-                    "encoder.layer.0.attention.self.key.bias",
-                    "pooler.dense.bias"
-                ],
-                "tensors": 391
-            },
-            "chatglm": {
-                "block_names": "chatglm",
-                "tensors": [
-                    200,
-                    312
-                ]
-            },
-            "clip-l": {
-                "block_names": "text_model.encoder.layers.0.mlp.fc1.weight",
-                "tensors": 196,
-                "shape": 768
-            },
-            "clip-vit-l": {
-                "block_names": "vision_model.embeddings.patch_embedding.weight"
-            },
-            "clip-g": {
-                "block_names": [
-                    "text_model.encoder.layers.12.self_attn.v_proj.weight",
-                    "text_projection.weight"
-                ],
-                "tensors": 517,
-                "shape": 1280
-            },
-            "clip-h": {
-                "block_names": "text_model.encoder.layers.22.mlp.fc1.weight",
-                "tensors": 520,
-                "shape": 1024
-            },
-            "gemma": {
-                "tensors": 160,
-                "shape": " [256, 2048]"
-            },
-            "open-clip": {
-                "block_names": [
-                    "logit_scale",
-                    "visual.trunk.stages.0.blocks.0.layer_scale.gamma"
-                ]
-            },
-            "open-clip-g": {
-                "block_names": "r'text_model.encoder.layers.d+.layer_norm1.weight'",
-                "tensors": [
-                    1722,
-                    782,
-                    1408
-                ]
-            },
-            "umt5": {
-                "block_names": "encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight"
-            },
-            "t5-base": {
-                "block_names": [
-                    "encoder.block.0.layer.1.DenseReluDense.wi.weight",
-                    "t5encoder."
-                ],
-                "tensors": 258
-            },
-            "t5-xl": {
-                "shape": "2048"
-            },
-            "t5-xxl": {
-                "block_names": [
-                    "text_encoders.t5xxl.transformer.shared.weight",
-                    "encoder.embed_tokens.weight"
-                ],
-                "tensors": [
-                    242,
-                    220,
-                    218
-                ],
-                "shape": 4096
-            }
-        },
-        "unet": {
-            "block_names": [
-                "diffusion_model",
-                "img_",
-                "img.",
-                "mid.",
-                "mid_"
-            ],
-            "auraflow": {
-                "block_names": [
-                    "double_layers.0.attn.w1q.weight",
-                    "model.register_tokens",
-                    "model.positional_encoding",
-                    "model.init_x_linear",
-                    "model.double_layers.3.mlpX.c_proj.weight"
-                ],
-                "tensors": 824
-            },
-            "flux": {
-                "block_names": [
-                    "double_blocks.12.img_attn.norm.key_norm.scale",
-                    "r'model.diffusion_model.double_blocks.d+.img_attn.norm.key_norm.scale'",
-                    "r'single_transformer_blocks.d+.proj_mlp.weight'"
-                ],
-                "tensors": [
-                    776,
-                    780,
-                    1722,
-                    2350
-                ],
-                "shape": [
-                    3072,
-                    172
-                ]
-            },
-            "hunyuan": {
-                "block_names": [
-                    "blocks.11.ff.net.2.weight",
-                    "blocks.39.skip_norm.weight"
-                ],
-                "shape": " [1408, 6144] [2816]",
-                "tensors": [
-                    1544,
-                    2166
-                ]
-            },
-            "kolors": {
-                "block_names": [
-                    "down_blocks.2.attentions.1.transformer_blocks.9.norm3.weight",
-                    "encoder_hid_proj.weight",
-                    "add_embedding.linear_1.bias"
-                ],
-                "tensors": 1682,
-                "shape": " [320] [1280] [2048, 4096]"
-            },
-            "lumina-mgpt": {
-                "block_names": "model.embed_tokens.weight",
-                "shape": " [1, 128]",
-                "tensors": [
-                    308,
-                    1220,
-                    222
-                ]
-            },
-            "lumina-next": {
-                "tensors": 639
-            },
-            "pixart-alpha": {
-                "tensors": 612
-            },
-            "pixart-sigma": {
-                "block_names": [
-                    "transformer_blocks.12.scale_shift_table",
-                    "adaln_single.emb.timestep_embedder.linear_1.weight"
-                ],
-                "tensors": 437,
-                "shape": "1152"
-            },
-            "playground-25": {
-                "block_names": [
-                    "edm_mean",
-                    "edm_std"
-                ]
-            },
-            "stable-cascade-b": {
-                "tensors": 1454,
-                "shape": 2094
-            },
-            "stable-cascade-b-lite": {
-                "tensors": 826,
-                "shape": 576
-            },
-            "stable-cascade-c": {
-                "tensors": [
-                    3047,
-                    2094
-                ],
-                "shape": 2048
-            },
-            "stable-cascade-c-lite": {
-                "tensors": 654,
-                "shape": 1536
-            },
-            "sd1": {
-                "block_names": "r'model.diffusion_model.output_blocks.d+.d+.transformer_blocks.d+.norm3.weight'",
-                "tensors": [
-                    "1131",
-                    "1133"
-                ],
-                "shape": 1280
-            },
-            "sdxl-base": {
-                "block_names": [
-                    "r'conditioner.embedders.1.model.transformer.resblocks.d+.mlp.c_proj.bias'",
-                    "conditioner.embedders.0.transformer.text_model.encoder.layers.0.self_attn.k_proj.weight",
-                    "ModelSDXL"
-                ],
-                "tensors": 2516,
-                "shape": 1280
-            },
-            "sdxl-refiner": "r'conditioner.embedders.0.model.transformer.resblocks.d+.mlp.c_proj.bias'",
-            "sd3": {
-                "block_names": [
-                    "r'model.diffusion_model.joint_blocks.d+.context_block.adaLN_modulation.d+.bias'",
-                    "r'transformer_blocks.0.attn.add_q_proj.weight'",
-                    "ModelSD3"
-                ],
-                "tensors": [
-                    735,
-                    1448,
-                    1668,
-                    1227
-                ],
-                "shape": 1536
             }
         }
     },

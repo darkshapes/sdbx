@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import tomllib
@@ -286,71 +287,25 @@ class Config(BaseSettings):
     
     @cached_property
     def model_indexer(self):
-        from sdbx.indexer import IndexManager
-        return IndexManager()
+        from sdbx.indexer import ModelIndexer
+        return ModelIndexer()
 
-    # @cached_property
-    # def t2i_pipe(self):
-    #     from sdbx.nodes.compute import T2IPipe
-    #     return T2IPipe()
+    @cached_property
+    def t2i_pipe(self):
+        from sdbx.nodes.compute import T2IPipe
+        return T2IPipe()
 
     @cached_property
     def node_tuner(self):
         from sdbx.nodes.tuner import NodeTuner
         return NodeTuner()
-    
-    def write_spec(self):
-        import psutil
-        from collections import defaultdict
-        from platform import system
-        spec = defaultdict(dict)
-        spec["data"]["dynamo"]  = False if system().lower() == "windows" else True
-        spec["data"]["devices"] = {}
-        if torch.cuda.is_available():
-            spec["data"]["devices"]["cuda"] = torch.cuda.mem_get_info()[1]
-            spec["data"]["flash_attention"] = False #str(torch.backends.cuda.flash_sdp_enabled()).title()
-            spec["data"]["allow_tf32"]      = False
-            spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
-            if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
-                spec["data"]["enable_attention_slicing"] = False
-        if torch.backends.mps.is_available() & self.device.backends.mps.is_built():
-            spec["data"]["devices"]["mps"] = torch.mps.driver_allocated_memory()
-            try: 
-                import flash_attn
-            except: 
-                spec["data"]["flash_attention"]          = False
-                spec["data"]["enable_attention_slicing"] = True
-            else:
-                spec["data"]["flash_attention"] = True  # hope for the best that user set this up
-            #set USE_FLASH_ATTENTION=1 in console
-            # ? https                       : //pytorch.org/docs/master/notes/mps.html
-            # ? memory_fraction = 0.5  https: //iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
-            # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
-        if torch.xpu.is_available():
-            # todo: code for xpu total memory, possibly code for mkl
-            """ spec["data"]["devices"]["xps"] = ram"""
-        spec["data"]["devices"]["cpu"] = psutil.virtual_memory().total # set all floats = fp32
-        spec_file = os.path.join(config_source_location, "spec.json")
-        if os.path.exists(spec_file):
-            try:
-                os.remove(spec_file)
-            except FileNotFoundError as error_log:
-                logging.debug(f"'Spec file absent at write time: {spec_file}.'{error_log}", exc_info=True)
-        if spec:
-            try:
-                with open(spec_file, "w+", encoding="utf8") as file_out:
-                    """ try opening file"""
-            except Exception as error_log:
-                logging.debug(f"Error writing spec file '{spec_file}': {error_log}", exc_info=True)
-            else:
-                with open(spec_file, "w+", encoding="utf8") as file_out:
-                    json.dump(spec, file_out, ensure_ascii=False, indent=4, sort_keys=False)
-        else:
-            logging.debug("No data to write to spec file.", exc_info=True)
-        #return data
 
+    @cached_property
+    def sys_cap(self):
+        from sdbx.capacity import SystemCapacity
+        return SystemCapacity()
 
-def parse() -> Config:
+def parse(testing: bool = False) -> Config:
     parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument('-c', '--config', type=str, default=get_config_location(), help='Location of the config file.')
@@ -360,16 +315,17 @@ def parse() -> Config:
     parser.add_argument('-h', '--help', action='help', help='See config.toml for more configuration options.')
     # parser.add_argument('--setup', action='store_true', help='Setup and exit.')
 
-    args = parser.parse_args()
+    args = parser.parse_args() if not testing else parser.parse_args([])
 
     level = logging.INFO
     if args.verbose:
         level = logging.DEBUG
     if args.silent:
         level = logging.ERROR
-    
+
     logging.basicConfig(encoding='utf-8', level=level)
-    
+
     return Config(path=args.config)
 
-config = parse()
+config = parse(testing=hasattr(sys, '_called_from_test'))
+

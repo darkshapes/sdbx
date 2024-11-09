@@ -1,10 +1,11 @@
 models = [
     "audio",    # speech and audio models
+    "dev",      # for model experimentation and training evaluation
     "download", # huggingface, civitai downloads and cache
     "image",    # vae incl TAESD, diffusion models, image weights
     "lora",     # loras & hypernetworks, all types
     "metadata", # configurations
-    "text",     # text transformers, CLIP, and llm
+    "text",     # text transformers, CLIP, and LLMS
     "upscale",  # "its not called upscale, its called Super Resolution!!!" - EXDYSA
     "other",    # misc .pth files and any other types
 ]
