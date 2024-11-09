@@ -191,7 +191,7 @@ class T2IPipe:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
-        #model = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae"
+        model = "C:\\Users\\Public\\models\\image\\sdxl.vae.safetensors"
         autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
         return autoencoder
 

@@ -22,42 +22,109 @@
                     "decoder.up",
                     "encoder.down"
                 ],
-                "sd1": {
-                    "block_names": [
-                        "model_ema.decay",
-                        "loss.perceptual_loss.net.slice5.28.weight"
-                    ]
+                "stable-cascade-a": {
+                    "block_names": "0.channelwise.0",
+                    "tensors": 122
                 },
-                "sdxl-base": {
-                    "block_names": "post_quant_conv.bias",
-                    "tensors": 248
-                },
-                "playground-2": {
-                    "block_names": "num_updates",
-                    "tensors": 248
-                },
-                "kolors": {
-                    "block_names": "decoder.conv_norm_out.bias",
-                    "tensors": 248
-                },
-                "pixart-sigma": {
-                    "block_names": "decoder.mid_block.attentions.0.group_norm.bias",
-                    "tensors": 248
-                },
-                "huanyun-dit": {
-                    "block_names": "decoder.mid_block.resnets.0.conv1.bias",
-                    "tensors": 248
-                },
-                "auraflow": {
-                    "block_names": "decoder.mid_block.resnets.1.norm2.weight",
-                    "tensors": 248
-                },
-                "taesd": {
+                "taesd-sd1": {
                     "block_names": [
                         "r'decoder.layers.d+'",
                         "r'encoder.layers.d+'"
                     ],
-                    "tensors": "134"
+                    "tensors": "134",
+                    "file_size": 9793292,
+                    "hash": "db169d69145ec4ff064e49d99c95fa05d3eb04ee453de35824a6d0f325513549"
+                },
+                "taesd-sdxl-base": {
+                    "block_names": [
+                        "r'decoder.layers.d+'",
+                        "r'encoder.layers.d+'"
+                    ],
+                    "tensors": "134",
+                    "file_size": 9793292,
+                    "hash": "ff4824aca94dd6111e0340fa749347fb74101060d9712cb5ef1ca8f1cf17502f"
+                },
+                "taesd-flux": {
+                    "tensors": 248,
+                    "file_size": 9848636,
+                    "hash": "6f79c1397cb9ce1dac363722dbe70147aee0ccca75e28338f8482fe515891399"
+                },
+                "tensors": 248,
+                "taesd-sd3": {
+                    "file_size": 9848636,
+                    "hash": "6f79c1397cb9ce1dac363722dbe70147aee0ccca75e28338f8482fe515891399"
+                },
+                "auraflow": {
+                    "block_names": "decoder.up.0.block.0.nin_shortcut.bias",
+                    "tensors": 248,
+                    "hash": "be0eb1ca9b09d52cfb33fff95805f071155f3eda94fee16e323d32cdba3d003b"
+                },
+                "playground-2": {
+                    "block_names": "num_updates",
+                    "tensors": 248,
+                    "hash": [
+                        "e8aef7b00195ec3fa8caaa3434e7516eff7d658e1d30eafc9ad6b0e66e9e827e",
+                        "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68"
+                    ]
+                },
+                "sd1": {
+                    "block_names": [
+                        "model_ema.decay",
+                        "loss.perceptual_loss.net.slice5.28.weight"
+                    ],
+                    "file_size": [
+                        334641190,
+                        114560782,
+                        404581567
+                    ],
+                    "hash": [
+                        "735e4c3a447a3255760d7f86845f09f937809baa529c17370d83e4c3758f3c75",
+                        "32db726da04f06c1b6b14c0043ce115cc87a501482945c5add89a40d838fcb46",
+                        "4fbcf0ebe55a0984f5a5e00d8c4521d52359af7229bb4d81890039d2aa16dd7c"
+                    ]
+                },
+                "sdxl-base": {
+                    "block_names": [
+                        "post_quant_conv.bias",
+                        "encoder.mid.attn_1.proj_out.bias"
+                    ],
+                    "tensors": 248,
+                    "hash": [
+                        "63aeecb90ff7bc1c115395962d3e803571385b61938377bc7089b36e81e92e2e",
+                        "1598f3d24932bcfe6634e8b618ea1e30ab1d57f5aad13a6d2de446d2199f2341",
+                        "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68"
+                    ]
+                },
+                "flux": {
+                    "block_names": [
+                        "encoder.down.3.block.1.norm1.bias"
+                    ],
+                    "tensors": 248,
+                    "hash": [
+                        "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38",
+                        "f5b59a26851551b67ae1fe58d32e76486e1e812def4696a4bea97f16604d40a3"
+                    ]
+                },
+                "kolors": {
+                    "block_names": "downsamplers",
+                    "tensors": 248,
+                    "hash": [
+                        "bcb60880a46b63dea58e9bc591abe15f8350bde47b405f9c38f4be70c6161e68",
+                        "1598f3d24932bcfe6634e8b618ea1e30ab1d57f5aad13a6d2de446d2199f2341"
+                    ]
+                },
+                "pixart-sigma": {
+                    "block_names": "decoder.mid_block.attentions.0.group_norm.bias",
+                    "tensors": 248,
+                    "hash": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
+                },
+                "pixart-alpha": {
+                    "hash": "703abdcd7c389316b5128faa9b750a530ea1680b453170b27afebac5e4db30c4"
+                },
+                "huanyun-dit": {
+                    "block_names": "decoder.mid_block.resnets.0.conv1.bias",
+                    "tensors": 248,
+                    "hash": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
                 }
             },
             "lora": {
@@ -65,22 +132,18 @@
                     "lora_down",
                     "lora_up"
                 ],
-                "flux": {
-                    "hyper": {
-                        "tensors": 1008,
-                        "hash": {
-                            "16": "6461f67dfc1a967ae60344c3b3f350877149ccab758c273cc37f5e8a87b5842e",
-                            "8": "e0ab0fdf569cd01a382f19bd87681f628879dea7ad51fe5a3799b6c18c7b2d03"
-                        }
+                "flux.hyper": {
+                    "tensors": 1008,
+                    "hash": {
+                        "16": "6461f67dfc1a967ae60344c3b3f350877149ccab758c273cc37f5e8a87b5842e",
+                        "8": "e0ab0fdf569cd01a382f19bd87681f628879dea7ad51fe5a3799b6c18c7b2d03"
                     }
                 },
-                "pixart-alpha": {
-                    "flash": {
-                        "hash": "99ef037fe3c1fb6d6bbefdbb85ad60df434fcc0577d34c768d752d60cf69681b"
-                    }
+                "pixart-alpha.flash": {
+                    "hash": "99ef037fe3c1fb6d6bbefdbb85ad60df434fcc0577d34c768d752d60cf69681b"
                 },
                 "sd1": {
-                    "hyper": {
+                    "sd1.hyper": {
                         "tensors": 834,
                         "shape": "[64] [320]",
                         "hash": {
@@ -96,7 +159,7 @@
                             }
                         }
                     },
-                    "pcm": {
+                    "sd1.pcm": {
                         "tensors": 834,
                         "shape": "[64] [320]",
                         "hash": {
@@ -135,18 +198,18 @@
                             }
                         }
                     },
-                    "spo": {
+                    "sd1.spo": {
                         "tensors": 686,
                         "shape": "[320] [1280]"
                     },
-                    "tcd": {
+                    "sd1.tcd": {
                         "tensors": 834,
                         "shape": "[64] [320]",
                         "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
                     }
                 },
                 "sdxl-base": {
-                    "dmd": {
+                    "sdxl-base.dmd": {
                         "tensors": 2364,
                         "shape": "[64] [320]",
                         "hash": [
@@ -154,7 +217,7 @@
                             "b3d9173815a4b595991c3a7a0e0e63ad821080f314a0b2a3cc31ecd7fcf2cbb8"
                         ]
                     },
-                    "flash": {
+                    "sdxl-base.flash": {
                         "tensors": [
                             1120,
                             1680,
@@ -170,7 +233,7 @@
                             "fd925177abbcf0a8e290f00e0264e1badbc292ef25cf99f455a5edb9c6b43c1b"
                         ]
                     },
-                    "hyper": {
+                    "sdxl-base.hyper": {
                         "tensors": 2364,
                         "shape": "[64] [320]",
                         "hash": {
@@ -186,12 +249,12 @@
                             }
                         }
                     },
-                    "lightning": {
+                    "sdxl-base.lightning": {
                         "tensors": 2364,
                         "shape": "[64] [320]",
                         "file_size": 393854592
                     },
-                    "pcm": {
+                    "sdxl-base.pcm": {
                         "tensors": 2364,
                         "shape": "[64] [320]",
                         "hash": {
@@ -230,12 +293,16 @@
                             }
                         }
                     },
-                    "tcd": {
+                    "sdxl-base.tcd": {
                         "hash": "2c777bc60abf41d3eb0fe405d23d73c280a020eea5adf97a82a141592c33feba"
                     }
                 },
                 "sd3": {
-                    "hyper": {
+                    "flash": {
+                        "tensors": 444,
+                        "hash": "85fce13c36e3739aa42930f745eb9fceb6c53d53fb17e2a687e3234c1a58ee15"
+                    },
+                    "sd3.hyper": {
                         "hash": {
                             "cfg": {
                                 "16": "5b4d0b99d58deb811bdbbe521a06f4dbf56a2e9148ff3211c594e0502b656bc9",
@@ -243,10 +310,6 @@
                                 "8": "fc6a3e73e14ed11e21e4820e960d7befcffe7e333850ada9545f239e9aa6027e"
                             }
                         }
-                    },
-                    "flash": {
-                        "tensors": 444,
-                        "hash": "85fce13c36e3739aa42930f745eb9fceb6c53d53fb17e2a687e3234c1a58ee15"
                     }
                 }
             },
