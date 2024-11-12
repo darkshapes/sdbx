@@ -220,7 +220,7 @@ class Config(BaseSettings):
                 }
                 if entry.is_dir(follow_symlinks=True):
                     entries.append({ **info, "children": recurse(fp) })
-                elif entry.is_file(follow_symlinks=False) and (not extension or entry.name.endswith(extension)):
+                elif entry.is_file(follow_symlinks=True) and (not extension or entry.name.endswith(extension)):
                     entries.append({ **info, **file_callback(fp) })
             return entries
 

@@ -13,7 +13,7 @@ schedulers = [
     "EulerAncestralDiscreteScheduler", # default 1 SDXL turbo
     "FlowMatchEulerDiscreteScheduler", # default 2 AUR, FLU
     "EDMDPMSolverMultistepScheduler",  # default 3 PLA
-    "DPMSolverMultistepScheduler",     # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
+    "DPMSolverMultistepScheduler",     # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++",
     "DDIMScheduler",                   # default 5 rescale_betas_zero_snr=True, timestep_spacing="trailing"
     "LCMScheduler",                    # default 6
     "TCDScheduler",                    # default 7
