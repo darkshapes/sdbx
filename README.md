@@ -20,6 +20,12 @@
 
 (contributed by mgua, (Marco Guardigli, mgua@tomware.it))
 
+### What is shadowbox (sdbx)?
+A free set of generative AI tools for synthetic pictures production, designed 
+for accessibility and easy use, capable of working off-line, fully customizable, 
+independent from cloud based services, appreciated by a vibrant community of artists.
+
+
 ### Requirements:
 - Microsoft Windows 64 bit
 - Nvidia GPU, with recent video drivers supporting CUDA 12
