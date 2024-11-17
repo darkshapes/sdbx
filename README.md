@@ -42,6 +42,7 @@ A robust internet connection is recommended for the installation steps.
 - Open a powershell prompt and execute these commands one by one:
 
 
+
 #### Creation of the python virtual environment venv_sdbx
 This is where the libraries and packages are being downloaded and installed
 
@@ -60,12 +61,14 @@ to "python" executable name in this virtual environment.
 ```
 cd ~
 py -3.12 -m venv venv_sdbx
+
 ```
 
 We activate the newly created environment:
 ```
 cd ~
 ./venv_sdbx/Scripts/Activate.ps1
+
 ```
 
 Once the environment is active, the command line prompt shows the 
@@ -101,11 +104,11 @@ cd ~
 mkdir sdbx
 cd sdbx
 git clone --branch dev https://github.com/darkshapes/sdbx.git .
+
 ```
 
 
 #### SDBX installation
-
 From a virtual environment activated prompt, we use pip to perform the installation, 
 following the instructions included in the downloaded repository.
 This steps takes a while, downloads approx 4.5Gbytes, and prepares the compiled version
@@ -116,10 +119,23 @@ You may see warnings, but it should complete without troubles if you have enough
 cd ~
 cd sdbx
 python - m pip install -e .
+
 ```
 
-#### Running SDBX
 
+#### Post-installation steps
+The installation should take care of everything, but an additional step is needed.
+This will be fixed in the future, but currently a simple file copy operation is needed to 
+make sdbx work.
+
+```
+copy ~\sdbx\config\users\extensions.toml ~\Appdata\Local\Shadowbox
+
+```
+
+
+
+#### Running SDBX
 Now we can run sdbx, running the following powershell command from its folder, 
 having activated its virtual environment
 
