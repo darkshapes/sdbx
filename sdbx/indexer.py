@@ -10,8 +10,9 @@ from sdbx import logger
 from sdbx import config
 from sdbx.config import config_source_location
 
-peek = config.get_default("tuning", "peek") # block and tensor values for identifying
-known = config.get_default("tuning", "known") # raw block & tensor data
+peek = config.get_default("tuning", "peek")  # block and tensor values for identifying
+known = config.get_default("tuning", "known")  # raw block & tensor data
+
 
 class EvalMeta:
     # determines identity of unknown tensor
@@ -26,20 +27,20 @@ class EvalMeta:
 
     # CRITERIA THRESHOLDS
     model_tensor_pct = 2e-3  # fine tunings
-    model_block_pct = 1e-4   # % of relative closeness to a known checkpoint value
-    model_size_pct = 3e-3    
-    vae_pct = 5e-3           # please do not disrupt
+    model_block_pct = 1e-4  # % of relative closeness to a known checkpoint value
+    model_size_pct = 3e-3
+    vae_pct = 5e-3  # please do not disrupt
     vae_xl_pct = 1e-8
     tra_pct = 1e-4
     tra_leeway = 0.03
     lora_pct = 0.05
 
-    model_peek = peek['model_peek']
-    vae_peek_12 = peek['vae_peek_12']
-    vae_peek = peek['vae_peek']
-    vae_peek_0 = peek['vae_peek_0']
-    tra_peek = peek['tra_peek']
-    lora_peek = peek['lora_peek']
+    model_peek = peek["model_peek"]
+    vae_peek_12 = peek["vae_peek_12"]
+    vae_peek = peek["vae_peek"]
+    vae_peek_0 = peek["vae_peek_0"]
+    tra_peek = peek["tra_peek"]
+    lora_peek = peek["lora_peek"]
 
     def __init__(self, extract, verbose=False):
         self.tag = ""
@@ -50,7 +51,7 @@ class EvalMeta:
         self.verbose = verbose
 
         # model measurements
-        #integer
+        # integer
         self.unet_value = int(self.extract.get("unet", 0))
         self.diffuser_value = int(self.extract.get("diffusers", 0))
         self.transformer_value = int(self.extract.get("transformers", 0))
@@ -62,123 +63,123 @@ class EvalMeta:
         self.hunyuan = int(self.extract.get("hunyuan", 0))
         self.size = int(self.extract.get("size", 0))
         self.shape_value = self.extract.get("shape", 0)
-        if self.shape_value: self.shape_value = self.shape_value[0:1]
+        if self.shape_value:
+            self.shape_value = self.shape_value[0:1]
 
-        #string value
+        # string value
         self.filename = self.extract.get("filename", "")
         self.ext = self.extract.get("extension", "")
         self.path = self.extract.get("path", "")
         self.dtype = self.extract.get("dtype", "") if not "" else self.extract.get("torch.dtype", "")
 
         # model supplied metadata
-        self.name_value = self.extract.get("general.name","")
-        self.arch = self.extract.get("general.architecture","").upper()
+        self.name_value = self.extract.get("general.name", "")
+        self.arch = self.extract.get("general.architecture", "").upper()
         self.tokenizer = self.extract.get("tokenizer.chat_template", "")
-        self.context_length = self.extract.get("context_length","")
+        self.context_length = self.extract.get("context_length", "")
 
     def process_vae(self):
         if [32] == self.shape_value:
             self.tag = "0"
-            self.key = '114560782'
-            self.sub_key = '248' # sd1 hook
+            self.key = "114560782"
+            self.sub_key = "248"  # sd1 hook
         elif [512] == self.shape_value:
             self.tag = "0"
             self.key = "335304388"
-            self.sub_key = "244" # flux hook
+            self.sub_key = "244"  # flux hook
         elif self.sdxl_value == 12:
             if self.mmdit_value == 4:
                 self.tag = "0"
                 self.key = "167335342"
                 self.sub_key = "248"  # auraflow
-            elif (isclose(self.size, 167335343, rel_tol=self.vae_xl_pct)
-            or isclose(self.size, 167666902, rel_tol=self.vae_xl_pct)):
+            elif isclose(self.size, 167335343, rel_tol=self.vae_xl_pct) or isclose(self.size, 167666902, rel_tol=self.vae_xl_pct):
                 if "vega" in self.filename.lower():
-                    self.tag = '12'
-                    self.key = '167335344'
-                    self.sub_key = '248'  #vega
+                    self.tag = "12"
+                    self.key = "167335344"
+                    self.sub_key = "248"  # vega
                 else:
                     self.tag = "0"
                     self.key = "167335343"
-                    self.sub_key = "248"  #kolors
+                    self.sub_key = "248"  # kolors
             else:
                 self.tag = "12"
                 self.key = "334643238"
-                self.sub_key = "248" #pixart
+                self.sub_key = "248"  # pixart
         elif self.mmdit_value == 8:
             if isclose(self.size, 404581567, rel_tol=self.vae_xl_pct):
                 self.tag = "0"
                 self.key = "404581567"
-                self.sub_key = "304" #sd1 hook
+                self.sub_key = "304"  # sd1 hook
             else:
                 self.tag = "v"
                 self.key = "167333134"
-                self.sub_key = "248" #sdxl hook
+                self.sub_key = "248"  # sdxl hook
         elif isclose(self.size, 334641190, rel_tol=self.vae_xl_pct):
             self.tag = "v"
             self.key = "334641190"
-            self.sub_key = "250" #sd1 hook
+            self.sub_key = "250"  # sd1 hook
         else:
             self.tag = "v"
             self.key = "334641162"
-            self.sub_key = "250" #sdxl hook
+            self.sub_key = "250"  # sdxl hook
 
     def process_lor(self):
         if self.size != 0:
             for size, attributes in self.lora_peek.items():
-                if (
-                    isclose(self.size, int(size),  rel_tol=self.lora_pct) or
-                    isclose(self.size, int(size)*2, rel_tol=self.lora_pct) or
-                    isclose(self.size, int(size)/2, rel_tol=self.lora_pct)
-                ):
+                if isclose(self.size, int(size), rel_tol=self.lora_pct) or isclose(self.size, int(size) * 2, rel_tol=self.lora_pct) or isclose(self.size, int(size) / 2, rel_tol=self.lora_pct):
                     for tensor_params, desc in attributes.items():
                         if isclose(self.tensor_value, int(tensor_params), rel_tol=self.lora_pct):
-                            for each in next(iter([desc, 'not_found'])):
+                            for each in next(iter([desc, "not_found"])):
                                 title = self.filename.upper()
                                 if each in title:
                                     self.tag = "l"
                                     self.key = size
                                     self.sub_key = tensor_params
-                                    self.value = each #lora hook                               
-                                        # found lora
+                                    self.value = each  # lora hook
+                                    # found lora
 
     def process_tra(self):
         for tensor_params, attributes in self.tra_peek.items():
             if isclose(self.tensor_value, int(tensor_params), rel_tol=self.tra_leeway):
                 for shape, name in attributes.items():
                     if isclose(self.transformer_value, name[0], rel_tol=self.tra_pct):
-                            self.tag = "t"
-                            self.key = tensor_params
-                            self.sub_key = shape # found transformer
+                        self.tag = "t"
+                        self.key = tensor_params
+                        self.sub_key = shape  # found transformer
 
     def process_model(self):
         if isclose(self.size, 5135149760, rel_tol=self.model_size_pct):
             self.tag = "m"
             self.key = "1468"
-            self.sub_key = "320" #found model
+            self.sub_key = "320"  # found model
         else:
-            for tensor_params, attributes, in self.model_peek.items():
+            for (
+                tensor_params,
+                attributes,
+            ) in self.model_peek.items():
                 if isclose(self.tensor_value, int(tensor_params), rel_tol=self.model_tensor_pct):
-
                     for shape, name in attributes.items():
                         num = self.shape_value[0:1]
                         if num:
-                            if (isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
-                            or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
-                            or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
-                            or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
-                            or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
-                            or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)):
-                                    self.tag = "m"
-                                    self.key = tensor_params
-                                    self.sub_key = shape #found model
+                            if (
+                                isclose(int(num[0]), int(shape), rel_tol=self.model_block_pct)
+                                or isclose(self.diffuser_value, name[0], rel_tol=self.model_block_pct)
+                                or isclose(self.mmdit_value, name[0], rel_tol=self.model_block_pct)
+                                or isclose(self.flux_value, name[0], rel_tol=self.model_block_pct)
+                                or isclose(self.diff_lora_value, name[0], rel_tol=self.model_block_pct)
+                                or isclose(self.hunyuan, name[0], rel_tol=self.model_block_pct)
+                            ):
+                                self.tag = "m"
+                                self.key = tensor_params
+                                self.sub_key = shape  # found model
                         else:
                             logger.debug(f"'[No shape key for model '{self.extract}'.", exc_info=True)
                             self.tag = "m"
                             self.key = tensor_params
-                            self.sub_key = shape               ######################################DEBUG
+                            self.sub_key = shape  ######################################DEBUG
 
     def data(self):
-        if "" not in self.name_value or self.context_length: # check LLM
+        if "" not in self.name_value or self.context_length:  # check LLM
             self.tag = "c"
             self.key = ""
             self.sub_key = ""
@@ -195,7 +196,6 @@ class EvalMeta:
             if self.size > 1e9:  # Check model
                 self.code = self.process_model()
 
-
         self.tag_dict = {}
         # 0 = vae_peek_0, 12 = vae_peek_12, v = vae_peek
         # these are separated because file sizes are otherwise too similar
@@ -211,16 +211,16 @@ class EvalMeta:
         elif self.tag == "t":
             self.code = f"TRA"
             name = self.tra_peek[self.key][self.sub_key]
-            self.lookup = f"{name[len(name)-1:][0]}" # type name is a list item
-        elif self.tag == "l":   
+            self.lookup = f"{name[len(name) - 1 :][0]}"  # type name is a list item
+        elif self.tag == "l":
             self.code = f"LOR"
             name = self.lora_peek[self.key][self.sub_key]
-            self.lookup = f"{self.value}-{name[len(name)-1:][0]}" # type name is a list item
+            self.lookup = f"{self.value}-{name[len(name) - 1 :][0]}"  # type name is a list item
         elif self.tag == "m":
             self.code = f"DIF"
             name = self.model_peek[self.key][self.sub_key]
-            self.lookup = f"{name[len(name)-1:][0]}"
-        elif self.tag == "c": 
+            self.lookup = f"{name[len(name) - 1 :][0]}"
+        elif self.tag == "c":
             self.code = f"LLM"
             self.lookup = f"{self.arch}"
         else:
@@ -232,12 +232,12 @@ class EvalMeta:
         if self.tag == "":
             logger.debug(f"'Not indexed. 'No eval error' should follow: '{self.extract}'.", exc_info=True)
             pass
-        else:   #format [ model type code, filename, compatability code, file size, full file path]
-            if self.verbose is True: logger.debug(self.code, self.lookup, self.filename, self.size, self.path)
-            return self.code, (
-                self.filename, self.lookup, self.size, self.path, 
-                (self.context_length if self.context_length else self.dtype))
-                                                 
+        else:  # format [ model type code, filename, compatability code, file size, full file path]
+            if self.verbose is True:
+                logger.debug(self.code, self.lookup, self.filename, self.size, self.path)
+            return self.code, (self.filename, self.lookup, self.size, self.path, (self.context_length if self.context_length else self.dtype))
+
+
 class ReadMeta:
     """
     Reads metadata from model files and extracts useful information.
@@ -296,7 +296,7 @@ class ReadMeta:
                 except:
                     log = f"Path not found'{self.path}'''."
                     logger.debug(log, exc_info=True)
-            
+
     def _parse_gguf_metadata(self):
         try:
             with open(self.path, "rb") as file:
@@ -313,11 +313,11 @@ class ReadMeta:
             self._search_dict(self.meta)
         except Exception as e:
             logger.debug(f"Error parsing GGUF metadata from '{self.path}': {e}", exc_info=True)
-    
+
     def _parse_metadata(self):
         self.full_data.update((k, v) for k, v in self.model_tag.items() if v != "")
         self.full_data.update((k, v) for k, v in self.count_dict.items() if v != 0)
-        for k, v in self.full_data.items(): 
+        for k, v in self.full_data.items():
             logger.debug(f"{k}: {v}")
         self.count_dict.clear()
         self.model_tag.clear()
@@ -350,7 +350,7 @@ class ReadMeta:
                         prefixless_key = key.replace(f"{prefix}.", "")
                         if prefixless_key in self.model_tag:
                             self.model_tag[prefixless_key] = value
-        elif self.ext in [".safetensors", ".sft," ""]:
+        elif self.ext in [".safetensors", ".sft,"]:
             for key in self.meta:
                 if key in self.model_tag:
                     self.model_tag[key] = self.meta.get(key)
@@ -370,8 +370,8 @@ class ReadMeta:
     def __repr__(self):
         return f"ReadMeta(data={self.data()})"
 
-class IndexManager:
 
+class IndexManager:
     all_data = {
         "DIF": defaultdict(dict),
         "LLM": defaultdict(dict),
@@ -379,10 +379,10 @@ class IndexManager:
         "TRA": defaultdict(dict),
         "VAE": defaultdict(dict),
     }
-    
+
     def write_index(self, index_file="index.json"):
         # Collect all data to write at once
-        self.directories =  config.get_default("directories","models") #multi read
+        self.directories = config.get_default("directories", "models")  # multi read
         self.delete_flag = True
         config.write_spec()
         for each in self.directories:
@@ -399,7 +399,7 @@ class IndexManager:
                             filename = self.eval_data[1][0]
                             compatability = self.eval_data[1][1:2][0]
                             data = self.eval_data[1][2:5]
-                            self.all_data[tag][filename][compatability] = (data)
+                            self.all_data[tag][filename][compatability] = data
                         else:
                             logger.debug(f"No eval: {each}.", exc_info=True)
                     else:
@@ -410,10 +410,10 @@ class IndexManager:
             if self.delete_flag:
                 try:
                     os.remove(index_file)
-                    self.delete_flag =False
+                    self.delete_flag = False
                 except FileNotFoundError as error_log:
                     logger.debug(f"'Config file absent at write time: {index_file}.'{error_log}", exc_info=True)
-                    self.delete_flag =False
+                    self.delete_flag = False
                     pass
             with open(os.path.join(config_source_location, index_file), "a", encoding="UTF-8") as index:
                 json.dump(self.all_data, index, ensure_ascii=False, indent=4, sort_keys=True)
@@ -421,9 +421,10 @@ class IndexManager:
             log = "Empty model directory, or no data to write."
             logger.debug(f"{log}{error_log}", exc_info=True)
 
-     #recursive function to return model codes assigned to tree keys and transformer model values
+    # recursive function to return model codes assigned to tree keys and transformer model values
     def _fetch_txt_enc_types(self, data, query, path=None, return_index_nums=False):
-        if path is None: path = []
+        if path is None:
+            path = []
 
         if isinstance(data, dict):
             for key, self.value in data.items():
@@ -443,44 +444,40 @@ class IndexManager:
                     self.match = self._fetch_txt_enc_types(self.value, query, self.current)
                     if self.match:
                         return self.match
-                    
-    #fix the recursive list so it doesnt make lists inside itself
-    def _unpack(self): 
-        iterate = []  
-        self.match = self.current, self.value           
-        for i in range(len(self.match)-1):
-            for j in (self.match[i]):
+
+    # fix the recursive list so it doesnt make lists inside itself
+    def _unpack(self):
+        iterate = []
+        self.match = self.current, self.value
+        for i in range(len(self.match) - 1):
+            for j in self.match[i]:
                 iterate.append(j)
-        iterate.append(self.match[len(self.match)-1])
+        iterate.append(self.match[len(self.match) - 1])
         return iterate
-    
-    #find the model code for a single model
+
+    # find the model code for a single model
     def fetch_id(self, search_item):
-        for each in self.all_data.keys(): 
+        for each in self.all_data.keys():
             peek_index = config.get_default("index", each)
             if not isinstance(peek_index, dict):
                 continue  # Skip if peek_index is not a dict
             if search_item in peek_index:
                 break
             else:
-                continue 
+                continue
         if search_item in peek_index:
             for category, value in peek_index[search_item].items():
                 return each, category, value  # Return keys and corresponding value
         else:
-            return "∅", "∅","∅"
+            return "∅", "∅", "∅"
 
-    #get compatible models from a specific model code
-    def fetch_compatible(self, query): 
-        self.clip_data = config.get_default("tuning", "clip_data") 
+    # get compatible models from a specific model code
+    def fetch_compatible(self, query):
+        self.clip_data = config.get_default("tuning", "clip_data")
         self.vae_index = config.get_default("index", "VAE")
         self.tra_index = config.get_default("index", "TRA")
         self.lor_index = config.get_default("index", "LOR")
-        self.model_indexes = {
-            "vae": self.vae_index,
-            "tra": self.tra_index, 
-            "lor": self.lor_index
-            }
+        self.model_indexes = {"vae": self.vae_index, "tra": self.tra_index, "lor": self.lor_index}
         try:
             tra_sorted = {}
             self.tra_req = self._fetch_txt_enc_types(self.clip_data, query)
@@ -488,11 +485,11 @@ class IndexManager:
             log = f"No match found for {query}"
             logger.debug(f"{log}{error_log}", exc_info=True)
         if self.tra_req == None:
-            tra_sorted =str("∅")
+            tra_sorted = str("∅")
             logger.debug(f"No external text encoder found compatible with {query}.", exc_info=True)
         else:
             tra_match = {}
-            for i in range(len(self.tra_req)-1):
+            for i in range(len(self.tra_req) - 1):
                 tra_match[i] = self.filter_compatible(self.tra_req[i], self.model_indexes["tra"])
                 if tra_match[i] == None:
                     tra_match[i] == query
@@ -509,12 +506,12 @@ class IndexManager:
         vae_sorted = self.filter_compatible(query, self.model_indexes["vae"])
         lora_sorted = self.filter_compatible(query, self.model_indexes["lor"])
         lora_sorted = dict(lora_sorted)
-        if vae_sorted == []: 
-            vae_sorted =str("∅")
+        if vae_sorted == []:
+            vae_sorted = str("∅")
             print(query)
             logger.debug(f"No external VAE found compatible with {query}.", exc_info=True)
-        if lora_sorted == []: 
-            lora_sorted =str("∅")
+        if lora_sorted == []:
+            lora_sorted = str("∅")
             logger.debug(f"No compatible LoRA found for {query}.", exc_info=True)
 
         return vae_sorted, tra_sorted, lora_sorted
@@ -526,7 +523,7 @@ class IndexManager:
                 return value
         return "∅"
 
-    #within a dict of models of the same type, match model code & sort by file size
+    # within a dict of models of the same type, match model code & sort by file size
     def filter_compatible(self, query, index):
         pack = defaultdict(dict)
         if index.items():
@@ -534,11 +531,9 @@ class IndexManager:
                 for code in v.keys():
                     if query in code:
                         pack[k, code] = v[code]
-                        
+
             sort = sorted(pack.items(), key=lambda item: item[1])
             return sort
         else:
             logger.debug("Compatible models not found")
             return "∅"
-    
-

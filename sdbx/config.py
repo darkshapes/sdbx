@@ -1,17 +1,20 @@
-import os
+import argparse
 import json
 import logging
+import os
+import sys
 import tomllib
-import argparse
+from io import TextIOWrapper
 
-import torch
-from enum import Enum
+# from enum import Enum
+from functools import cache, cached_property, partial  # , total_ordering
 from glob import glob
-from pathlib import Path
-from typing import Tuple, Type, Union, Literal, List
-from functools import cache, cached_property, partial, total_ordering
 
-from pydantic import BaseModel, Field, ConfigDict
+# from pathlib import Path
+from typing import Callable, ClassVar, Generator, List, Literal, Set, Tuple, Type, Union
+
+import torch  # noqa: F811
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -19,120 +22,43 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
+# pylint: disable=unnecessary-lambda, unnecessary-lambda-assignment
+
 source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 config_source_location = os.path.join(source, "config")
 
+
 @cache
-def get_config_location():
+def get_config_location() -> dict[str]:
+    """Return user the config folder for each platform type
+    :return: A dictionary keyed by OS name
+    """
     from platform import system
 
     filename = "config.toml"
 
     return {
-        'windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local')), 'Shadowbox', filename),
-        'darwin': os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Shadowbox', filename),
-        'linux': os.path.join(os.path.expanduser('~'), '.config', 'shadowbox', filename),
+        "windows": os.path.join(os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local")), "Shadowbox", filename),
+        "darwin": os.path.join(os.path.expanduser("~"), "Library", "Application Support", "Shadowbox", filename),
+        "linux": os.path.join(os.path.expanduser("~"), ".config", "shadowbox", filename),
     }[system().lower()]
 
-class LatentPreviewMethod(str, Enum):
-    NONE = "none"
-    AUTO = "auto"
-    LATENT2RASTER = "latent2raster"
-    TAESD = "taesd"
-
-@total_ordering
-class VRAM(str, Enum):
-    HIGH = "high"
-    NORMAL = "normal"
-    LOW = "low"
-    NONE = "none"
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            order = [VRAM.NONE, VRAM.LOW, VRAM.NORMAL, VRAM.HIGH]
-            return order.index(self) < order.index(other)
-        return NotImplemented
-
-# class SD_ASPECT(str, Enum):
-#         "1:1___ 512x512"= (512, 512)
-#         "4:3___ 682x512"= (682, 512)
-#         "3:2___ 768x512"= (768, 512)
-#         "16:9__ 910x512"= (910, 512)
-#         "1:85:1 952x512"= (952, 512)
-#         "2:1__ 1024x512"= (1024, 512)
-
-# class SD21_ASPECT(str,Enum):
-#         "1:1_ 768x768"= (768, 768)
-
-# class SVD_ASPECT(str, Enum):
-#         "1:1__ 576x576" = (576, 576)
-#         "16:9 1024X576"= (1024, 576)
-
-# class XL_ASPECT(str, Enum):
-#         "1:1_ 1024x1024"= (1024, 1024)
-#         "16:15 1024x960"= (1024, 960)
-#         "17:15 1088x960"= (1088, 960)
-#         "17:14 1088x896"= (1088, 896)
-#         "4:3__ 1152x896"= (1152, 896)
-#         "18:13 1152x832"= (1152, 832)
-#         "3:2__ 1216x832"= (1216, 832)
-#         "5:3__ 1280x768"= (1280, 768)
-#         "7:4__ 1344x768"= (1344, 768)
-#         "21:11 1344x704"= (1344, 704)
-#         "2:1__ 1408x704"= (1408, 704)
-#         "23:11 1472x704"= (1472, 704)
-#         "21:9_ 1536x640"= (1536, 640)
-#         "5:2__ 1600x640"= (1600, 640)
-#         "26:9_ 1664x576"= (1664, 576)
-#         "3:1__ 1728x576"= (1728, 576)
-#         "28:9_ 1792x576"= (1792, 576)
-#         "29:8_ 1856x512"= (1856, 512)
-#         "15:4_ 1920x512"= (1920, 512)
-#         "31:8_ 1984x512"= (1984, 512)
-#         "4:1__ 2048x512"= (2048, 512)
-
-
-class Precision(str, Enum):
-    MIXED = "mixed"
-    FP64 = "float64"
-    FP32 = "float32"
-    FP16 = "float16"
-    BF16 = "bfloat16"
-    FP8E4M3FN = "float8_e4m3fn"
-    FP8E5M2 = "float8_e5m2"
-    IN64 =  "int64"
-    IN32 =  "int32"
-    IN16 =  "int16"
-    IN8 =  "int8"
-    UN8 =  "uint8"
-    NF4 = "nf4"
-
-class TensorDataType:
-    TYPE_T = Literal["F64", "F32", "F16", "BF16", "F8_E4M3", "F8_E5M2", "I64", "I32", "I16", "I8", "U8", "nf4", "BOOL"]
-    TYPE_R = Literal["fp64", "fp32", "fp16", "bf16", "fp8_e4m3fn", "fp8_e5m2", "i64", "i32", "i16", "i8", "u8", "nf4", "bool"]
-
-# class TensorData:
-#     dtype: DTYPE_T
-#     shape: List[int]
-#     data_offsets: Tuple[int, int]
-#     parameter_count: int = field(init=False)
-
-#     def __post_init__(self) -> None:
-#         # Taken from https://stackoverflow.com/a/13840436
-#         try:
-#             self.parameter_count = functools.reduce(operator.mul, self.shape)
-#         except TypeError:
-#             self.parameter_count = 1  # scalar value has no shape
 
 class ConfigModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=lambda s: s.replace('_', '-')
-    )
+    """Config file system"""
+
+    model_config = ConfigDict(alias_generator=lambda s: s.replace("_", "-"))
+
 
 class ExtensionsConfig(ConfigModel):
-    disable: Union[bool, Literal['clients', 'nodes']] = False
+    """Eextension setting toggle"""
+
+    disable: Union[bool, Literal["clients", "nodes"]] = False
+
 
 class LocationConfig(ConfigModel):
+    """Default directory paths"""
+
     clients: str = "clients"
     nodes: str = "nodes"
     flows: str = "flows"
@@ -140,7 +66,10 @@ class LocationConfig(ConfigModel):
     output: str = "output"
     models: str = "models"
 
+
 class WebConfig(ConfigModel):
+    """Server configuration setup"""
+
     listen: str = "127.0.0.1"
     port: int = 8188
     reload: bool = True
@@ -149,36 +78,23 @@ class WebConfig(ConfigModel):
     max_upload_size: int = 100
     auto_launch: bool = True
     known_models: bool = True
-    preview_mode: LatentPreviewMethod = LatentPreviewMethod.AUTO
+
 
 class ComputationalConfig(ConfigModel):
+    """Toggle deterministic seeding (CUDA)"""
+
     deterministic: bool = False
 
+
 class MemoryConfig(ConfigModel):
-    vram: VRAM = VRAM.NORMAL
-    smart_memory: bool = True
+    """Toggle system spec gathering on start"""
 
-MixedPrecision = Union[Literal[Precision.MIXED, Precision.FP32, Precision.FP16, Precision.BF16]]
-EncoderPrecision = Union[Literal[Precision.FP32, Precision.FP16, Precision.BF16, Precision.FP8E4M3FN, Precision.FP8E5M2]]
+    system_profiling: bool = True
 
-class PrecisionConfig(ConfigModel):
-    fp: MixedPrecision = Precision.MIXED
-    unet: EncoderPrecision = Precision.FP32
-    vae: MixedPrecision = Precision.MIXED
-    text_encoder: EncoderPrecision = Precision.FP16
-
-class DistributedConfig(ConfigModel):
-    role: Literal[False, Literal['worker', 'frontend']] = False
-    name: str = "shadowbox"
-    connection_uri: str = "amqp://guest:guest@127.0.0.1"
-
-class OrganizationConfig(ConfigModel):
-    channels_first: bool = False
 
 class Config(BaseSettings):
-    """
-    Configuration options parsed from config.toml.
-    """
+    """Configuration options parsed from config.toml."""
+
     model_config = SettingsConfigDict(env_prefix="SDBX_")
 
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig)
@@ -186,18 +102,17 @@ class Config(BaseSettings):
     web: WebConfig = Field(default_factory=WebConfig)
     computational: ComputationalConfig = Field(default_factory=ComputationalConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
-    precision: PrecisionConfig = Field(default_factory=PrecisionConfig)
-    distributed: DistributedConfig = Field(default_factory=DistributedConfig)
-    organization: OrganizationConfig = Field(default_factory=OrganizationConfig)
 
-    development: bool = False
+    development: bool = False  # Whether this is a development build
 
-    def __new__(cls, path: str, *args, **kwargs):
-        cls.model_config['toml_file'] = path
+    def __new__(cls, path: str, *args, **kwargs) -> Callable:
+        """Recreate the main config file"""
+        cls.model_config["toml_file"] = path
         cls.path = os.path.dirname(path)
         return super().__new__(cls)
 
-    def model_post_init(self, __context):
+    def model_post_init(self, __context) -> None:  # pylint: disable=arguments-differ
+        """Trigger new config build if folders do not exist"""
         if not os.path.exists(self.path):
             self.generate_new_config()
 
@@ -210,28 +125,33 @@ class Config(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        """Settings locations for base settings, environment variables, password secrets, etc"""
         return (TomlConfigSettingsSource(settings_cls),)
-        
-    def generate_new_config(self):
-        logging.info(f"Creating config directory at {self.path}...")
+
+    def generate_new_config(self) -> None:
+        """Rebuild the config files"""
+        logging.info("%s", f"Creating config directory at {self.path}...")
 
         os.makedirs(self.path, exist_ok=True)
 
         for subdir in self._path_dict.values():
             print(os.path.join(self.path, subdir))
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
-        
+
         from shutil import copytree
+
         copytree(os.path.join(config_source_location, "user"), self.path, dirs_exist_ok=True)
 
-    def rewrite(self, key, value):
-        # rewrites the config.toml key to value
-        pass
-    
-    def get_path(self, name):
+    def rewrite(self, key, value) -> None:
+        """Rewrites the config.toml key to value"""
+        # Not Implemented
+
+    def get_path(self, name) -> dict[str]:
+        """Helper function for path"""
         return self._path_dict[name]
-    
-    def get_path_contents(self, name, extension="", path_name=True, base_name=False):  # List contents of a directory
+
+    def get_path_contents(self, name, extension="", path_name=True, base_name=False) -> Generator:
+        """List contents of a directory"""
         p = self.get_path(name) if path_name else name
 
         format_path = lambda p, g: os.path.join(p, g)
@@ -240,12 +160,28 @@ class Config(BaseSettings):
             format_path = lambda p, g: os.path.basename(g)  # Only return base name
 
         return [format_path(p, g) for g in glob(f"**.{extension}", root_dir=p, recursive=True)]
-    
-    def get_path_tree(self, name, extension="", path_name=True, file_callback=lambda e: e, visited=None):
+
+    def get_path_tree(
+        self,
+        name: str,
+        extension: str = "",
+        path_name: bool = True,
+        file_callback: Callable = lambda e: e,
+        visited: set[str] = None,
+    ) -> Callable | List[str]:
+        """Trace file system, marking locations as visited along the way
+
+        :param name: Location to trace
+        :param extension: Suffix type to *exclude*, defaults to ""
+        :param path_name: Whether `name` is a cached location, otherwise access like normal, defaults to True
+        :param file_callback: Additional function to perform on each file, defaults to lambda e:e (passthrough)
+        :param visited: Canonical, non-symbolic link of current progress through folders, defaults to None
+        :return: All files and folder paths within `name`
+        """
         p = self.get_path(name) if path_name else name
         visited = visited or set()
 
-        def recurse(path):
+        def recurse(path) -> set[str]:
             entries = []
             for entry in os.scandir(path):
                 fp = os.path.join(path, entry.name)
@@ -258,28 +194,33 @@ class Config(BaseSettings):
                     "name": entry.name,
                 }
                 if entry.is_dir(follow_symlinks=True):
-                    entries.append({ **info, "children": recurse(fp) })
+                    entries.append({**info, "children": recurse(fp)})
                 elif entry.is_file(follow_symlinks=False) and (not extension or entry.name.endswith(extension)):
-                    entries.append({ **info, **file_callback(fp) })
+                    entries.append({**info, **file_callback(fp)})
             return entries
 
         return recurse(p)
 
     @cached_property
-    def _path_dict(self):
-        root = {
-            n: os.path.join(self.path, p) for n, p in dict(self.location).items() # see self.location for details
-        }
+    def _path_dict(self) -> set[str]:
+        """Cache a map of names to file paths, generate paths for model sub directories"""
+        root = {n: os.path.join(self.path, p) for n, p in dict(self.location).items()}  # see self.location for details
 
         for n, p in dict(self.location).items():
             if ".." in p:
-                raise Exception("Cannot set location outside of config path.")
+                raise ValueError("Cannot set location outside of config path.")
 
         models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
 
         return {**root, **models}
-    
-    def load_data(self, path):
+
+    def load_data(self, path: str) -> TextIOWrapper:
+        """Load TOML/JSON file contents
+
+        :param path: Path to file
+        :raises SyntaxError: File couldn't be read
+        :return: File contents
+        """
         _, ext = os.path.splitext(path)
         loader, mode = (tomllib.load, "rb") if ext == ".toml" else (json.load, "r")
         with open(path, mode) as f:
@@ -288,127 +229,150 @@ class Config(BaseSettings):
             except (tomllib.TOMLDecodeError, json.decoder.JSONDecodeError) as e:
                 raise SyntaxError(f"Couldn't read file {path}") from e
         return fd
-    
-    def get_default(self, name, prop):
+
+    def get_default(self, name: str | int, prop: str | int) -> dict[str | bool | int | float]:
+        """Retrieve configuration from file
+
+        :param name: The prefix of a configuration file
+        :param prop: The setting from the file to retrieve
+        :return: A mapping of `name` to its contents
+        """
         return self._defaults_dict[name][prop]
 
     @cached_property
-    def _defaults_dict(self):
+    def _defaults_dict(self) -> dict[str]:
+        """Map TOML/JSON files to their contents"""
         d = {}
         glob_source = partial(glob, root_dir=config_source_location)
         for filename in glob_source("*.toml") + glob_source("*.json"):
             fp = os.path.join(config_source_location, filename)
             name, _ = os.path.splitext(filename)
             d[name] = self.load_data(fp)
-        
+
         return d
 
     @cached_property
-    def extension_data(self):
+    def extension_data(self) -> TextIOWrapper:
+        """Additional extensions to load with the system"""
         with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
             return tomllib.load(f)
 
     @cached_property
-    def node_manager(self):
-        from sdbx.nodes.manager import NodeManager # we must import this here lest we summon the dreaded ouroboros
+    def node_manager(self) -> Callable:
+        """**`B̴̨̒e̷w̷͇̃ȁ̵͈r̸͔͛ę̵͂ ̷̫̚t̵̻̐h̶̜͒ȩ̸̋ ̵̪̄ő̷̦ù̵̥r̷͇̂o̷̫͑b̷̲͒ò̷̫r̴̢͒ô̵͍s̵̩̈́`**"""
+        from sdbx.nodes.manager import NodeManager  # we must import this here lest we summon the dreaded ouroboros
+
         return NodeManager(self.extension_data, nodes_path=self.get_path("nodes"))
 
     @cached_property
-    def client_manager(self):
+    def client_manager(self) -> Callable:
+        """Client to use for the system"""
         from sdbx.clients.manager import ClientManager
+
         return ClientManager(self.extension_data, clients_path=self.get_path("clients"))
 
     @cached_property
-    def executor(self):
+    def executor(self) -> Callable:
+        """Puts nodes to work"""
         from sdbx.executor import Executor
+
         return Executor(self.node_manager)
-    
+
     @cached_property
-    def model_indexer(self):
+    def model_indexer(self) -> Callable:
+        """Model detection and recognition"""
         from sdbx.indexer import IndexManager
+
         return IndexManager()
 
     @cached_property
     def t2i_pipe(self):
+        """Functionality for text-to-image generation"""  # will probably be moved to nnll
         from sdbx.nodes.compute import T2IPipe
+
         return T2IPipe()
 
     @cached_property
     def node_tuner(self):
+        """Runtime inference performance optimizations"""
         from sdbx.nodes.tuner import NodeTuner
+
         return NodeTuner()
-    
-    def write_spec(self):
-        import psutil
+
+    def system_profiler(self) -> None:
+        """Collect system GPU, CPU and environment data, then write to file"""
         from collections import defaultdict
         from platform import system
+
+        import psutil
+
         spec = defaultdict(dict)
-        spec["data"]["dynamo"]  = False if system().lower() == "windows" else True
+        spec["data"]["dynamo"] = False if system().lower() == "windows" else True
         spec["data"]["devices"] = {}
         if torch.cuda.is_available():
             spec["data"]["devices"]["cuda"] = torch.cuda.mem_get_info()[1]
-            spec["data"]["flash_attention"] = False #str(torch.backends.cuda.flash_sdp_enabled()).title()
-            spec["data"]["allow_tf32"]      = False
-            spec["data"]["xformers"]        = torch.backends.cuda.mem_efficient_sdp_enabled()
+            spec["data"]["flash_attention"] = False  # str(torch.backends.cuda.flash_sdp_enabled()).title()
+            spec["data"]["allow_tf32"] = False
+            spec["data"]["xformers"] = torch.backends.cuda.mem_efficient_sdp_enabled()
             if "True" in [spec["data"].get("xformers"), spec["data"].get("flash_attention")]:
                 spec["data"]["enable_attention_slicing"] = False
         if torch.backends.mps.is_available() & torch.backends.mps.is_built():
             spec["data"]["devices"]["mps"] = torch.mps.driver_allocated_memory()
-            try: 
-                import flash_attn
-            except: 
-                spec["data"]["flash_attention"]          = False
-                spec["data"]["enable_attention_slicing"] = True
-            else:
+            try:
+                import flash_attn  # noqa # pylint: disable=unused-import
+
                 spec["data"]["flash_attention"] = True  # hope for the best that user set this up
-            #set USE_FLASH_ATTENTION=1 in console
+            except (ImportError, ModuleNotFoundError):
+                spec["data"]["flash_attention"] = False
+                spec["data"]["enable_attention_slicing"] = True
+            # set USE_FLASH_ATTENTION=1 in console
             # ? https                       : //pytorch.org/docs/master/notes/mps.html
             # ? memory_fraction = 0.5  https: //iifx.dev/docs/pytorch/generated/torch.mps.set_per_process_memory_fraction
             # ? torch.mps.set_per_process_memory_fraction(memory_fraction)
-        if torch.xpu.is_available():
-            # todo: code for xpu total memory, possibly code for mkl
-            """ spec["data"]["devices"]["xps"] = ram"""
-        spec["data"]["devices"]["cpu"] = psutil.virtual_memory().total # set all floats = fp32
+        # if torch.xpu.is_available():
+        #     # add code for xpu total memory, possibly code for mkl
+        #     """ spec["data"]["devices"]["xps"] = ram"""
+        spec["data"]["devices"]["cpu"] = psutil.virtual_memory().total  # set all floats = fp32
         spec_file = os.path.join(config_source_location, "spec.json")
         if os.path.exists(spec_file):
             try:
                 os.remove(spec_file)
-            except FileNotFoundError as error_log:
-                logging.debug(f"'Spec file absent at write time: {spec_file}.'{error_log}", exc_info=True)
+            except (FileNotFoundError, IOError):
+                logging.debug("Spec file absent at write time: %s", spec_file, exc_info=True)
         if spec:
             try:
                 with open(spec_file, "w+", encoding="utf8") as file_out:
-                    """ try opening file"""
-            except Exception as error_log:
-                logging.debug(f"Error writing spec file '{spec_file}': {error_log}", exc_info=True)
-            else:
-                with open(spec_file, "w+", encoding="utf8") as file_out:
                     json.dump(spec, file_out, ensure_ascii=False, indent=4, sort_keys=False)
+            except (json.JSONDecodeError, FileNotFoundError, IOError):
+                logging.debug("Error writing spec file %s", spec_file, exc_info=True)
         else:
             logging.debug("No data to write to spec file.", exc_info=True)
-        #return data
 
 
-def parse() -> Config:
+def parse(testing: bool = False) -> Config:
+    if "pytest" in sys.modules:
+        testing = True
+
     parser = argparse.ArgumentParser(add_help=False)
 
-    parser.add_argument('-c', '--config', type=str, default=get_config_location(), help='Location of the config file.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output.')
-    parser.add_argument('-s', '--silent', action='store_true', help='Silence all print to stdout.')
-    parser.add_argument('-d', '--daemon', action='store_true', help='Run in daemon mode (not associated with tty).')
-    parser.add_argument('-h', '--help', action='help', help='See config.toml for more configuration options.')
+    parser.add_argument("-c", "--config", type=str, default=get_config_location(), help="Location of the config file.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
+    parser.add_argument("-s", "--silent", action="store_true", help="Silence all print to stdout.")
+    parser.add_argument("-d", "--daemon", action="store_true", help="Run in daemon mode (not associated with tty).")
+    parser.add_argument("-h", "--help", action="help", help="See config.toml for more configuration options.")
     # parser.add_argument('--setup', action='store_true', help='Setup and exit.')
 
-    args = parser.parse_args()
+    args = parser.parse_args() if not testing else parser.parse_args([])
 
     level = logging.INFO
     if args.verbose:
         level = logging.DEBUG
     if args.silent:
         level = logging.ERROR
-    
-    logging.basicConfig(encoding='utf-8', level=level)
-    
+
+    logging.basicConfig(encoding="utf-8", level=level)
+
     return Config(path=args.config)
 
-config = parse()
+
+config = parse(testing=hasattr(sys, "_called_from_test"))

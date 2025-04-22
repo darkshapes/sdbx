@@ -2,36 +2,26 @@
 disable = false # [default false] Toggle extensions. false | "clients" | "nodes" | true
 
 [location] # Assigned paths for loading and saving = "c:\\foo\\bar" or "..\\foo\\bar" | "/user/username/foo/bar" or "../foo/bar"
-output = "C:\\Users\Public\\output"   # [default "output"]clients = "clients" # [default "clients"]
-nodes = "nodes"     # [default "nodes"]
-flows = "flows"     # [default "flows"]
-input = "input"     # [default "input"]
-models = "models"   # [default "models]
+output  = "output"   # [default "output"]
+clients = "clients"  # [default "clients"]
+nodes   = "nodes"    # [default "nodes"]
+flows   = "flows"    # [default "flows"]
+input   = "input"    # [default "input"]
+models  = "models"   # [default "models]
 
-[web] # http: //listen:port and related settings. IPv4 format addresses.
-listen = "127.0.0.1" # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0"
-port = 8188 # [default 8188] Chooses the listen port.
-reload = true # [default true] Reload the server on changes to source or user config directory.
-reload-include = [ # [default .toml, .json, models/] Glob for which file changes to reload the server to.
-    "*.toml",
-    "*.json",
-    "models/**/*",
-]
-external-address = "localhost" # [default "localhost"] URL for external API, such as for image paths.
-max-upload-size = 100 # [default 100] Maximum file import size
-auto-launch = true # [default true] Opens Shadowbox in the default browser on launch.
-preview-mode = "auto" # [default auto] Show image while generating. "none" | "auto" | "taesd"
+[web]                           # http:   //listen:port and related settings. IPv4 format.
+listen         = "127.0.0.1"    # [default "127.0.0.1"] Service address. Accept all local connections using "" or "0.0.0.0"
+port           = 8188           # [default 8188] Server port.
+reload         = true           # [default true] Changes to source or user config directories reloads server.
+reload-include = [ "*.toml", "*.json", "models/**/*" ] # Glob matches that reload above. [default "*.toml", "*.json", "models/**/*" ]
+external-address = "localhost"  # [default "localhost"] URL for external API, such as image paths.
+max-upload-size  = 100          # [default 100] Maximum file import size.
+auto-launch      = true         # [default true] Shadowbox opens default browser when started.
+known-models     = true         # [default true] Trigger model scanning when started
 
-[computational] # Settings that directly affect inference computation
-deterministic = false # [default false] Use slower deterministic algorithms. Determinism not guaranteed
+[computational]         # Settings that directly affect inference computation
+deterministic = false   # [default false] Use slower deterministic algorithms. Determinism not guaranteed. CUDA only.
 
-[memory] # Override RAM management
-vram = "normal"         # [default "normal"] Available GPU RAM = "high" | "normal" | "low" | "none"
-system-profiling = true # [default true] Prevent out-of-memory errors by auto-configuring to system GPU and CPU
-channels-first = false  # [default false] Toggles channels last memory format when inferencing the models.
-
-[precision] # Override bitrate for float point and weight calculation
-fp = "mixed"             # [default "mixed"] Floating point = "mixed" | "float32" | "float16" | "bfloat16"
-unet = "float32"         # [default "float32"] Unet           = "float32" | "float16" | "bfloat16" | "float8_e4m3fn" | "float8_e5m2"
-vae = "mixed"            # [default "mixed"] VAE             = "mixed" | "float32" | "float16" | "bfloat16"
-text-encoder = "float16" # [default "float16"] Text encoder           = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"
+[memory]                    # RAM management
+system-profiling = true     # [default true] Prevent OOM out-of-memory errors by measuring system GPU and CPU in advance.
+# channels-first   = false    # [default false] Toggles channels last memory format when inferencing the models.
