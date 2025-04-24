@@ -2,6 +2,7 @@
 Credits:
 Felixsans
 """
+
 import gc
 import os
 import torch
@@ -30,14 +31,15 @@ from sdbx import logger
 from sdbx.config import config
 from sdbx.nodes.helpers import seed_planter
 
+
 class T2IPipe:
     # __call__? NO __init__! ONLY __call__. https://huggingface.co/docs/diffusers/main/en/api/pipelines/auto_pipeline#diffusers.AutoPipelineForText2Image
 
     config_path = config.get_path("models.metadata")
-    spec = config.get_default("spec","data")
-    device = next(iter(spec.get("devices",None)),None)
+    spec = config.get_default("spec", "data")
+    device = next(iter(spec.get("devices", None)), None)
 
-############## STFU HUGGINGFACE
+    ############## STFU HUGGINGFACE
     def hf_log(self, on=False, fatal=False):
         if on is True:
             tf_log.enable_default_handler()
@@ -53,107 +55,85 @@ class T2IPipe:
             tf_log.set_verbosity_error()
             df_log.set_verbosity_error()
 
-############## TORCH DATATYPE
+    ############## TORCH DATATYPE
     def float_converter(self, old_index):
         float_chart = {
-                "F64": ["fp64", torch.float64],
-                "F32": ["fp32", torch.float32],
-                "F16": ["fp16", torch.float16],
-                "BF16": ["bf16", torch.bfloat16],
-                "F8_E4M3": ["fp8e4m3fn", torch.float8_e4m3fn],
-                "F8_E5M2": ["fp8e5m2", torch.float8_e5m2],
-                "I64": ["i64", torch.int64],
-                "I32": ["i32", torch.int32],
-                "I16": ["i16", torch.int16],
-                "I8": ["i8", torch.int8],
-                "U8": ["u8", torch.uint8],
-                "NF4": ["nf4", "nf4"],
+            "F64": ["fp64", torch.float64],
+            "F32": ["fp32", torch.float32],
+            "F16": ["fp16", torch.float16],
+            "BF16": ["bf16", torch.bfloat16],
+            "F8_E4M3": ["fp8e4m3fn", torch.float8_e4m3fn],
+            "F8_E5M2": ["fp8e5m2", torch.float8_e5m2],
+            "I64": ["i64", torch.int64],
+            "I32": ["i32", torch.int32],
+            "I16": ["i16", torch.int16],
+            "I8": ["i8", torch.int8],
+            "U8": ["u8", torch.uint8],
+            "NF4": ["nf4", "nf4"],
         }
         for key, val in float_chart.items():
             if old_index is key:
                 return val[0], val[1]
 
-############## SET DEVICE
+    ############## SET DEVICE
     def set_device(self, device=None):
         if device is None:
-            self.device = next(iter(self.spec.get("devices",None)),None)
+            self.device = next(iter(self.spec.get("devices", None)), None)
         else:
             self.device = device
-        tf32 = self.spec.get("allow_tf32",False)
-        fasdp = self.spec.get("flash_attention",False)
-        mps_as = self.spec.get("enable_attention_slicing",False)
+        tf32 = self.spec.get("allow_tf32", False)
+        fasdp = self.spec.get("flash_attention", False)
+        mps_as = self.spec.get("enable_attention_slicing", False)
         if self.device == "cuda":
             torch.backends.cudnn.allow_tf32 = tf32
             torch.backends.cuda.enable_flash_sdp = fasdp
         elif self.device == "mps":
-                torch.backends.mps.enable_attention_slicing = mps_as
+            torch.backends.mps.enable_attention_slicing = mps_as
         return self.device
 
-############## MEM USE
+    ############## MEM USE
     def metrics(self):
         if "cuda" in self.device:
             memory = round(torch.cuda.max_memory_allocated(self.device) * 1e-9, 2)
             logger.debug(f"Total mem use: {memory}.", exc_info=True)
-            print('Total. memory used:', memory, 'GB')
+            print("Total. memory used:", memory, "GB")
 
-############## ENCODERS
+    ############## ENCODERS
     def declare_encoders(self, model_symlinks, tk_expressions, te_expressions):
         model_class = os.path.basename(model_symlinks)
 
-        if te_expressions.get("variant",0) != 0:
+        if te_expressions.get("variant", 0) != 0:
             var, dtype = self.float_converter(te_expressions["variant"])
             te_expressions["variant"] = var
             te_expressions.setdefault("torch_dtype", dtype)
 
-        self.hf_log(fatal=True) #suppress layer skip messages
+        self.hf_log(fatal=True)  # suppress layer skip messages
 
         if model_class == "CLI-VL":
-            tokenizer = CLIPTokenizer.from_pretrained(
-                model_symlinks,
-                **tk_expressions
-                )
+            tokenizer = CLIPTokenizer.from_pretrained(model_symlinks, **tk_expressions)
 
-            text_encoder = CLIPTextModel.from_pretrained(
-                model_symlinks,
-                **te_expressions
-            ).to(self.device)
+            text_encoder = CLIPTextModel.from_pretrained(model_symlinks, **te_expressions).to(self.device)
 
         elif model_class == "CLI-VG":
-            tokenizer = CLIPTokenizerFast.from_pretrained(
-                model_symlinks,
-                **tk_expressions
-                )
+            tokenizer = CLIPTokenizerFast.from_pretrained(model_symlinks, **tk_expressions)
 
-            text_encoder = CLIPTextModelWithProjection.from_pretrained(
-                model_symlinks,
-                **te_expressions
-            ).to(self.device)
+            text_encoder = CLIPTextModelWithProjection.from_pretrained(model_symlinks, **te_expressions).to(self.device)
 
         elif "T5" in model_class:
-            tokenizer = T5Tokenizer.from_pretrained(
-                model_symlinks,
-                **tk_expressions
-                )
+            tokenizer = T5Tokenizer.from_pretrained(model_symlinks, **tk_expressions)
 
-            text_encoder = T5EncoderModel.from_pretrained(
-                model_symlinks,
-                **te_expressions
-            ).to(self.device)
+            text_encoder = T5EncoderModel.from_pretrained(model_symlinks, **te_expressions).to(self.device)
 
-        self.hf_log(on=True) #return to normal
+        self.hf_log(on=True)  # return to normal
 
         return tokenizer, text_encoder
 
-############## EMBEDDINGS
+    ############## EMBEDDINGS
     def generate_embeddings(self, prompts, tokenizers_in, text_encoders_in, conditioning):
         embeddings_list = []
 
         for prompt, tokenizer, text_encoder in zip(prompts, tokenizers_in, text_encoders_in):
-            cond_input = tokenizer(
-            prompt,
-            max_length=tokenizer.model_max_length,
-            **conditioning
-        )
+            cond_input = tokenizer(prompt, max_length=tokenizer.model_max_length, **conditioning)
             prompt_embeds = text_encoder(cond_input.input_ids.to(self.device), output_hidden_states=True)
 
             pooled_prompt_embeds = prompt_embeds[0]
@@ -177,43 +157,45 @@ class T2IPipe:
 
         return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
 
- ############## VAE PT1
+    ############## VAE PT1
     def add_vae(self, model, vae_in):
-        if vae_in.get("variant",0) != 0:
+        if vae_in.get("variant", 0) != 0:
             var, dtype = self.float_converter(vae_in["variant"])
             vae_in["variant"] = var
             vae_in.setdefault("torch_dtype", dtype)
-        autoencoder = AutoencoderKL.from_single_file(model,**vae_in).to(self.device)
+        autoencoder = AutoencoderKL.from_single_file(model, **vae_in).to(self.device)
         return autoencoder
 
-############## PIPE
+    ############## PIPE
     def construct_pipe(self, model, pipe_data):
-        if pipe_data.get("variant",0) != 0:
+        if pipe_data.get("variant", 0) != 0:
             var, dtype = self.float_converter(pipe_data["variant"])
             pipe_data["variant"] = var
             pipe_data.setdefault("torch_dtype", dtype)
         pipe = AutoPipelineForText2Image.from_pretrained(model, **pipe_data).to(self.device)
 
         if self.device == "mps":
-            if self.spec.get("enable_attention_slicing",False) == True:
+            if self.spec.get("enable_attention_slicing", False) == True:
                 pipe.enable_attention_slicing()
         return pipe
 
-############## LORA
+    ############## LORA
     def add_lora(self, pipe, lora, weight_name, fuse, scale):
         pipe.load_lora_weights(lora, weight_name=weight_name)
         if fuse:
-            pipe.fuse_lora(**scale) #add unet only possibility
+            pipe.fuse_lora(**scale)  # add unet only possibility
         return pipe
 
-############## ENCODE
+    ############## ENCODE
     def encode_prompt(self, queue, tokenizers, text_encoders, conditioning):
         with torch.no_grad():
             for generation in queue:
-                generation['embeddings'] = self.generate_embeddings(
-                    [generation['prompt'], generation['prompt']],
-                    tokenizers, text_encoders, conditioning,
-                    )
+                generation["embeddings"] = self.generate_embeddings(
+                    [generation["prompt"], generation["prompt"]],
+                    tokenizers,
+                    text_encoders,
+                    conditioning,
+                )
         self.metrics()
         for i in tokenizers:
             del i
@@ -222,37 +204,44 @@ class T2IPipe:
         self.cache_jettison()
         return queue
 
-############## COMPILE
+    ############## COMPILE
     def compile_model(self, pipe, compile_data):
-        if pipe.transformer is not None: pipe.transformer = torch.compile(pipe.transformer, **compile_data)
-        if pipe.unet is not None: pipe.unet = torch.compile(pipe.unet, **compile_data)
-        if pipe.vae is not None: pipe.vae = torch.compile(pipe.vae, **compile_data)
+        if pipe.transformer is not None:
+            pipe.transformer = torch.compile(pipe.transformer, **compile_data)
+        if pipe.unet is not None:
+            pipe.unet = torch.compile(pipe.unet, **compile_data)
+        if pipe.vae is not None:
+            pipe.vae = torch.compile(pipe.vae, **compile_data)
         return pipe
 
-############## CACHE MANAGEMENT
+    ############## CACHE MANAGEMENT
     def cache_jettison(self, pipe=None):
         gc.collect()
-        if self.device == "cuda": torch.cuda.empty_cache()
-        if self.device == "mps": torch.mps.empty_cache()
-        if self.device == "xpu": torch.xpu.empty_cache()
-        if pipe: return pipe
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
+        if self.device == "mps":
+            torch.mps.empty_cache()
+        if self.device == "xpu":
+            torch.xpu.empty_cache()
+        if pipe:
+            return pipe
 
-############## SCHEDULER
+    ############## SCHEDULER
     def add_scheduler(self, pipe, scheduler_in, scheduler_data):
         self.schedule_chart = {
-            "EulerDiscreteScheduler" : EulerDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "EulerAncestralDiscreteScheduler" : EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "FlowMatchEulerDiscreteScheduler" : FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "EDMDPMSolverMultistepScheduler" : EDMDPMSolverMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "DPMSolverMultistepScheduler" : DPMSolverMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "DDIMScheduler" : DDIMScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "LCMScheduler" : LCMScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "TCDScheduler" : TCDScheduler.from_config(pipe.scheduler.config,**scheduler_data),
+            "EulerDiscreteScheduler": EulerDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "EulerAncestralDiscreteScheduler": EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "EDMDPMSolverMultistepScheduler": EDMDPMSolverMultistepScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "DPMSolverMultistepScheduler": DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "DDIMScheduler": DDIMScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "LCMScheduler": LCMScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "TCDScheduler": TCDScheduler.from_config(pipe.scheduler.config, **scheduler_data),
             "AysSchedules": AysSchedules,
-            "HeunDiscreteScheduler" : HeunDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "UniPCMultistepScheduler" : UniPCMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "LMSDiscreteScheduler" : LMSDiscreteScheduler.from_config(pipe.scheduler.config,**scheduler_data),
-            "DEISMultistepScheduler" : DEISMultistepScheduler.from_config(pipe.scheduler.config,**scheduler_data),
+            "HeunDiscreteScheduler": HeunDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "UniPCMultistepScheduler": UniPCMultistepScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "LMSDiscreteScheduler": LMSDiscreteScheduler.from_config(pipe.scheduler.config, **scheduler_data),
+            "DEISMultistepScheduler": DEISMultistepScheduler.from_config(pipe.scheduler.config, **scheduler_data),
         }
         if scheduler_in in self.schedule_chart:
             pipe.scheduler = self.schedule_chart[scheduler_in]
@@ -263,73 +252,76 @@ class T2IPipe:
             except ValueError as error_log:
                 logger.debug(f"Scheduler error {error_log}.", exc_info=True)
 
-
-############## MEMORY OFFLOADING
+    ############## MEMORY OFFLOADING
     def offload_to(self, pipe, offload_method):
         if not "cpu" in self.device:
-            if offload_method == "sequential": pipe.enable_sequential_cpu_offload()
-            elif offload_method == "cpu": pipe.enable_model_cpu_offload()
-        elif offload_method == "disk": accelerate.disk_offload()
+            if offload_method == "sequential":
+                pipe.enable_sequential_cpu_offload()
+            elif offload_method == "cpu":
+                pipe.enable_model_cpu_offload()
+        elif offload_method == "disk":
+            accelerate.disk_offload()
         return pipe
 
-############## CFG CUTOFF
+    ############## CFG CUTOFF
     def _dynamic_guidance(self, pipe, step_index, timestep, callback_key):
         if step_index is int(pipe.num_timesteps * 0.5):
-            callback_key['prompt_embeds'] = callback_key['prompt_embeds'].chunk(2)[-1]
-            callback_key['add_text_embeds'] = callback_key['add_text_embeds'].chunk(2)[-1]
-            callback_key['add_time_ids'] = callback_key['add_time_ids'].chunk(2)[-1]
+            callback_key["prompt_embeds"] = callback_key["prompt_embeds"].chunk(2)[-1]
+            callback_key["add_text_embeds"] = callback_key["add_text_embeds"].chunk(2)[-1]
+            callback_key["add_time_ids"] = callback_key["add_time_ids"].chunk(2)[-1]
             pipe._guidance_scale = 0.0
         return callback_key
 
-############## INFERENCE
+    ############## INFERENCE
     def diffuse_latent(self, pipe, queue, gen_data):
         self.metrics()
         generator = torch.Generator(device=self.device)
 
         for i, generation in enumerate(queue, start=1):
-            seed_planter(generation['seed'])
-            generator.manual_seed(generation['seed'])
-            if generation.get("embeddings",False) is not False:
+            seed_planter(generation["seed"])
+            generator.manual_seed(generation["seed"])
+            if generation.get("embeddings", False) is not False:
                 gen_data["prompt_embeds"] = generation["embeddings"][0]
                 gen_data["negative_prompt_embeds"] = generation["embeddings"][1]
                 gen_data["pooled_prompt_embeds"] = generation["embeddings"][2]
                 gen_data["negative_pooled_prompt_embeds"] = generation["embeddings"][3]
             else:
-                if self.spec["xformers"] == True: pipe.enable_xformers_memory_efficient_attention()
-            if self.spec.get("dynamo",False) == True:
-                generation['latents'] = pipe(generator=generator,**gen_data)[0] # return individual for compiled
+                if self.spec["xformers"] is True:
+                    pipe.enable_xformers_memory_efficient_attention()
+            if self.spec.get("dynamo", False) == True:
+                generation["latents"] = pipe(generator=generator, **gen_data)[0]  # return individual for compiled
             else:
-                generation['latents'] = pipe(generator=generator,**gen_data).images # return entire batch at once
+                generation["latents"] = pipe(generator=generator, **gen_data).images  # return entire batch at once
                 #  pipe ends with image, but really its a latent...
         if queue[0].get("embeddings", False) is not False:
-            #pipe.unload_lora_weights()
-            #del pipe.unet
+            # pipe.unload_lora_weights()
+            # del pipe.unet
             del generator
             pipe = self.cache_jettison(pipe)
         self.metrics()
         return pipe, queue
 
-############## AUTODECODE
+    ############## AUTODECODE
     def decode_latent(self, pipe, queue, upcast, file_prefix, counter):
         self.pipe = pipe
         if upcast == True:
             pipe.upcast_vae()
         output_dir = config.get_path("output")
         with torch.no_grad():
-            counter = [s.endswith('png') for s in output_dir].count(True) # get existing images
+            counter = [s.endswith("png") for s in output_dir].count(True)  # get existing images
             for i, generation in enumerate(queue, start=1):
-                generation['latents'] = generation['latents'].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
+                generation["latents"] = generation["latents"].to(next(iter(pipe.vae.post_quant_conv.parameters())).dtype)
 
                 image = pipe.vae.decode(
-                    generation['latents'] / pipe.vae.config.scaling_factor,
+                    generation["latents"] / pipe.vae.config.scaling_factor,
                     return_dict=False,
                 )[0]
 
-                image = pipe.image_processor.postprocess(image, output_type='pil')[0]
+                image = pipe.image_processor.postprocess(image, output_type="pil")[0]
 
                 counter += 1
                 filename = f"{file_prefix}-{counter}-batch-{i}.png"
 
-                image.save(os.path.join(config.get_path("output"), filename)) # optimize=True,
+                image.save(os.path.join(config.get_path("output"), filename))  # optimize=True,
 
                 return image.save(os.path.join(config.get_path("output"), filename))
