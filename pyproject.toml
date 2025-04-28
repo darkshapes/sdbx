@@ -11,16 +11,6 @@ requires-python = ">= 3.11"
 
 [project.optional-dependencies]
 core = [
-    # PyTorch extensions
-    # (torch, torchvision, and torchaudio version are determined by system in setup.py)
-    "diffusers",
-    "transformers",
-    "accelerate",
-    "peft",
-
-    # Other machine learning libraries
-    "llama-cpp-python",
-
     # Graph data structure
     "networkx",
 

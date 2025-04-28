@@ -5,12 +5,6 @@ from dataclasses import asdict, dataclass, field
 from inspect import signature, isgeneratorfunction
 from typing import Annotated, Any, Callable, Dict, Generic, Literal, List, Optional, Tuple, TypeVar, Union, get_args, get_origin, get_type_hints
 
-# from torch import Tensor
-# from torch.nn import Module
-
-# from PIL import Image as ImageSource
-
-# from sdbx.sd import CLIP as CLIPSource, VAE as VAESource
 from sdbx.nodes.helpers import rename_class
 
 
