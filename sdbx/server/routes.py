@@ -21,11 +21,11 @@ def register_node_routes(rtr: APIRouter):
     def list_nodes():
         return config.node_manager.node_info
     
-    @rtr.post("/prompt")
-    def start_prompt(graph: Graph):
+    @rtr.post("/prompt") # hate that this is async for reasons of conformity
+    async def start_prompt(graph: Graph):
         tid = str(uuid.uuid4())
         try:
-            task = config.executor.execute(node_link_graph(graph.dict()), tid)
+            config.executor.execute(node_link_graph(graph.dict()), tid)
             return {"task_id": tid}
         except Exception as e:
             logger.exception(e)

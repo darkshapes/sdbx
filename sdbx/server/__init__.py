@@ -1,8 +1,10 @@
 from sdbx import config
 
 def create_app():
+    import os
+    
     from fastapi import FastAPI, APIRouter
-    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
 
     app = FastAPI()
     router = APIRouter()
@@ -12,7 +14,8 @@ def create_app():
     register_routes(router)
     app.include_router(router)
 
-    # Mount the built React app's static files
-    app.mount("/", StaticFiles(directory=config.client_manager.selected_path, html=True), name="static")
+    @app.get("/{path:path}")
+    async def static(path: str):
+        return FileResponse(os.path.join(config.client_manager.selected_path, path or "index.html"))
 
     return app
