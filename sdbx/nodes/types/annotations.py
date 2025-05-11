@@ -30,3 +30,4 @@ class Dependent:
 class Validator:
     condition: Callable[[Any], bool]
     error_message: str
+

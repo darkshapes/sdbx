@@ -5,6 +5,7 @@ from sdbx.nodes.types.annotations import *
 from sdbx.nodes.types.decorator import node
 
 # Annotations
+
 from typing import Annotated as A                   # A
 
 # Iterators
@@ -45,3 +46,4 @@ from collections.abc import Iterator as I
 
 # class GLIGen(Module):                               # GLIGen
 #     use_type_as_name = True
+

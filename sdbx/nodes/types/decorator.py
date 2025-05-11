@@ -8,6 +8,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     Parameters
     ----------
         path : str 
+
             The path that the node will appear in.
         name : str
             The display name of the node.
@@ -17,6 +18,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     if fn is None:
         return partial(node, **kwargs)
     
+
     fn.generator = isgeneratorfunction(fn)
 
     from sdbx.nodes.info import NodeInfo  # Avoid circular import
@@ -26,3 +28,4 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     # fn.tuner = NodeTuner(fn)
 
     return fn
+

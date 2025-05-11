@@ -7,16 +7,58 @@ from diffusers import AutoPipelineForText2Image, DPMSolverMultistepScheduler, Au
 from diffusers.schedulers import AysSchedules
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
-queue = []    
-prompt = "A slice of a rich and delicious chocolate cake presented on a table in a luxurious palace reminiscent of Versailles"
-seed = soft_random()
-queue.extend([{
-"prompt": prompt,
-"seed": seed,
-}])
+from sdbx.config import config
+from sdbx.nodes.base import nodes
+from sdbx.indexer import IndexManager
 
+optimize         = config.node_tuner
+defaults = optimize.determine_tuning("sdxlbase.diffusion_pytorch_model.fp16.safetensors")
+queue = nodes.text_input(**defaults.get("text_input"))
 device = "cuda"
-def encode_prompt(prompts, tokenizers, text_encoders):
+
+import os
+
+# # print("\nInitializing model index, checking system specs.\n  Please wait...")
+# # create_index = IndexManager().write_index()      # (defaults to config/index.json)
+# # dif_index = config.get_default("index", "DIF")
+# # print(f"Ready.")
+# name_path = "sdxlbase.diffusion_pytorch_model.fp16.safetensors" #input("""
+# # Please type the filename of an available checkpoint.
+# # Path will be detected.
+# # (default:diffusion_pytorch_model.fp16.safetensors):""" or "diffusion_pytorch_model.fp16.safetensors")
+
+
+# name_path = os.path.basename(name_path)
+# spec = config.get_default("index","DIF")
+# name_path = name_path.strip()
+# name_path = os.path.basename(name_path)
+# if ".safetensors" not in name_path:
+#      name_path = name_path + ".safetensors"
+# for key,val in spec.items():
+#     if name_path in key:
+#         model = key
+#         pass
+
+
+# device = nodes.force_device(**defaults.get("force_device"))
+# if defaults["empty_cache"]["stage"].get("head", None) != None:
+#     nodes.empty_cache(**defaults["empty_cache"]["stage"].get("head"))
+
+
+# queue = nodes.encode_prompt(queue=queue, transformer_models=transformer_models, **defaults.get("encode_prompt"))
+# if defaults["empty_cache"]["stage"].get("encoder", None) != None:
+#     nodes.empty_cache(queue, defaults["empty_cache"]["stage"].get("encoder"))
+# pipe = nodes.diffusion_pipe(vae, **defaults.get("diffusion_pipe"))
+
+# pipe = nodes.generate_image(pipe, queue, scheduler, **defaults.get("generate_image"))
+# if defaults["empty_cache"]["stage"].get("generate", None) != None:
+#     nodes.empty_cache(pipe, defaults["empty_cache"]["stage"].get("generate"))
+# image = nodes.autodecode(pipe, **defaults.get("autodecode"))
+
+#if defaults["empty_cache"]["stage"].get("tail", None) != None:
+#       nodes.empty_cache(image, **defaults["empty_cache"]["stage"]["tail"])
+def encode_prompt(prompts, transformers_models, text_encoders):
+    tokenizers, text_encoders = transformers_models
     embeddings_list = []
     for prompt, tokenizer, text_encoder in zip(prompts, tokenizers, text_encoders):
         cond_input = tokenizer(
@@ -52,41 +94,50 @@ def encode_prompt(prompts, tokenizers, text_encoders):
 model = "C:\\Users\\Public\\models\\metadata\\STA-XL"
 clip = "C:\\Users\\Public\\models\\metadata\\CLI-VL"
 clip2 = "C:\\Users\\Public\\models\\metadata\\CLI-VG"
-tokenizer = CLIPTokenizer.from_pretrained(
-    clip,
-    local_files_only=True,
-)
 
-text_encoder = CLIPTextModel.from_pretrained(
-    clip,
-    use_safetensors=True,
-    torch_dtype=torch.float16,
-    variant='fp16',
-    local_files_only=True,
-).to(device)
+transformers_data = nodes.load_transformer(**defaults.get("load_transformer"))
 
-tokenizer_2 = CLIPTokenizer.from_pretrained(
-    clip2,
-    local_files_only=True,
-)
 
-text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
-    clip2,
-    use_safetensors=True,
-    torch_dtype=torch.float16,
-    variant='fp16',
-    local_files_only=True,
-).to(device)
+# tokenizer = CLIPTokenizer.from_pretrained(
+#     clip,
+#     local_files_only=True,
+# )
+
+# text_encoder = CLIPTextModel.from_pretrained(
+#     clip,
+#     use_safetensors=True,
+#     torch_dtype=torch.float16,
+#     variant='fp16',
+#     local_files_only=True,
+# ).to(device)
+
+# tokenizer_2 = CLIPTokenizer.from_pretrained(
+#     clip2,
+#     local_files_only=True,
+# )
+
+# text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
+#     clip2,
+#     use_safetensors=True,
+#     torch_dtype=torch.float16,
+#     variant='fp16',
+#     local_files_only=True,
+# ).to(device)
+
+conditioning = {
+    "padding"   : "max_length",
+    "truncation": True,
+    "return_tensors": 'pt'
+                }
 
 with torch.no_grad():
     for generation in queue:
         generation['embeddings'] = encode_prompt(
             [generation['prompt'], generation['prompt']],
-            [tokenizer, tokenizer_2],
-            [text_encoder, text_encoder_2],
-    )
+            transformers_data, conditioning
+            )
 
-del tokenizer, text_encoder, tokenizer_2, text_encoder_2
+del transformers_data
 
 torch.cuda.empty_cache()
 max_memory = round(torch.cuda.max_memory_allocated(device=device) / 1e9, 2)
@@ -94,23 +145,16 @@ print('Max. memory used:', max_memory, 'GB')
 
 vae_file = "C:\\Users\\Public\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors"
 config_file = "C:\\Users\\Public\\models\\metadata\\STA-XL\\vae\\config.json"
-vae = AutoencoderKL.from_single_file(vae_file, config=config_file, local_files_only=True,  torch_dtype=torch.float16, variant="fp16").to("cuda")
+# vae = AutoencoderKL.from_single_file(vae_file, config=config_file, local_files_only=True,  torch_dtype=torch.float16, variant="fp16").to("cuda")
+vae   = nodes.load_vae_model(**defaults.get("load_vae_model"))
+pipe = nodes.diffusion_pipe(vae, **defaults.get("diffusion_pipe"))
+#ays = AysSchedules["StableDiffusionXLTimesteps"]
 
-pipe = AutoPipelineForText2Image.from_pretrained(
-    model,
-    torch_dtype=torch.float16, 
-    variant="fp16",
-    tokenizer = None,
-    text_encoder = None,
-    tokenizer_2 = None,
-    text_encoder_2 = None,
-    local_files_only=True,
-    vae = vae #"C:\\Users\\Public\\models\\image\\flatpiecexlVAE_baseonA1579.safetensors"
-    ).to("cuda")
+lora = nodes.load_lora(pipe, **defaults.get("load_lora"))
+scheduler = nodes.load_scheduler(pipe, **defaults.get("noise_scheduler"))
 
-ays = AysSchedules["StableDiffusionXLTimesteps"]
-
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="dpmsolver++")
+# pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="dpmsolver++")
+pipe.scheduler = scheduler
 pipe.enable_sequential_cpu_offload()
 
 generator = torch.Generator(device=device)
@@ -124,9 +168,9 @@ for i, generation in enumerate(queue, start=1):
         negative_prompt_embeds =generation['embeddings'][1],
         pooled_prompt_embeds=generation['embeddings'][2],
         negative_pooled_prompt_embeds=generation['embeddings'][3],
-        num_inference_steps=10,
-        timesteps=ays,
-        guidance_scale=5,
+        num_inference_steps=2,
+        #timesteps=ays,
+        guidance_scale=0,
         generator=generator,
         output_type='latent',
     ).images 
