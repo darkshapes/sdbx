@@ -51,7 +51,9 @@ class Executor:
         context = TaskContext.get_current()
 
         fname = node['fname']
-        widget_inputs = node['widget_inputs']
+        widget_inputs = { name: data.get('value') for name, data in node.get('widget_inputs', {}).items() }
+        # why is the client sending all of this data? doesn't the executor just need the value?
+        # are we doing validation on the server side?
 
         nf = self.node_manager.registry[fname] # Node function
         lf = partial(nf, **inputs, **widget_inputs) # Loaded function

@@ -1,6 +1,6 @@
-from pydantic import BaseModel
-
 from typing import Dict, List, Optional, Any
+
+from pydantic import BaseModel
 
 class Edge(BaseModel):
     source: str

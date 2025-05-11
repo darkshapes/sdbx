@@ -1,9 +1,11 @@
-rom functools import partial
+from functools import partial
 from inspect import isgeneratorfunction
 
-def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
+
+def node(fn=None, **kwargs):  # Arguments defined in NodeInfo init
     """
     Decorator for nodes. All functions using this decorator will be automatically read by the node manager.
+
     Parameters
     ----------
         path : str
@@ -19,6 +21,7 @@ def node(fn=None, **kwargs): # Arguments defined in NodeInfo init
     fn.generator = isgeneratorfunction(fn)
 
     from sdbx.nodes.info import NodeInfo  # Avoid circular import
+
     fn.info = NodeInfo(fn, **kwargs)
 
     # from sdbx.nodes.tuner import NodeTuner

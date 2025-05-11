@@ -8,8 +8,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse
 
 from sdbx import config, logger
-from sdbx.server.types import Graph
 from sdbx.server.serialize import WebEncoder
+from sdbx.server.types import Graph, TaskUpdate
 
 def register_update_signal(rtr: APIRouter):
     @rtr.websocket("/ws/update")
@@ -21,24 +21,24 @@ def register_node_routes(rtr: APIRouter):
     def list_nodes():
         return config.node_manager.node_info
     
-    @rtr.post("/prompt")
-    def start_prompt(graph: Graph):
+    @rtr.post("/prompt") # hate that this is async for reasons of conformity
+    async def start_prompt(graph: Graph):
         tid = str(uuid.uuid4())
         try:
-            task = config.executor.execute(node_link_graph(graph.dict()), tid)
-            return {"task_id": tid}
+            config.executor.execute(node_link_graph(graph.dict()), tid)
+            return TaskUpdate(id=tid).dict()
         except Exception as e:
             logger.exception(e)
-            return {"error": str(e)}
+            return TaskUpdate(id=tid, error=str(e)).dict()
     
     @rtr.post("/kill/{tid}")
     def kill_prompt(tid: str):
         try:
             config.executor.halt(tid)
-            return {"task_id": tid}
+            return TaskUpdate(id=tid).dict()
         except Exception as e:
             logger.exception(e)
-            return {"error": str(e)}
+            return TaskUpdate(id=tid, error=str(e)).dict()
     
     @rtr.websocket("/ws/task/{tid}")
     async def task_subscribe_websocket(websocket: WebSocket, tid: str):
@@ -47,13 +47,18 @@ def register_node_routes(rtr: APIRouter):
         task_context = config.executor.tasks.get(tid)
 
         if not task_context:
-            await websocket.send_json({"error": "Invalid task ID"})
+            await websocket.send_json(TaskUpdate(error="Invalid task ID").dict())
             await websocket.close()
             return
         
-        websocket.send_serialized = lambda data: websocket.send({
-            "type": "websocket.send", 
-            "text": json.dumps(data, separators=(",", ":"), ensure_ascii=False, cls=WebEncoder)
+        websocket.send_update = lambda **kwargs: websocket.send({
+            "type": "websocket.send",
+            "text": json.dumps(
+                TaskUpdate(id=tid, **kwargs).dict(),
+                separators=(",", ":"),
+                ensure_ascii=False,
+                cls=WebEncoder
+            )
         })
 
         async def notifier():
@@ -72,13 +77,13 @@ def register_node_routes(rtr: APIRouter):
                     if task_context.error_event.is_set():
                         raise task_context.task_error
                     elif task_context.completion_event.is_set():
-                        await websocket.send_serialized({"task_id": tid, "results": dict(task_context.results), "completed": True})
+                        await websocket.send_update(results=dict(task_context.results), completed=True)
                         await websocket.close()
                         return
                     elif task_context.result_event.is_set():
                         print("sending results")
                         # Send the latest results of the task to the websocket
-                        await websocket.send_serialized({"task_id": tid, "results": dict(task_context.results)})
+                        await websocket.send_update(results=dict(task_context.results))
 
                         # Inform that results are finished processing
                         task_context.process_event.set() # All events are cleared by the executor
@@ -86,7 +91,7 @@ def register_node_routes(rtr: APIRouter):
                 # If error occurred, send error message and close the WebSocket
                 logger.exception(e)
                 logger.error("sending websocket error")
-                await websocket.send_json({"task_id": tid, "error": task_context.task_error})
+                await websocket.send_update(error=str(task_context.task_error))
                 await websocket.close()
                 return
 
