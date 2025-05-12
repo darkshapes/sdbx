@@ -9,6 +9,7 @@ def node(fn=None, **kwargs):  # Arguments defined in NodeInfo init
     Parameters
     ----------
         path : str
+
             The path that the node will appear in.
         name : str
             The display name of the node.
