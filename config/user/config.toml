@@ -22,25 +22,26 @@ external-address = "localhost" # [default "localhost"] URL for external API, suc
 max-upload-size = 100 # [default 100] Maximum file import size
 auto-launch = true # [default true] Opens Shadowbox in the default browser on launch.
 known-models = true # [default true] Toggle whether known (downloadable) models are shown in the UI.
-preview-mode = "auto" # [default auto] Show image while generating. "none" | "auto" | "latent2rgb" | "taesd"
+# preview-mode = "auto" # [default auto] Show image while generating. "none" | "auto" | "latent2rgb" | "taesd"
 
 [computational] # Settings that directly affect inference computation
 deterministic = false # [default false] Use slower deterministic algorithms. Determinism not guaranteed
 
 [memory] # force RAM management
-vram = "normal"     # [default "normal"] Available VRAM = "high" | "normal" | "low" | "none"
-smart-memory = true # [default true] Agressively offload to DRAM instead of VRAM
+# vram = "normal"     # [default "normal"] Available VRAM = "high" | "normal" | "low" | "none"
+# smart-memory = true # [default true] Agressively offload to DRAM instead of VRAM
+system-profiling = true # [default true] Agressively offload to DRAM instead of VRAM
 
-[precision] # Bitrate for float point and weight calculation
-fp = "mixed"             # [default "mixed"] Floating point = "mixed" | "float32" | "float16" | "bfloat16" 
-unet = "float32"         # [default "float32"] Unet = "float32" | "float16" | "bfloat16" | "float8_e4m3fn" | "float8_e5m2"
-vae = "mixed"            # [default "mixed"] VAE = "mixed" | "float32" | "float16" | "bfloat16"
-text-encoder = "float16" # [default "float16"] Text encoder = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"
+# [precision] # Bitrate for float point and weight calculation
+# fp = "mixed"             # [default "mixed"] Floating point = "mixed" | "float32" | "float16" | "bfloat16" 
+# unet = "float32"         # [default "float32"] Unet = "float32" | "float16" | "bfloat16" | "float8_e4m3fn" | "float8_e5m2"
+# vae = "mixed"            # [default "mixed"] VAE = "mixed" | "float32" | "float16" | "bfloat16"
+# text-encoder = "float16" # [default "float16"] Text encoder = "float32" | "float16" | "float8_e4m3fn" | "float8_e5m2"
 
-[distributed] # Multi GPU and computer rendering
-role = false                                    # [default false] mode = "worker" | "frontend" | false.
-name = "shadowbox"                              # [default "shadowbox"] Exchange prompt requests and replies using queue_name.user_ID.
-connection-uri = "amqp://guest:guest@127.0.0.1" # [default "amqp://guest:guest@127.0.0.1"] AMQP communication URL.
+# [distributed] # Multi GPU and computer rendering
+# role = false                                    # [default false] mode = "worker" | "frontend" | false.
+# name = "shadowbox"                              # [default "shadowbox"] Exchange prompt requests and replies using queue_name.user_ID.
+# connection-uri = "amqp://guest:guest@127.0.0.1" # [default "amqp://guest:guest@127.0.0.1"] AMQP communication URL.
 
-[organization]
-channels-first = false # [default false] Toggles channels last format when inferencing the models.
+# [organization]
+# channels-first = false # [default false] Toggles channels last format when inferencing the models.
