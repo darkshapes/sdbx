@@ -1,32 +1,19 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel", "pip"]
+requires      = ["setuptools", "setuptools-scm", "wheel", "pip"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sdbx"
-dynamic = ["version", "dependencies"]
-description = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
-authors = [
-    { name = "darkshapes" },
-]
+name            = "sdbx"
+dynamic         = ["version", "dependencies"]
+description     = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
+authors         = [{ name = "darkshapes" }]
 requires-python = ">= 3.11"
 
 [project.optional-dependencies]
 core = [
-    # PyTorch extensions
-    # (torch, torchvision, and torchaudio version are determined by system in setup.py)
-    "diffusers",
-    "transformers",
-    "accelerate",
-    "peft",
+    "nnll[nnll-01,nnll-04, nnll-05,nnll-49, nnll-62] @ git+https://github.com/darkshapes/nnll@x/dev", # Machine learning libraries
 
-    # Other machine learning libraries
-    "llama-cpp-python",
-
-    # Graph data structure
-    "networkx",
-
-    # Server libraries
+    # Server libraries     # (torch, torchvision, and torchaudio version are determined by system in setup.py)
     "fastapi",
     "uvicorn",
     "watchfiles",
@@ -37,7 +24,6 @@ core = [
     "virtualenv",
 
     # Data validation
-    "pydantic",
     "pydantic_settings",
 ]
 dev = [

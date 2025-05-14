@@ -30,9 +30,15 @@ config_source_location = os.path.join(source, "config")
 
 @cache
 def get_config_location() -> dict[str]:
-    """Return user the config folder for each platform type
+    """Return user the config folder for each platform type\n
     :return: A dictionary keyed by OS name
     """
+    # Rationale: operator may want to discard the application
+    # EXAMPLES: maintin experimental conditions, improper venv setup, conflicting dependencies, troubleshooting,
+    # overreliance on experience with reinstalling to fix things, disk space full, they got advice online, etc
+    # we want to accomodate this, and for the user to return to the application with previous settings intact
+    # Therefore, settings are kept separate from the application in os-specific library location
+
     from platform import system
 
     filename = "config.toml"

@@ -166,3 +166,5 @@ cython_debug/
 
 #microsoft
 .vscode
+log/*
+log/

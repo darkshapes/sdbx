@@ -12,9 +12,10 @@ from asyncio import Queue, Event, create_task, gather
 
 import networkx as nx
 from networkx import MultiDiGraph
-
+from nnll_01 import debug_monitor
 from sdbx import config, logger
 from sdbx.server.types import Edge, Node
+
 
 current_context = contextvars.ContextVar("current_context")
 
@@ -57,10 +58,11 @@ class Executor:
         self.node_manager = node_manager
         self.tasks = {}
 
+    # @debug_monitor
     async def execute_node(self, node_id: str, node: Node, inputs: Dict[str, Any]) -> None:
         """Retrieve function name and processes additional inputs from\n
         :param node_id: Title of the node
-        :param node: Dictionary containing node functions
+        :param node: Dictionary containing node functions (expects "fname" key)
         :param inputs: Arguments collected from the node widgets to feed into the node function
         """
         context = TaskContext.get_current()
