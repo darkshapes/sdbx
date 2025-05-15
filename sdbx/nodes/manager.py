@@ -20,7 +20,7 @@ class NodeManager:
 
     def __init__(self, node_modules: ExtensionRegistry, nodes_path: str, env_name: str = ".node_env") -> None:
         """Create an instance of NodeManager\n
-        :param extensions: Auxillary node extensions installed by user (expects "nodes" key)
+        :param node_modules: Auxillary node extensions installed by user
         :param nodes_path: The install location for node extensions
         :param env_name: Location for the Python venv to constrain node dependencies in, defaults to ".node_env"
         """

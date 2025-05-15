@@ -32,13 +32,13 @@ config_source_location = os.path.join(source, "config")
 def get_config_location() -> dict[str]:
     """Return user the config folder for each platform type\n
     :return: A dictionary keyed by OS name
-    """
-    # Rationale: operator may want to discard the application
-    # EXAMPLES: maintin experimental conditions, improper venv setup, conflicting dependencies, troubleshooting,
-    # overreliance on experience with reinstalling to fix things, disk space full, they got advice online, etc
-    # we want to accomodate this, and for the user to return to the application with previous settings intact
-    # Therefore, settings are kept separate from the application in os-specific library location
 
+    Rationale: operator may want to discard the application\n
+    EXAMPLES: to maintain experimental conditions, improper venv setup, conflicting dependencies, troubleshooting,
+    overreliance on reinstalling to fix things, switching computersquit, disk space full, they got advice online, etc\n
+    we want to accomodate this, and for the user to return to the application with previous settings intact\n
+    Therefore, settings are kept separate from the application in os-specific library location
+    """
     from platform import system
 
     filename = "config.toml"
@@ -97,11 +97,14 @@ class MemoryConfig(ConfigModel):
 
     system_profiling: bool = True
 
+
 type ExtensionRegistry = Dict[Path, HttpUrl]
+
 
 class ExtensionData(BaseSettings):
     clients: ExtensionRegistry = {}
-    nodes:   ExtensionRegistry = {}
+    nodes: ExtensionRegistry = {}
+
 
 class Config(BaseSettings):
     """Configuration options parsed from config.toml."""
@@ -265,9 +268,7 @@ class Config(BaseSettings):
     @cached_property
     def extension_data(self) -> ExtensionData:
         """Additional extensions to load with the system"""
-        return ExtensionData.validate(
-            TomlConfigSettingsSource(ExtensionData, toml_file=os.path.join(self.path, "extensions.toml"))()
-        )
+        return ExtensionData.validate(TomlConfigSettingsSource(ExtensionData, toml_file=os.path.join(self.path, "extensions.toml"))())
         # with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
         #     return tomllib.load(f)
 

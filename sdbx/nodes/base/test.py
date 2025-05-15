@@ -3,20 +3,41 @@ from PIL import Image
 from sdbx.nodes.types import *
 
 
-@node(name="Displays String", display=True)
-def displays_string(string: str):
-    print(string)
-
-
-@node(path="Test", name="Input Node", display=True)
-def input_node(string: str):
+@node(path="Test", name="Input Node")
+def input_node(string: A[str, Text()] = None) -> str:
     return string
 
 
 @node(path="Test", name="Display Node", display=True)
-def display_node(string: str):
+def display_node(string: str) -> str:
     print(f"Received string: {string}")
     return string
+
+
+# @node(path="Test", name="Display Node", display=True)
+# def display_node(string: str) -> str:
+#     print(f"Received string: {string}")
+#     return string
+
+
+# @node(name="Outputs String")
+# def outputs_string(string: str) -> str:
+#     return string
+
+
+# @node(name="Outputs String")
+# def outputs_string(string: A[str, Text()] = None) -> str:
+#     return string
+
+
+# @node(name="Displays String", display=True)
+# def displays_string(string: str):
+#     print("prints_string prints:", string)
+
+
+# @node(name="Displays String", display=True)
+# def displays_string(string: str):
+#     print(string)
 
 
 # @node(display=True)

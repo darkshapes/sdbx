@@ -222,18 +222,8 @@ def llm_print(response: str) -> I[str]:
 
 
 @node(name="Outputs String")
-def outputs_string(string: str) -> str:
+def outputs_string(string: A[str, Text()] = None) -> str:
     return string
-
-
-# @node(name="Outputs String")
-# def outputs_string(string: str = None) -> str:
-#     return string
-
-
-# @node(name="Displays String", display=True)
-# def displays_string(string: str):
-#     print("prints_string prints:", string)
 
 
 # @node(name="Text Inversion")

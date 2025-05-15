@@ -14,6 +14,7 @@ import networkx as nx
 from networkx import MultiDiGraph
 from nnll_01 import debug_monitor
 from sdbx import config, logger
+from sdbx.nodes.manager import NodeManager
 from sdbx.server.types import Edge, Node
 
 
@@ -54,7 +55,7 @@ class TaskContext:
 class Executor:
     """Execute graph nodes, interface with `node_manager` and track active tasks"""
 
-    def __init__(self, node_manager) -> None:
+    def __init__(self, node_manager: NodeManager) -> None:
         self.node_manager = node_manager
         self.tasks = {}
 
