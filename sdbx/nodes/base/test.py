@@ -8,6 +8,17 @@ def displays_string(string: str):
     print(string)
 
 
+@node(path="Test", name="Input Node", display=True)
+def input_node(string: str):
+    return string
+
+
+@node(path="Test", name="Display Node", display=True)
+def display_node(string: str):
+    print(f"Received string: {string}")
+    return string
+
+
 # @node(display=True)
 # def output_dictionary(string: A[str, Text()] = None) -> dict:
 #     return {"fname": print, "args": "string"}
