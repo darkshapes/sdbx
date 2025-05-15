@@ -3,11 +3,12 @@ import tomllib
 import logging
 import urllib3
 
+from sdbx.config import ExtensionRegistry
 from sdbx.clients.releases import download_asset, get_asset_url, parse_service
 
 class ClientManager:
-    def __init__(self, extensions, clients_path):
-        self.client_signatures = extensions["clients"]
+    def __init__(self, client_signatures: ExtensionRegistry, clients_path):
+        self.client_signatures = client_signatures
         self.clients_path = clients_path
 
         self.http = None

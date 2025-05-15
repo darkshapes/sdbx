@@ -11,19 +11,20 @@ from typing import Callable, Dict, List
 
 import virtualenv
 
+from sdbx.config import ExtensionRegistry
 from sdbx.nodes.helpers import cache
 
 
 class NodeManager:
     """Ensure node extensions are installed in a venv and available for use."""
 
-    def __init__(self, extensions: dict, nodes_path: str, env_name: str = ".node_env") -> None:
+    def __init__(self, node_modules: ExtensionRegistry, nodes_path: str, env_name: str = ".node_env") -> None:
         """Create an instance of NodeManager\n
         :param extensions: Auxillary node extensions installed by user (expects "nodes" key)
         :param nodes_path: The install location for node extensions
         :param env_name: Location for the Python venv to constrain node dependencies in, defaults to ".node_env"
         """
-        self.node_modules = extensions["nodes"]
+        self.node_modules = node_modules
         self.nodes_path = nodes_path
 
         self.initialize_environment(env_name)

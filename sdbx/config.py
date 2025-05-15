@@ -10,11 +10,11 @@ from io import TextIOWrapper
 from functools import cache, cached_property, partial  # , total_ordering
 from glob import glob
 
-# from pathlib import Path
-from typing import Callable, ClassVar, Generator, List, Literal, Set, Tuple, Type, Union
+from pathlib import Path
+from typing import Callable, ClassVar, Dict, Generator, List, Literal, Set, Tuple, Type, Union
 
 import torch  # noqa: F811
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -65,12 +65,12 @@ class ExtensionsConfig(ConfigModel):
 class LocationConfig(ConfigModel):
     """Default directory paths"""
 
-    clients: str = "clients"
-    nodes: str = "nodes"
-    flows: str = "flows"
-    input: str = "input"
-    output: str = "output"
-    models: str = "models"
+    clients: Path = "clients"
+    nodes: Path = "nodes"
+    flows: Path = "flows"
+    input: Path = "input"
+    output: Path = "output"
+    models: Path = "models"
 
 
 class WebConfig(ConfigModel):
@@ -97,6 +97,11 @@ class MemoryConfig(ConfigModel):
 
     system_profiling: bool = True
 
+type ExtensionRegistry = Dict[Path, HttpUrl]
+
+class ExtensionData(BaseSettings):
+    clients: ExtensionRegistry = {}
+    nodes:   ExtensionRegistry = {}
 
 class Config(BaseSettings):
     """Configuration options parsed from config.toml."""
@@ -212,8 +217,8 @@ class Config(BaseSettings):
         """Cache a map of names to file paths, generate paths for model sub directories"""
         root = {n: os.path.join(self.path, p) for n, p in dict(self.location).items()}  # see self.location for details
 
-        for n, p in dict(self.location).items():
-            if ".." in p:
+        for n, p in root.items():
+            if not Path(p).resolve().is_relative_to(self.path):
                 raise ValueError("Cannot set location outside of config path.")
 
         models = {f"models.{name}": os.path.join(root["models"], name) for name in self.get_default("directories", "models")}
@@ -258,24 +263,27 @@ class Config(BaseSettings):
         return d
 
     @cached_property
-    def extension_data(self) -> TextIOWrapper:
+    def extension_data(self) -> ExtensionData:
         """Additional extensions to load with the system"""
-        with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
-            return tomllib.load(f)
+        return ExtensionData.validate(
+            TomlConfigSettingsSource(ExtensionData, toml_file=os.path.join(self.path, "extensions.toml"))()
+        )
+        # with open(os.path.join(self.path, "extensions.toml"), "rb") as f:
+        #     return tomllib.load(f)
 
     @cached_property
     def node_manager(self) -> Callable:
         """**`B̴̨̒e̷w̷͇̃ȁ̵͈r̸͔͛ę̵͂ ̷̫̚t̵̻̐h̶̜͒ȩ̸̋ ̵̪̄ő̷̦ù̵̥r̷͇̂o̷̫͑b̷̲͒ò̷̫r̴̢͒ô̵͍s̵̩̈́`**"""
         from sdbx.nodes.manager import NodeManager  # we must import this here lest we summon the dreaded ouroboros
 
-        return NodeManager(self.extension_data, nodes_path=self.get_path("nodes"))
+        return NodeManager(self.extension_data.nodes, nodes_path=self.get_path("nodes"))
 
     @cached_property
     def client_manager(self) -> Callable:
         """Client to use for the system"""
         from sdbx.clients.manager import ClientManager
 
-        return ClientManager(self.extension_data, clients_path=self.get_path("clients"))
+        return ClientManager(self.extension_data.clients, clients_path=self.get_path("clients"))
 
     @cached_property
     def executor(self) -> Callable:
