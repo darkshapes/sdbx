@@ -208,12 +208,12 @@ class Executor:
             context.task_error = e
             context.error_event.set()
 
-    def execute(self, graph: MultiDiGraph, task_id: str) -> None:
+    def execute(self, graph: MultiDiGraph, task_id: str, context: TaskContext = None) -> None:
         """Start the execution process of the specified graph\n
         :param graph: Refers to the graph in use
         :param task_id: The context indicator for the execution
         """
-        context = TaskContext()
+        context = context or TaskContext()
         self.tasks[task_id] = context
         with context.use():
             context.running_task = create_task(self.execute_graph(graph))
