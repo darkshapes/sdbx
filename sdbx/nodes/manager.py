@@ -8,7 +8,7 @@ import sysconfig
 from functools import cached_property
 from inspect import getmembers, isfunction
 from typing import Callable, Dict, List
-
+import subprocess
 import virtualenv
 
 from sdbx.config import ExtensionRegistry
@@ -20,7 +20,7 @@ class NodeManager:
 
     def __init__(self, node_modules: ExtensionRegistry, nodes_path: str, env_name: str = ".node_env") -> None:
         """Create an instance of NodeManager\n
-        :param node_modules: Auxillary node extensions installed by user
+        :param node_modules: Auxiliary node extensions installed by user
         :param nodes_path: The install location for node extensions
         :param env_name: Location for the Python venv to constrain node dependencies in, defaults to ".node_env"
         """
@@ -62,23 +62,23 @@ class NodeManager:
     # We should provide a robust solution when ready.
 
     # def validate_node_installed(self, node_module: str, url: str):
-    # 	"""Pull nodes from a remote repo\n
-    # 	:param node_module" The node to access
-    # 	:param url: The url to access it from
-    # 	:return: The name of the node
-    # 	"""
+    #     """Pull nodes from a remote repo\n
+    #     :param node_module" The node to access
+    #     :param url: The url to access it from
+    #     :return: The name of the node
+    #     """
 
     #     node_path = os.path.join(self.nodes_path, os.path.normpath(node_module))
     #     node_name = os.path.basename(node_module)
 
     #     if not os.path.exists(node_path):  # check all manifest nodes downloaded
-    #          logging.info(f"Downloading {node_module}...")
-    #          os.makedirs(node_path, exist_ok=True)
-    #          porcelain.clone(url, node_path)
+    #         logging.info(f"Downloading {node_module}...")
+    #         os.makedirs(node_path, exist_ok=True)
+    #         porcelain.clone(url, node_path)
 
     #     if node_name not in self.env_packages:  # check all downloaded nodes installed
-    #          logging.info(f"Installing {node_module}...")
-    #          subprocess.check_call([self.env_pip, "install", "-e", node_path])
+    #         logging.info(f"Installing {node_module}...")
+    #         subprocess.check_call([self.env_pip, "install", "-e", node_path])
 
     #     return node_name
 
@@ -115,7 +115,7 @@ class NodeManager:
 
     @cached_property
     def registry(self) -> Dict[str, Callable]:
-        """Each node’s name is mapped to its callable function
-        :return:  Dictionary of node names -> function
+        """Each nodes' name is mapped to its callable function
+        :return: Dictionary of node names -> function
         """
         return {node.__name__: cache(node) for node in self.nodes}

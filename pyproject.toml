@@ -7,11 +7,20 @@ name            = "sdbx"
 dynamic         = ["version", "dependencies"]
 description     = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
 authors         = [{ name = "darkshapes" }]
-requires-python = ">= 3.11"
+requires-python = ">= 3.12"
+
+[dependency-groups]
+dev = [
+    # Testing frameworks and tools
+    "mir[dev] @ git+https://github.com/darkshapes/mir@main",
+    "pytest",
+    "pytest-asyncio",
+    "sdbx[core]",
+]
 
 [project.optional-dependencies]
 core = [
-    "nnll[nnll-01,nnll-04, nnll-05,nnll-49, nnll-62] @ git+https://github.com/darkshapes/nnll@main", # Machine learning libraries
+    # Machine learning libraries
 
     # Server libraries     # (torch, torchvision, and torchaudio version are determined by system in setup.py)
     "fastapi",
@@ -25,11 +34,14 @@ core = [
 
     # Data validation
     "pydantic_settings",
+    "mir[full] @ git+https://github.com/darkshapes/mir@main",
 ]
 dev = [
     # Testing frameworks and tools
+    "mir[dev] @ git+https://github.com/darkshapes/mir@main",
     "pytest",
     "pytest-asyncio",
+    "sdbx[core]",
 ]
 
 [project.scripts]

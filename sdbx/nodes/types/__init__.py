@@ -5,10 +5,11 @@ from sdbx.nodes.types.annotations import *
 from sdbx.nodes.types.decorator import node
 
 # Annotations
-from typing import Annotated as A                   # A
+from typing import Annotated as A  # A
 
 # Iterators
 from collections.abc import Iterator as I
+
 
 # Primitives
 # bool                                              # bool
