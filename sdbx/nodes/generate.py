@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Callable, Union, List
 from mir.constants import PkgType
+import typing
 
 
 def terminal_gen_cls(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
@@ -8,10 +9,11 @@ def terminal_gen_cls(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, 
     :param pkg_name: The name of the package where the class resides.
     :returns: A dictionary containing three groups of parameters: 'generation', 'pipe', and 'aux'.
     :raises: ModuleNotFoundError or AttributeError if path or class is not found"""
-
     from nnll.metadata.helpers import make_callable, class_parent
     from nnll.tensor_pipe.deconstructors import get_code_names, root_class
     from nnll.monitor.file import dbuq
+    from sdbx.nodes.types import Text, Numerical, Slider
+    import sdbx
 
     pkg_name = pkg_name.value[1].lower()
     pipe_args = {}
@@ -24,13 +26,16 @@ def terminal_gen_cls(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, 
     elif pkg_name == "transformers":
         module_path = root_class(class_name, "transformers").get("config")
         pipe_class_obj = make_callable(module_name=class_name, pkg_name_or_abs_path=".".join(module_path[:3]))
-    gen_args = pipe_class_obj.__call__.__annotations__
-    pipe_args = pipe_class_obj.__init__.__annotations__
+    gen_args = typing.get_type_hints(pipe_class_obj.__call__)
+    # gen_args = {k: type_map.get(v, Callable) for k, v in preprocess_gen_args.items()}
+    pipe_args = typing.get_type_hints(pipe_class_obj.__init__)
     dbuq(pipe_class_obj)
+
     if hasattr(pipe_class_obj, "_optional_components"):
         optional_components = pipe_class_obj._optional_components
         dbuq(optional_components)
-        pipe_aux = {k: Optional[v] for k, v in pipe_args.items() if k in optional_components}
+        # pipe_aux = {k: type_map.get(v, v) for k, v in pipe_args.items() if k in optional_components}
+
     parameter_groups = {
         "class_name": class_name,
         "pipe_class_obj": pipe_class_obj,
