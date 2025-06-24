@@ -6,7 +6,7 @@ import pytest_asyncio
 from sdbx.executor import Executor, TaskContext
 from sdbx.nodes.types import *
 from sdbx.server.types import Node
-from nnll_01 import debug_monitor, dbug
+from nnll.monitor.file import debug_monitor, dbug
 
 
 @node(name="DumbAFNode", display=False)

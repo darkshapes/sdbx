@@ -12,7 +12,7 @@ from asyncio import Queue, Event, create_task, gather
 
 import networkx as nx
 from networkx import MultiDiGraph
-from nnll_01 import debug_monitor
+from nnll.monitor.file import debug_monitor
 from sdbx import config, logger
 from sdbx.nodes.manager import NodeManager
 from sdbx.server.types import Edge, Node
