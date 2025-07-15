@@ -1,25 +1,37 @@
 from typing import Dict, Callable, Union, List
-from types import FunctionType
-from mir.constants import PkgType
-import typing
+from zodiac.providers.constants import PkgType
 
 
-def terminal_gen(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
+def terminal_gen(class_obj: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
     """Generate parameter groups based on class name and package name.\n
-    :param class_name: The name of the class from which to generate parameters.
-    :param class_obj: The class object referred to in.
+    :param class_obj: The name of the class from which to generate parameters.
+    :param pkg_name: The class object referred to in.
     :returns: A dictionary containing three groups of parameters: 'generation', 'pipe', and 'aux'.
     :raises: `ModuleNotFoundError` or `AttributeError` if path or class is not found"""
 
-    from nnll.metadata.helpers import snake_caseify, make_callable
-    from nnll.monitor.file import dbuq
+    import typing
 
-    class_obj = make_callable(module_name=class_name, pkg_name_or_abs_path=pkg_name.value[1].lower())
+    from nnll.metadata.helpers import snake_caseify, make_callable
+
+    # from nnll.monitor.file import dbuq
+    pkg_name = pkg_name.value[1].lower()
+    # trace_modular_class(class_name=class_name, pkg_name=pkg_name)
+    # class_obj = make_callable(module_name=class_name, pkg_name_or_abs_path=pkg_name)
+    if not isinstance(class_obj, str):
+        class_name = class_obj.__name__
+
+    else:
+        class_name = class_obj
+        class_obj = make_callable(class_name, pkg_name)
+    if class_name == "HunyuanVideoFramepackPipeline":
+        return None
+
     pipe_args = {}
     pipe_aux = {}
     gen_args = typing.get_type_hints(class_obj.__call__)
     pipe_args = typing.get_type_hints(class_obj.__init__)
-    dbuq(class_obj)
+
+    # dbuq(class_obj)
 
     if hasattr(class_obj, "_optional_components"):
         optional_components = class_obj._optional_components
@@ -40,6 +52,8 @@ def terminal_gen(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, Unio
     return parameter_groups
 
 
+# [terminal_gen(v) for k,v in parameter_groups.get('pipeline_args').items()]
+
 # def autotype_methods(class_name: Union[str, Callable], pkg_type: PkgType) -> Dict[str, Dict[str, Callable]]:
 #     from sdbx.nodes.types import Text, Numerical, Slider
 #     from nnll.metadata.helpers import make_callable
@@ -58,3 +72,13 @@ def terminal_gen(class_name: str, pkg_name: PkgType) -> Dict[str, Dict[str, Unio
 #             if isinstance(v, data_type):
 #                 v.update(note(v))
 #     return function_parameters
+
+# def trace_modular_class(class_name: str, pkg_name: str) -> List[str]:
+#     from mir.mappers import class_parent
+
+#     class_path = class_parent(class_name, pkg_name)
+#     modular_pipeline = "modular_" + class_path[-1]
+#     class_path.append(modular_pipeline)
+#     modular_data = ".".join(class_path)
+
+#     __all__
