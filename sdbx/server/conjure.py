@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0 AND LicenseRef-Commons-Clause-License-Condition-1.0
 # <!-- // /*  d a r k s h a p e s */ -->
 
-# import json
-# import uuid
-# from fastapi import WebSocket
-# from starlette.websockets import WebSocketDisconnect
-# from typing import Dict
-# from fastapi.responses import JSONResponse
+import json
+import uuid
+from fastapi import WebSocket, APIRouter
+from starlette.websockets import WebSocketDisconnect
+from typing import Dict
+from fastapi.responses import JSONResponse
 
 
 from server.routes import register_update_signal
@@ -14,35 +14,12 @@ from server.routes import register_update_signal
 
 node_data = {
     "id": str(uuid.uuid4()),
-    "name": "New Node",
+    "name": "Display Text",
     "position": {"x": 100, "y": 100},
     "fn": "some_node_function",
     "width": 200,
     "height": 80,
 }
-
-from fastapi import APIRouter,
-async def add_node(websocket: WebSocket, action: str, data: dict):
-    await send_command(websocket, "insert_node", node_data)
-
-
-# @rtr.post("/command/insert_node")
-# async def insert_node_api(node: Dict):
-#     """
-#     API endpoint to trigger insertion of a node.
-#     This can be used if WebSockets are not preferred or for HTTP-based commands.
-#     """
-#     node_data = {
-#         "id": str(uuid.uuid4()),
-#         "name": "Display Text",
-#         "position": {"x": 100, "y": 100},
-#         "fn": "display_text",
-#         "width": 200,
-#         "height": 80,
-#     }
-#     # Simulate sending the command through WebSocket
-#     # In a real implementation, you would broadcast to connected clients
-#     return JSONResponse(content=node_data)
 
 
 # async def send_command(websocket: WebSocket, action: str, data: dict):

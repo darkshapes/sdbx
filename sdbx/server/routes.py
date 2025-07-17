@@ -3,7 +3,7 @@ import logging
 import os
 import uuid
 from asyncio import FIRST_COMPLETED, create_task, wait
-
+from websockets.asyncio.server import broadcast
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse
@@ -12,6 +12,7 @@ from networkx import node_link_graph
 from sdbx import config, logger
 from sdbx.server.serialize import WebEncoder
 from sdbx.server.types import Graph, TaskUpdate
+from sdbx.nodes.base.nodes import register_add_node_router
 
 
 def register_update_signal(rtr: APIRouter):
@@ -102,7 +103,7 @@ def register_node_routes(rtr: APIRouter):
     @rtr.post("/tune/{node_id}")
     def tune_node(node_id: str, graph: Graph):
         try:
-            g = node_link_graph(graph.dict())
+            g = node_link_graph(graph.model_dump())
             node_fn = config.node_manager.registry[g.nodes[node_id]["fname"]]
             params = node_fn.tuner.collect_tuned_parameters(config.node_manager, g, node_id)
             return {"tuned_parameters": params}
@@ -121,20 +122,7 @@ def register_flow_routes(rtr: APIRouter):
         return json.load(os.path.join(config.get_path("flows"), item))
 
 
-def register_node_manipulation_routes(rtr: APIRouter):
-    @rtr.websocket("/ws/command")
-    async def command_websocket(websocket: WebSocket):
-        await websocket.accept()
-
-        # Closure-based send_command
-        async def send_command(action, data):
-            message = json.dumps({"action": action, "data": data})
-            await websocket.send_text(message)
-
-        add_node_command = send_command
-
-
 def register_routes(rtr: APIRouter):
     register_node_routes(rtr)
     register_flow_routes(rtr)
-    register_node_manipulation_routes(rtr)
+    register_add_node_router(rtr)

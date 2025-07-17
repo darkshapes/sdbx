@@ -60,6 +60,7 @@ class NodeManager:
 
     # The convenience of pulling nodes from repos has proven very insecure for other projects.
     # We should provide a robust solution when ready.
+    # Ehh I also couldnt get porcelain to work...
 
     # def validate_node_installed(self, node_module: str, url: str):
     #     """Pull nodes from a remote repo\n

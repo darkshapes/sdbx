@@ -7,6 +7,10 @@ from types import FunctionType, NoneType
 from typing import Dict, List, Optional, Union, Tuple, Literal, Any, Coroutine
 from PIL.Image import Image
 import sounddevice as sd
+from fastapi import APIRouter
+from sdbx.server.types import Graph
+from networkx import node_link_graph
+from sdbx import logger
 
 # from nnll.metadata.helpers import make_callable
 from nnll.mir.json_cache import MIR_PATH_NAMED, TEMPLATE_PATH_NAMED, JSONCache
@@ -25,41 +29,41 @@ MIR_DATA = JSONCache(MIR_PATH_NAMED)
 TEMPLATE_DATA = JSONCache(TEMPLATE_PATH_NAMED)
 
 
-def track_imports(input_string: Optional[str]) -> Dict[str, FunctionType]:
-    """Track imports from a given string and return a dictionary mapping module names to their base import functions.\n
-    :param input_string: A string containing import statements or paths to modules.
-    :return: A dictionary where keys are module names and values are the imported functions."""
+# def track_imports(input_string: Optional[str]) -> Dict[str, FunctionType]:
+#     """Track imports from a given string and return a dictionary mapping module names to their base import functions.\n
+#     :param input_string: A string containing import statements or paths to modules.
+#     :return: A dictionary where keys are module names and values are the imported functions."""
 
-    from importlib import import_module
+#     from importlib import import_module
 
-    pattern: str = r"(\b\w+\.\w+\b)"  # locate "[word."" or " word."
-    local_name_server: Dict[str, str] = {"types": import_module("types", "NoneType")}
-    if input_string:
-        matches: List[List[str]] = re.findall(pattern, input_string)
-        found: List[str]
-        for found in matches:
-            package_name = found.split(".")[0]
-            local_name_server.setdefault(package_name, import_module(package_name))
-    return local_name_server
+#     pattern: str = r"(\b\w+\.\w+\b)"  # locate "[word."" or " word."
+#     local_name_server: Dict[str, str] = {"types": import_module("types", "NoneType")}
+#     if input_string:
+#         matches: List[List[str]] = re.findall(pattern, input_string)
+#         found: List[str]
+#         for found in matches:
+#             package_name = found.split(".")[0]
+#             local_name_server.setdefault(package_name, import_module(package_name))
+#     return local_name_server
 
 
-def serialize_function(name: str, args_def: dict[str, type], body: str = "    ") -> FunctionType:
-    """Dynamically generate a function string with specified keyword arguments and types.\n
-    :param name: Function name.
-    :param kwarg_types: Mapping of keyword arg names to types.
-    :body: Function body as string (indented with spaces).
-    :returns: A callable function object with the provided attributes"""
+# def serialize_function(name: str, args_def: dict[str, type], body: str = "    ") -> FunctionType:
+#     """Dynamically generate a function string with specified keyword arguments and types.\n
+#     :param name: Function name.
+#     :param kwarg_types: Mapping of keyword arg names to types.
+#     :body: Function body as string (indented with spaces).
+#     :returns: A callable function object with the provided attributes"""
 
-    import ast
+#     import ast
 
-    static_args = str(args_def)[1:-1].replace("<class '", "").replace("'>", "").replace("'", "")
-    func_code = f"def {name}({static_args}):\n{body}\n"
-    local_name_server = track_imports(static_args)
-    dbuq(local_name_server)
-    node_function = ast.parse(func_code, mode="exec")
-    code = compile(source=node_function, filename="<dynamic>", mode="exec")
-    exec(code, globals(), local_name_server)
-    return local_name_server
+#     static_args = str(args_def)[1:-1].replace("<class '", "").replace("'>", "").replace("'", "")
+#     func_code = f"def {name}({static_args}):\n{body}\n"
+#     local_name_server = track_imports(static_args)
+#     dbuq(local_name_server)
+#     node_function = ast.parse(func_code, mode="exec")
+#     code = compile(source=node_function, filename="<dynamic>", mode="exec")
+#     exec(code, globals(), local_name_server)
+#     return local_name_server
 
 
 # @MIR_DATA.decorator
@@ -123,6 +127,45 @@ def serialize_function(name: str, args_def: dict[str, type], body: str = "    ")
 #                     #     ),
 #                     # )
 #                     # setattr(node_array, func_name, static_node)
+
+
+def register_add_node_router(rtr: APIRouter):
+    @rtr.post("/add/{node_id}")
+    async def add_node(node_name: str, graph: Graph):
+        from sdbx.nodes.base import nodes as base_nodes
+        from importlib import import_module
+
+        try:
+            g = node_link_graph(graph.model_dump())
+            node_data = import_module(
+                base_nodes,
+                node_name,
+            )
+            # node_data = {
+            #     "id": str(uuid.uuid4()),
+            #     "name": config.node_manager.registry[g.nodes[node_name]["name"]],
+            #     "position": {"x": 100, "y": 100},
+            #     "fn": config.node_manager.registry[g.nodes[node_name]["fname"]],
+            #     "width": 200,
+            #     "height": 80,
+            # }
+            g.nodes.append(node_data)
+            # graph.links
+            return g
+        except Exception as e:
+            logger.exception(e)
+            print({"error": str(e)})
+
+    @rtr.post("/tune/{node_id}")
+    def tune_node(node_id: str, graph: Graph):
+        try:
+            g = node_link_graph(graph.model_dump())
+            node_fn = config.node_manager.registry[g.nodes[node_id]["fname"]]
+            params = node_fn.tuner.collect_tuned_parameters(config.node_manager, g, node_id)
+            return {"tuned_parameters": params}
+        except Exception as e:
+            logger.exception(e)
+            return {"error": str(e)}
 
 
 # load prompt save generate
