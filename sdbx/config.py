@@ -21,12 +21,12 @@ from pydantic_settings import (
     SettingsConfigDict,
     TomlConfigSettingsSource,
 )
+from pydantic import ValidationError
 
 # pylint: disable=unnecessary-lambda, unnecessary-lambda-assignment
 
 source = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 config_source_location = os.path.join(source, "config")
-
 
 @cache
 def get_config_location() -> dict[str]:
@@ -36,7 +36,7 @@ def get_config_location() -> dict[str]:
     Rationale: operator may want to discard the application\n
     EXAMPLES: to maintain experimental conditions, improper venv setup, conflicting dependencies, troubleshooting,
     overreliance on reinstalling to fix things, switching computersquit, disk space full, they got advice online, etc\n
-    we want to accomodate this, and for the user to return to the application with previous settings intact\n
+    we want to accommodate this, and for the user to return to the application with previous settings intact\n
     Therefore, settings are kept separate from the application in os-specific library location
     """
     from platform import system
@@ -48,7 +48,6 @@ def get_config_location() -> dict[str]:
         "darwin": os.path.join(os.path.expanduser("~"), "Library", "Application Support", "Shadowbox", filename),
         "linux": os.path.join(os.path.expanduser("~"), ".config", "shadowbox", filename),
     }[system().lower()]
-
 
 class ConfigModel(BaseModel):
     """Config file system"""
@@ -319,5 +318,14 @@ def parse(testing: bool = False) -> Config:
 
     return Config(path=args.config)
 
+LOCAL_CONFIG = get_config_location()
+try:
 
-config = parse(testing=hasattr(sys, "_called_from_test"))
+    config = parse(testing=hasattr(sys, "_called_from_test"))
+except ValidationError:
+    try:
+        os.remove(LOCAL_CONFIG)
+    except FileNotFoundError:
+        pass
+    config = parse(testing=hasattr(sys, "_called_from_test"))
+
