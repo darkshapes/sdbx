@@ -1,3 +1,9 @@
+---
+language:
+- en
+library_name: sdbx
+license_name: MPL-2.0 + Commons Clause 1.0
+---
 
 
 # [SDBX](https://github.com/darkshapes/sdbx) / Powerful ML
