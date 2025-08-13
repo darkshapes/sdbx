@@ -1,228 +1,144 @@
 # ### <!-- // /*  d a r k s h a p e s */ -->
 
-import re
 import contextlib
-from pathlib import Path
-from types import FunctionType, NoneType
-from typing import Dict, List, Optional, Union, Tuple, Literal, Any, Coroutine
-from PIL.Image import Image
+from decimal import Decimal
+from typing import Any, AsyncGenerator, Coroutine, Generator, Literal, Optional, Union
+
+import dspy
 import sounddevice as sd
-from fastapi import APIRouter
-from sdbx.server.types import Graph
-from networkx import node_link_graph
-from sdbx import logger
+from PIL.Image import Image
+from zodiac.providers.registry_entry import RegistryEntry
+from zodiac.toga import app
 
-# from nnll.metadata.helpers import make_callable
-from nnll.mir.json_cache import MIR_PATH_NAMED, TEMPLATE_PATH_NAMED, JSONCache
-from nnll.monitor.file import dbuq
+from sdbx.nodes.types import A, Dependent, I, Name, Numerical, Slider, Text, node
 
-# from zodiac.providers.constants import PkgType
-from sdbx.nodes.signatures import qa_program
-
-# from sdbx.nodes.generate import terminal_gen  # , autotype_methods
-from sdbx.nodes.types import A, Slider, Text, node, I, Name, Numerical
-
-SIGNATURE_TYPES = [
-    qa_program,
-]
-MIR_DATA = JSONCache(MIR_PATH_NAMED)
-TEMPLATE_DATA = JSONCache(TEMPLATE_PATH_NAMED)
+# from sdbx import logger
+# from sdbx.server.types import Graph
 
 
-# def track_imports(input_string: Optional[str]) -> Dict[str, FunctionType]:
-#     """Track imports from a given string and return a dictionary mapping module names to their base import functions.\n
-#     :param input_string: A string containing import statements or paths to modules.
-#     :return: A dictionary where keys are module names and values are the imported functions."""
-
-#     from importlib import import_module
-
-#     pattern: str = r"(\b\w+\.\w+\b)"  # locate "[word."" or " word."
-#     local_name_server: Dict[str, str] = {"types": import_module("types", "NoneType")}
-#     if input_string:
-#         matches: List[List[str]] = re.findall(pattern, input_string)
-#         found: List[str]
-#         for found in matches:
-#             package_name = found.split(".")[0]
-#             local_name_server.setdefault(package_name, import_module(package_name))
-#     return local_name_server
-
-
-# def serialize_function(name: str, args_def: dict[str, type], body: str = "    ") -> FunctionType:
-#     """Dynamically generate a function string with specified keyword arguments and types.\n
-#     :param name: Function name.
-#     :param kwarg_types: Mapping of keyword arg names to types.
-#     :body: Function body as string (indented with spaces).
-#     :returns: A callable function object with the provided attributes"""
-
-#     import ast
-
-#     static_args = str(args_def)[1:-1].replace("<class '", "").replace("'>", "").replace("'", "")
-#     func_code = f"def {name}({static_args}):\n{body}\n"
-#     local_name_server = track_imports(static_args)
-#     dbuq(local_name_server)
-#     node_function = ast.parse(func_code, mode="exec")
-#     code = compile(source=node_function, filename="<dynamic>", mode="exec")
-#     exec(code, globals(), local_name_server)
-#     return local_name_server
-
-
-# @MIR_DATA.decorator
-# def _read_data(data: Optional[Dict[str, str]] = None):
-#     return data
-
-
-# class NodeArray:
-#     """"""
-
-
-# node_array = NodeArray()
-
-# field_book = []
-# TEMPLATE_DATA._load_cache()
-# template_data = TEMPLATE_DATA._cache
-# mir_data = _read_data()
-# for series, compatibility in mir_data.items():
-#     arch_name = series.split(".")[1:]
-#     for comp_name, comp_data in compatibility.items():
-#         if any(arch in arch_name for arch in template_data["arch"]["diffuser"]) and comp_data.get("pkg", 0) and comp_data["pkg"]["0"].get("diffusers"):
-#             class_name = comp_data["pkg"]["0"]["diffusers"]
-#             if "Pipeline" in class_name:
-#                 make_callable(class_name, PkgType.DIFFUSERS.value[1].lower())
-#                 dbuq(class_name)
-#                 node_frame = terminal_gen(class_name, PkgType.DIFFUSERS)
-#                 if node_frame is not None:
-#                     func_name = node_frame["func_name"]
-#                     try:
-#                         tray_path = "frameworks/diffusers"
-#                         tray_path += "/" if node_frame["aux_classes"] else "/pipelines"
-
-#                         local_name_server = serialize_function(name=func_name, args_def=node_frame["generation_args"], body="    return 12")
-#                         static_node = node(name=node_frame["node_name"], path=tray_path)(local_name_server[func_name])
-#                         locals()[func_name] = static_node
-
-#                     except ModuleNotFoundError:
-#                         pass
-#         elif any(arch in arch_name for arch in template_data["arch"]["transformer"]) and comp_data.get("pkg", 0) and comp_data["pkg"]["0"].get("transformers"):
-#             class_name = comp_data["pkg"]["0"]["transformers"]
-#             if "Model" in class_name:
-#                 dbuq(class_name)
-#                 node_frame = terminal_gen(class_name, PkgType.TRANSFORMERS)
-#                 func_name = node_frame["func_name"]
-#                 try:
-#                     local_name_server = serialize_function(name=func_name, args_def=node_frame["generation_args"], body="    return 12")
-#                     static_node = node(name=node_frame["node_name"], path="frameworks/transformers")(local_name_server[func_name])
-#                     locals()[func_name] = static_node
-
-#                 except ModuleNotFoundError:
-#                     pass
-
-#                     # field = {node_frame["node_name"]: (node, ...), "default": static_node}
-#                     # field_book.append(create_model(class_name + "ElementBase", func_name=(node, static_node)))
-#                     # setattr(node_array, func_name, static_node)
-
-#                     # field_book.append(
-#                     #     create_model(
-#                     #         class_name + "ElementBase",
-#                     #         func_name=(node, static_node),
-#                     #     ),
-#                     # )
-#                     # setattr(node_array, func_name, static_node)
-
-
-def register_add_node_router(rtr: APIRouter):
-    @rtr.post("/add/{node_id}")
-    async def add_node(node_name: str, graph: Graph):
-        from sdbx.nodes.base import nodes as base_nodes
-        from importlib import import_module
-
-        try:
-            g = node_link_graph(graph.model_dump())
-            node_data = import_module(
-                base_nodes,
-                node_name,
-            )
-            # node_data = {
-            #     "id": str(uuid.uuid4()),
-            #     "name": config.node_manager.registry[g.nodes[node_name]["name"]],
-            #     "position": {"x": 100, "y": 100},
-            #     "fn": config.node_manager.registry[g.nodes[node_name]["fname"]],
-            #     "width": 200,
-            #     "height": 80,
-            # }
-            g.nodes.append(node_data)
-            # graph.links
-            return g
-        except Exception as e:
-            logger.exception(e)
-            print({"error": str(e)})
-
-    @rtr.post("/tune/{node_id}")
-    def tune_node(node_id: str, graph: Graph):
-        try:
-            g = node_link_graph(graph.model_dump())
-            node_fn = config.node_manager.registry[g.nodes[node_id]["fname"]]
-            params = node_fn.tuner.collect_tuned_parameters(config.node_manager, g, node_id)
-            return {"tuned_parameters": params}
-        except Exception as e:
-            logger.exception(e)
-            return {"error": str(e)}
-
-
-# load prompt save generate
 @node(path="load", name="Load LLM")
-def load_llm(
-    model: Union[Path, str],
-    api_url: A[str, Text(multiline=False)],
-    api_base: A[str, Text(multiline=False)],
-    api_key: A[str, Text(multiline=False)] = None,
-    model_type: A[str, Text(multiline=False)] = None,
-    max_tokens: A[int, Numerical(min=0, max=10e7)] = 4000,
+async def load_llm(
+    model: RegistryEntry,
+    cache: bool = True,
+    max_tokens: A[int, Numerical(min=0, max=0xFFFFFFFFFFFFFFFF, step=16)] = 4096,
+    max_workers: A[int, Numerical(min=0, max=16)] = 4,
     temperature: A[float, Slider(min=0, max=2.0)] = 0.0,
-    cache: bool = False,
-) -> A[contextlib.contextmanager, Name("MODEL_CONTEXT")]:
-    import dspy
+    bypass_api_options: bool = False,
+    api_base: A[
+        str,
+        Dependent(on="bypass_api_options", when=True),
+        Text(
+            multiline=False,
+            dynamic_prompts=False,
+        ),
+    ] = None,
+    api_key: A[
+        str,
+        Dependent(on="bypass_api_options", when=True),
+        Text(
+            multiline=False,
+            dynamic_prompts=False,
+        ),
+    ] = None,
+    model_type: A[Optional[str], Dependent(on="bypass_api_options", when=True), Literal["chat", "text", ""]] = "",
+) -> A[dspy.LM, Name("MODEL")]:
+    dspy.configure_cache(enable_disk_cache=cache)
+    lm_kwargs = {"async_max_workers": max_workers, "cache": cache, "max_tokens": max_tokens}
+    lm_kwargs.setdefault("temperature", temperature) if temperature else ()
+    if not bypass_api_options:
+        api_kwargs = model.api_kwargs
+    else:
+        api_kwargs.setdefault("model_type", model_type) if model_type else ()
+        api_kwargs.setdefault("api_key", api_key) if api_key else ()
+        api_kwargs.setdefault("api_base", api_base) if api_base else ()
+    lm_model = dspy.LM(
+        model.model,
+        **api_kwargs,
+        **lm_kwargs,
+    )
+    return lm_model
 
-    api_kwargs = {"api_base": api_base}
-    api_kwargs.setdefault("model_type", model_type) if model_type else ()
-    api_kwargs.setdefault("model_type", api_key) if api_key else ()
-    api_kwargs.setdefault("max_tokens", max_tokens) if max_tokens else ()
 
-    return dspy.context(lm=dspy.LM(model=model, cache=cache, **api_kwargs))
+@node(path="generate", name="Add Streaming")
+async def add_streaming(
+    model: dspy.LM,
+    dspy_stream: bool = True,
+    async_stream: bool = True,
+    stream_type: A[
+        str,
+        Literal[
+            "auto",
+            "dspy",
+            "litellm",
+        ],
+    ] = "auto",
+    include_final_output: bool = False,
+    adapter: Optional[dspy.ChatAdapter] = None,
+) -> A[contextlib.contextmanager, Name("CONTEXT")]:
+    from zodiac.toga.signatures import StreamActivity
+
+    context_kwargs = {"lm": model}
+    if adapter:
+        context_kwargs.setdefault("adapter", adapter)
+    if stream_type == "dspy" or stream_type == "auto":
+        stream_listeners = [dspy.streaming.StreamListener(signature_field_name="answer")]  # TODO: automate from dspy.Signature,
+    predictor_kwargs = {
+        "status_message_provider": StreamActivity(),  # feedback to zodiac interface
+        "async_streaming": async_stream,
+        "include_final_prediction_in_output_stream": include_final_output,
+    }
+    if dspy_stream:
+        predictor_kwargs["stream_listeners"] = stream_listeners
+
+    return context_kwargs, predictor_kwargs
 
 
 @node(path="prompt", name="Text Prompt")
-def text_prompt(
+async def text_prompt(
     text: A[str, Text(multiline=True, dynamic_prompts=True)] = "",
-) -> A[str, Name("TEXT_PROMPT")]:
+) -> A[str, Name("PROMPT")]:
     return text
 
 
-@node(path="prompt", name="Image Prompt")
-def image_prompt(
-    image: Optional[Image] = None,
-) -> A[Image, Name("IMAGE")]:
-    return image
-
-
-@node(path="generate", name="Generate Text")
-async def generate_text(
-    model_context: Tuple[contextlib.contextmanager],
-    prompts: str,
-    voice_device: Optional[sd.DeviceList] = None,
-    signature: A[str, Literal[next(iter([SIGNATURE_TYPES]), "")]] = next(iter(SIGNATURE_TYPES)),
+@node(path="generate", name="stream_inference")
+async def stream_inference(
+    context: contextlib.contextmanager,
+    audio_prompt: list = None,
+    image_prompt: Image = None,
+    text_prompt: str = None,
 ) -> A[Any, Name("GENERATOR")]:
-    with model_context:
-        async for prediction in qa_program(question=text_prompt):
-            yield prediction
-    # self.status.value = "Complete"
+    from dspy import context as dspy_context
+    from dspy import streamify
+    from zodiac.toga.signatures import Predictor
+
+    prompts = dict()
+    prompts.setdefault("text", text_prompt) if text_prompt else ()
+    prompts.setdefault("audio", audio_prompt) if audio_prompt else ()
+    prompts.setdefault("image", image_prompt) if image_prompt else ()
+    context_kwargs, predictor_kwargs = context  # ,dspy_stream=False)
+    with dspy_context(**context_kwargs):
+        generator = streamify(Predictor(), **predictor_kwargs)
+        return generator(question=prompts["text"])
 
 
 @node(path="save", display=True, name="Display Text")
 async def display_text(
-    generator: Coroutine,
-) -> I[str]:
+    generator: Any = None,
+) -> I[Any]:  # pyright:ignore[reportInvalidTypeForm]
     from dspy import Prediction
-    from dspy.streaming import StreamResponse, StatusMessage
+    from dspy.streaming import StatusMessage, StreamResponse
+    from litellm.types.utils import ModelResponseStream  # StatusStreamingCallback
+
+    if isinstance(generator, AsyncGenerator):
+        async for prediction in generator:
+            if isinstance(generator, ModelResponseStream) and prediction["choices"][0]["delta"]["content"]:
+                yield prediction["choices"][0]["delta"]["content"]
+            elif isinstance(generator, StreamResponse):
+                yield str(generator.chunk)
+            elif isinstance(generator, Prediction):
+                yield str(generator.answer)
+            # elif isinstance(generator, StatusMessage):
+            # app.app.Interface.status_display.text = app.app.Interface.status_text_prefix + str(generator.message)
 
     if isinstance(generator, StreamResponse):
         yield generator.chunk
@@ -232,28 +148,38 @@ async def display_text(
         yield generator.message
 
 
-@node(path="")
-async def record_audio(self, frequency: int = 16000) -> None:
+@node(path="prompt", name="Audio Prompt")
+async def audio_prompt(
+    sample_rate: A[int, Numerical(min=8000, max=64000, step=8000)] = 16000,
+    duration: A[float, Numerical(min=1.0, max=10.0)] = 3.0,
+) -> A[tuple[list, Decimal], Name("PROMPT")]:
     """Get audio from mic"""
-    self.frequency = frequency
-    self.audio_stream = [0]
-    self.audio_stream = sd.rec(int(self.precision), samplerate=self.frequency, channels=1)
+
+    precision = duration * sample_rate
+    audio_stream = [0]
+    audio_stream = sd.rec(int(precision), samplerate=sample_rate, channels=1)
     sd.wait()
-    self.sample_length = str(float(len(self.audio_stream) / frequency))
-    return self.audio_stream
+    sample_length = Decimal(str(float(len(audio_stream) / sample_rate)))
+    return audio_stream, sample_length
 
 
-async def play_audio(self) -> None:
-    """Playback audio recordings"""
-    try:
-        sd.play(self.audio_stream, samplerate=self.frequency)
-        sd.wait()
-    except TypeError as error_log:
-        dbuq(error_log)
+# async def play_audio(self) -> None:
+#     """Playback audio recordings"""
+#     try:
+#         sd.play(self.audio_stream, samplerate=self.frequency)
+#         sd.wait()
+#     except TypeError as error_log:
+#         dbuq(error_log)
 
 
-async def erase_audio(self) -> None:
-    """Clear audio graph and recording"""
-    self.audio_stream = [0]
-    self.frequency = 0.0
-    self.sample_length = 0.0
+# async def erase_audio(self) -> None:
+#     """Clear audio graph and recording"""
+#     self.audio_stream = [0]
+#     self.frequency = 0.0
+#     self.sample_length = 0.0
+
+# @node(path="prompt", name="Image Prompt")
+# def image_prompt(
+#     image: Optional[Image] = None,
+# ) -> A[Image, Name("IMAGE")]:
+#     return image

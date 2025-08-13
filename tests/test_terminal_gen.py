@@ -1,6 +1,7 @@
 import pytest
 from nnll.metadata.helpers import snake_caseify
 from sdbx.nodes.generate import terminal_gen
+from zodiac.providers.constants import PkgType
 
 
 # Define a test case for the terminal_gen function
@@ -21,7 +22,7 @@ def test_terminal_gen_diffusers_cls():
     }
 
     # Call the function with mocked values
-    result = terminal_gen(class_name, class_obj)
+    result = terminal_gen(class_obj, PkgType.DIFFUSERS)
 
     # Assert that the output matches the expected structure
     assert result == expected_output
@@ -44,7 +45,7 @@ def test_terminal_gen_transformers_cls():
     }
 
     # Call the function with mocked values
-    result = terminal_gen(class_name, class_obj)
+    result = terminal_gen(class_name, PkgType.TRANSFORMERS)
 
     # Assert that the output matches the expected structure
     assert result == expected_output
@@ -69,7 +70,7 @@ def test_terminal_gen_diffusers_with_aux_classes():
     }
 
     # Call the function with mocked values
-    result = terminal_gen(class_name, class_obj)
+    result = terminal_gen(class_obj, PkgType.TRANSFORMERS)
 
     # Assert that the output matches the expected structure
     assert result == expected_output
@@ -82,7 +83,7 @@ def test_terminal_gen_invalid_class():
     class_obj = AyaVisionConfig
     class_name = class_obj.__name__
 
-    result = terminal_gen(class_name, AyaVisionConfig)
+    result = terminal_gen(AyaVisionConfig, PkgType.TRANSFORMERS)
     assert not result["generation_args"]
     assert not result["pipeline_args"]
     assert not result["aux_classes"]

@@ -2,46 +2,58 @@
 # <!-- // /*  d a r k s h a p e s */ -->
 
 import dspy
+from zodiac.toga.signatures import QATask
 
 
-class Active(dspy.streaming.StatusMessageProvider):
-    def lm_start_status_message(self):
-        return "Processing.."
-
-    def lm_end_status_message(self):
-        return "Complete."
-
-
-class QATask(dspy.Signature):
-    """Reply with short responses within 60-90 word/10k character code limits"""
-
-    question: str = dspy.InputField(desc="The question to respond to")
-    answer = dspy.OutputField(desc="Often between 60 and 90 words and limited to 10000 character code blocks")
-
-
-class QuestionAnswer(dspy.Module):
+class Predictor(dspy.Module):
     def __init__(self):
-        super().__init__()
-        self.predict = dspy.Predict(QATask)
+        super().__init__
+        self.program = dspy.Predict(signature=QATask)
 
-    def forward(self, question, **kwargs):
-        self.predict(question=question, **kwargs)
-        return self.predict(question=question, **kwargs)
+    def __call__(self, question: str):
+        from litellm.exceptions import APIConnectionError
+        from litellm.llms.ollama.common_utils import OllamaError
+        from httpx import ConnectError
+        from dspy.utils.exceptions import AdapterParseError
+        from aiohttp.client_exceptions import ClientConnectorError
+
+        try:
+            return self.program(question=question)
+        except (ClientConnectorError, ConnectError, AdapterParseError, APIConnectionError, OllamaError, OSError):
+            pass
 
 
-qa_program = dspy.streamify(
-    QuestionAnswer(),
-    stream_listeners=[
-        dspy.streaming.StreamListener(signature_field_name="answer"),  # allow_reuse=True),
-    ],
-)
+# class Active(dspy.streaming.StatusMessageProvider):
+#     def lm_start_status_message(self):
+#         return "Processing.."
+
+#     def lm_end_status_message(self):
+#         return "Complete."
 
 
-# class VisionTask(dspy.Signature):
-#     """Describe the image in detail."""
+# class QATask(dspy.Signature):
+#     """Reply with short responses within 60-90 word/10k character code limits"""
 
-#     image: dspy.Image = dspy.InputField(desc="An image")
-#     description: str = dspy.OutputField(desc="Detailed description of the image.")
+#     question: str = dspy.InputField(desc="The question to respond to")
+#     answer = dspy.OutputField(desc="Often between 60 and 90 words and limited to 10000 character code blocks")
+
+
+# class QuestionAnswer(dspy.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.predict = dspy.Predict(QATask)
+
+#     def forward(self, question, **kwargs):
+#         self.predict(question=question, **kwargs)
+#         return self.predict(question=question, **kwargs)
+
+
+# qa_program = dspy.streamify(
+#     QuestionAnswer(),
+#     stream_listeners=[
+#         dspy.streaming.StreamListener(signature_field_name="answer"),  # allow_reuse=True),
+#     ],
+# )
 
 
 # image_path="image.png"
@@ -53,14 +65,6 @@ qa_program = dspy.streamify(
 # print(result.description)
 
 # dspy.Audio
-
-
-# class SpeechTask(dspy.Signature):
-#     f"""{bqa_sysprompt}"""
-
-#     message: str = dspy.InputField(desc="The message to respond to")
-#     # history: dspy.History = dspy.InputField()
-#     answer = dspy.OutputField(desc="Often between 60 and 90 words and limited to 10000 character code blocks")
 
 
 # class T2ASignature(dspy.Signature):

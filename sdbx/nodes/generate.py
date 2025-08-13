@@ -1,8 +1,8 @@
-from typing import Dict, Callable, Union, List
+from typing import Callable, Optional
 from zodiac.providers.constants import PkgType
 
 
-def terminal_gen(class_obj: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
+def terminal_gen(class_name_or_obj: str, pkg_name: PkgType) -> dict[str, dict[str | Callable | list[str]]]:
     """Generate parameter groups based on class name and package name.\n
     :param class_obj: The name of the class from which to generate parameters.
     :param pkg_name: The class object referred to in.
@@ -13,16 +13,16 @@ def terminal_gen(class_obj: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union
 
     from nnll.metadata.helpers import snake_caseify, make_callable
 
-    # from nnll.monitor.file import dbuq
     pkg_name = pkg_name.value[1].lower()
-    # trace_modular_class(class_name=class_name, pkg_name=pkg_name)
-    # class_obj = make_callable(module_name=class_name, pkg_name_or_abs_path=pkg_name)
-    if not isinstance(class_obj, str):
-        class_name = class_obj.__name__
-
+    if not isinstance(class_name_or_obj, str):
+        class_name = class_name_or_obj.__name__
+        class_obj = class_name_or_obj
     else:
-        class_name = class_obj
-        class_obj = make_callable(class_name, pkg_name)
+        class_name = class_name_or_obj
+        class_obj = make_callable(class_name_or_obj, pkg_name)
+        # trace_modular_class(class_name=class_name, pkg_name=pkg_name)
+        # class_obj = make_callable(module_name=class_name, pkg_name_or_abs_path=pkg_name)
+        # class_obj = getattr(pkg_obj,class_name_or_obj)
     if class_name == "HunyuanVideoFramepackPipeline":
         return None
 
@@ -35,6 +35,7 @@ def terminal_gen(class_obj: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union
 
     if hasattr(class_obj, "_optional_components"):
         optional_components = class_obj._optional_components
+        print(optional_components)
         pipe_aux = {}
         if optional_components and pipe_args:
             for component in optional_components:
@@ -50,6 +51,7 @@ def terminal_gen(class_obj: str, pkg_name: PkgType) -> Dict[str, Dict[str, Union
         "aux_classes": pipe_aux,
     }
     return parameter_groups
+
 
 
 # [terminal_gen(v) for k,v in parameter_groups.get('pipeline_args').items()]

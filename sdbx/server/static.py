@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 
 from sdbx import config
 
+
 def register_static(app: FastAPI):
     @app.get("/{path:path}")
     async def static(path: str):

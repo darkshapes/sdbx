@@ -12,7 +12,6 @@ from networkx import node_link_graph
 from sdbx import config, logger
 from sdbx.server.serialize import WebEncoder
 from sdbx.server.types import Graph, TaskUpdate
-from sdbx.nodes.base.nodes import register_add_node_router
 
 
 def register_update_signal(rtr: APIRouter):
@@ -111,6 +110,33 @@ def register_node_routes(rtr: APIRouter):
             logger.exception(e)
             return {"error": str(e)}
 
+    # @rtr.post("/add/{node_id}")
+    # async def add_nodes(node_name: str, graph: Graph):
+    #     from sdbx.server.types import Node,
+    #     from sdbx.nodes.base import nodes as base_nodes
+    #     from importlib import import_module
+
+    #     try:
+    #         g = node_link_graph(graph.model_dump())
+    #         node_data = import_module(
+    #             base_nodes,
+    #             node_name,
+    #         )
+    #         # node_data = {
+    #         #     "id": str(uuid.uuid4()),
+    #         #     "name": config.node_manager.registry[g.nodes[node_name]["name"]],
+    #         #     "position": {"x": 100, "y": 100},
+    #         #     "fn": config.node_manager.registry[g.nodes[node_name]["fname"]],
+    #         #     "width": 200,
+    #         #     "height": 80,
+    #         # }
+    #         graph.nodes.append(node_data)
+    #         # graph.links
+    #         return
+    #     except Exception as e:
+    #         logger.exception(e)
+    #         return {"error": str(e)}
+
 
 def register_flow_routes(rtr: APIRouter):
     @rtr.get("/flows")
@@ -125,4 +151,3 @@ def register_flow_routes(rtr: APIRouter):
 def register_routes(rtr: APIRouter):
     register_node_routes(rtr)
     register_flow_routes(rtr)
-    register_add_node_router(rtr)
