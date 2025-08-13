@@ -1,18 +1,32 @@
-schedulers = [
-    "EulerDiscreteScheduler",
-    "EulerAncestralDiscreteScheduler",
-    "HeunDiscreteScheduler",
-    "UniPCMultistepScheduler",
-    "DDIMScheduler",                    # rescale_betas_zero_snr=True, timestep_spacing="trailing"
-    "DPMSolverMultistepScheduler",      # dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
-    "LMSDiscreteScheduler",             # use_karras_sigmas=True
-    "DEISMultistepScheduler",
-    "AysSchedules"
+pipelines = [
+    "StableDiffusionXLPipeline",
+    "FluxPipeline",
+    "HunyuanDiTPipeline",
+    "StableDiffusionPipeline",
+    "PixArtAlphaPipeline",
+    "PixArtSigmaPipeline",
+    "AuraFlowPipeline",          # add any additional pipelines here
 ]
 
-solvers = [
-    "dpmsolver++",
-    "sde-dpmsolver++",
-    "sde-dpmsolver",
-    "dpmsolver"
+schedulers = [
+    "EulerDiscreteScheduler",          # default 0 STA-XL default, HUN,
+    "EulerAncestralDiscreteScheduler", # default 1 SDXL turbo
+    "FlowMatchEulerDiscreteScheduler", # default 2 AUR, FLU
+    "EDMDPMSolverMultistepScheduler",  # default 3 PLA
+    "DPMSolverMultistepScheduler",     # default 4 SD3 dpmpp2m, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++", 
+    "DDIMScheduler",                   # default 5 rescale_betas_zero_snr=True, timestep_spacing="trailing"
+    "LCMScheduler",                    # default 6
+    "TCDScheduler",                    # default 7
+    "AysSchedules",                    # default 8
+    "HeunDiscreteScheduler",
+    "UniPCMultistepScheduler",
+    "LMSDiscreteScheduler",            # use_karras_sigmas=True
+    "DEISMultistepScheduler",          # add any additional or custom samplers after this line
+    # "example custom sampler",
 ]
+
+# arrange this order as you like
+lora_priority = ["PCM", "TCD", "SPO", "HYP", "LIG", "LCM", "DMD", "RT-", "FLA"]
+
+# this order does not need to be changed
+solvers = ["dpmsolver++", "sde-dpmsolver++", "sde-dpmsolver", "dpmsolver"]

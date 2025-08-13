@@ -1,32 +1,27 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel", "pip"]
+requires      = ["setuptools", "setuptools-scm", "wheel", "pip"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sdbx"
-dynamic = ["version", "dependencies"]
-description = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
-authors = [
-    { name = "darkshapes" },
+name            = "sdbx"
+dynamic         = ["version", "dependencies"]
+description     = "A powerful and modular stable diffusion GUI with a graph/nodes interface."
+authors         = [{ name = "darkshapes" }]
+requires-python = ">= 3.12"
+
+[dependency-groups]
+dev = [
+    # Testing frameworks and tools
+    "zodiac[dev] @ git+https://github.com/darkshapes/zodiac@main",
+    "pytest",
+    "pytest-asyncio",
+    "ruff>=0.12.0",
+    "sdbx[core]",
 ]
-requires-python = ">= 3.11"
 
 [project.optional-dependencies]
 core = [
-    # PyTorch extensions
-    # (torch, torchvision, and torchaudio version are determined by system in setup.py)
-    "diffusers",
-    "transformers",
-    "accelerate",
-    "peft",
-
-    # Other machine learning libraries
-    "llama-cpp-python",
-
-    # Graph data structure
-    "networkx",
-
-    # Server libraries
+    # Server libraries     # (torch, torchvision, and torchaudio version are determined by system in setup.py)
     "fastapi",
     "uvicorn",
     "watchfiles",
@@ -37,13 +32,19 @@ core = [
     "virtualenv",
 
     # Data validation
-    "pydantic",
     "pydantic_settings",
+
+    # Machine learning libraries
+    "zodiac[full] @ git+https://github.com/darkshapes/zodiac@main",
+
 ]
 dev = [
     # Testing frameworks and tools
+    "zodiac[dev] @ git+https://github.com/darkshapes/zodiac@main",
     "pytest",
     "pytest-asyncio",
+    "ruff>=0.12.0",
+    "sdbx[core]",
 ]
 
 [project.scripts]
@@ -53,3 +54,25 @@ sdbx = "sdbx.__main__:main"
 packages = ["sdbx"]
 
 [tool.setuptools_scm]
+
+
+[tool.ruff]
+line-length    = 140
+include        = ["*.py"]
+extend-exclude = ["^tests/.*$", "test.*$"]
+
+# [tool.ruff.format]
+# exclude = ["*.py"]
+
+[tool.pylint]
+max-line-length = 140
+ignore-paths    = ["^tests/.*$", "test_.*$"]
+disable         = ["C0415"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length               = 140
+ignore-overlong-task-comments = true
+
+[tool.typos]
+files.extend-exclude = ["^tests/.*$", "test.*$"]
+default.extend-words = { "ot" = "ot" }

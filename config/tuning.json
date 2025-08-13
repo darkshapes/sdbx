@@ -1,0 +1,490 @@
+{
+    "known": {
+        "adaLN_modulation": "mmdit",
+        "mlp.fc": "mmdit",
+        "mlpX": "mmdit",
+        "w1q": "mmdit",
+        "self_attn.out_proj": "mmdit",
+        "w1o": "mmdit",
+        "mlpX.c_proj": "mmdit",
+        "mlpC.c_proj": "mmdit",
+        "w2q.": "mmdit",
+        "w2k.": "mmdit",
+        "w2v.": "mmdit",
+        "w2o.": "mmdit",
+        "w1k.": "mmdit",
+        "w1v.": "mmdit",
+        "mlpX.c_fc": "mmdit",
+        "mlpX.c_proj.": "mmdit",
+        "mlpC.c_fc": "mmdit",
+        "modC.": "mmdit",
+        "modX.": "mmdit",
+        "model.register_tokens": "auraflow",
+        "model.positional_encoding": "auraflow",
+        "model.init_x_linear": "auraflow",
+        "model.t_embedder.mlp.": "auraflow",
+        "modCX": "flux",
+        "img_attn.proj": "flux",
+        "time_in.in_layer": "flux",
+        "time_in.out_layer": "flux",
+        "vector_in.in_layer": "flux",
+        "vector_in.out_layer": "flux",
+        "guidance_in.in_layer": "flux",
+        "txt_in": "flux",
+        "img_in": "flux",
+        "img_mod.lin": "flux",
+        "txt_mod.lin": "flux",
+        "img_attn.qkv": "flux",
+        "txt_attn.qkv": "flux",
+        "t_embedder.mlp": "pixart_s",
+        "y_embedder.embedding_table": "pixart_s",
+        "wkqv.": "hunyuan",
+        "wqkv.": "hunyuan",
+        "q_norm": "hunyuan",
+        "k_norm": "hunyuan",
+        "out_proj": "hunyuan",
+        "kq_proj": "hunyuan",
+        "default_modulation.": "hunyuan",
+        "pooler": "hunyuan",
+        "t_embedder": "hunyuan",
+        "x_embedder": "hunyuan",
+        "mlp_t5": "hunyuan",
+        "time_extra_emb.extra_embedder": "hunyuan",
+        "to_q": "diffusers",
+        "to_k": "diffusers",
+        "to_v": "diffusers",
+        "norm_q": "diffusers",
+        "norm_k": "diffusers",
+        "to_out": "diffusers",
+        "norm1.norm": "diffusers",
+        "norm1.linear": "diffusers",
+        "ff.net.0": "diffusers",
+        "ff.net.2": "diffusers",
+        "time_extra_emb": "diffusers",
+        "time_embedding": "diffusers",
+        "pos_embd": "diffusers",
+        "text_embedder": "diffusers",
+        "extra_embedder": "diffusers",
+        "attn.norm_added_q": "diffusers",
+        "skip.connection": "sdxl",
+        "in.layers.2": "sdxl",
+        "out.layers.3": "sdxl",
+        "upsamplers": "sdxl",
+        "downsamplers": "sdxl",
+        "op": "sd",
+        "in_layers": "sd",
+        "out_layers": "sd",
+        "emb_layers": "sd",
+        "skip_connection": "sd",
+        "text_model": "diffusers_lora",
+        "self_attn": "diffusers_lora",
+        "to_q_lora": "diffusers_lora",
+        "to_k_lora": "diffusers_lora",
+        "to_v_lora": "diffusers_lora",
+        "to_out_lora": "diffusers_lora",
+        "text_projection": "diffusers_lora",
+        "to.q.lora": "unet_lora",
+        "to.k.lora": "unet_lora",
+        "to.v.lora": "unet_lora",
+        "to.out.0.lora": "unet_lora",
+        "proj.in": "unet_lora",
+        "proj.out": "unet_lora",
+        "emb.layers": "unet_lora",
+        "proj_in.": "transformers",
+        "proj_out.": "transformers",
+        "norm.": "transformers",
+        "norm1.": "unet",
+        "norm2.": "unet",
+        "norm3.": "unet",
+        "attn1.to_q.": "unet",
+        "attn1.to_k.": "unet",
+        "attn1.to_v.": "unet",
+        "attn1.to_out.0.": "unet",
+        "attn2.to_q.": "unet",
+        "attn2.to_k.": "unet",
+        "attn2.to_v.": "unet",
+        "attn2.to_out.0.": "unet",
+        "ff.net.0.proj.": "unet",
+        "ff.net.2.": "unet"
+    },
+    "clip_data": {
+        "CLI-VL": [
+            "STA-15",
+            "MIT-D1",
+            "TIN-SD",
+            "SD1-TR",
+            {
+                "CLI-VG": [
+                    "STA-XL",
+                    "PLA-25",
+                    "COM-XC",
+                    "COM-XN",
+                    "SEG-VG",
+                    "SSD-1B",
+                    {
+                        "T5X-XL": "STA-3"
+                    }
+                ]
+            },
+            {
+                "T5X-XL": "FLU-01"
+            }
+        ],
+        "CLI-VG": "STA-CA",
+        "CLI-VH": "WUR-00",
+        "T5V-11": [
+            "PIX-AL",
+            "PIX-SG",
+            {
+                "BER-T": "HUN-12"
+            }
+        ],
+        "T5V-UM": "AUR-03",
+        "CHA-G3": "KOL-01",
+        "LUM-01": "LUM-01",
+        "GEM-A": "LUM-NS"
+    },
+    "peek": {
+        "model_peek": {
+            "1131": {
+                "1280": [
+                    224,
+                    "STA-15"
+                ]
+            },
+            "2515": {
+                "1280": [
+                    980,
+                    "STA-XL"
+                ]
+            },
+            "735": {
+                "1536": [
+                    286,
+                    "STA-3M"
+                ]
+            },
+            "1448": {
+                "768": [
+                    550,
+                    "STA-3C"
+                ]
+            },
+            "1668": {
+                "32128": [
+                    550,
+                    "STA-3Q"
+                ]
+            },
+            "1682": {
+                "320": [
+                    984,
+                    "KOL-01"
+                ]
+            },
+            "786": {
+                "3072": [
+                    2,
+                    "FLU-10"
+                ]
+            },
+            "780": {
+                "3072": [
+                    204,
+                    "FLU-1D"
+                ]
+            },
+            "776": {
+                "3072": [
+                    2,
+                    "FLU-1S"
+                ]
+            },
+            "824": {
+                "8": [
+                    208,
+                    "AUR-03"
+                ]
+            },
+            "612": {
+                "6": [
+                    560,
+                    "PIX-AL"
+                ]
+            },
+            "437": {
+                "1152": [
+                    1262008531,
+                    "PIX-SI"
+                ]
+            },
+            "2166": {
+                "4309802": [
+                    162,
+                    "HUN-12"
+                ]
+            },
+            "1220": {
+                "81": [
+                    640,
+                    "LUM-01"
+                ]
+            },
+            "826": {
+                "576": [
+                    72,
+                    "STA-CQ"
+                ]
+            },
+            "2094": {
+                "8192": [
+                    773,
+                    "STA-CB"
+                ]
+            },
+            "639": {
+                "1024": [
+                    432,
+                    "LUM-NS"
+                ]
+            }
+        },
+        "vae_peek_0": {
+            "167335342": {
+                "248": "AUR-03-"
+            },
+            "335304388": {
+                "244": "FLU-1"
+            },
+            "404581567": {
+                "304": "STA-15"
+            },
+            "167335343": {
+                "248": "KOL-01"
+            },
+            "114560782": {
+                "248": "STA-15"
+            }
+        },
+        "vae_peek_12": {
+            "334643238": {
+                "248": "PIX-SI"
+            },
+            "334643268": {
+                "248": "PIX-AL"
+            },
+            "167335344": {
+                "248": "SGM-VG"
+            }
+        },
+        "vae_peek": {
+            "167333134": {
+                "248": "STA-XL"
+            },
+            "334641162": {
+                "250": "STA-XL"
+            },
+            "334641190": {
+                "250": "STA-15"
+            }
+        },
+        "tra_peek": {
+            "220": {
+                "32128": [
+                    49,
+                    "T5X-XL"
+                ]
+            },
+            "258": {
+                "32128": [
+                    62,
+                    "T5V-11"
+                ]
+            },
+            "517": {
+                "1280": [
+                    2,
+                    "CLI-VG"
+                ]
+            },
+            "1722": {
+                "90": [
+                    220,
+                    "CLI-OP"
+                ]
+            },
+            "520": {
+                "1024": [
+                    4,
+                    "CLI-VH"
+                ]
+            },
+            "242": {
+                "32128": [
+                    49,
+                    "T5X-PI"
+                ]
+            },
+            "196": {
+                "768": [
+                    2,
+                    "CLI-VL"
+                ]
+            },
+            "312": {
+                "4608": [
+                    57,
+                    "CHA-G3"
+                ]
+            }
+        },
+        "lora_peek": {
+            "134621524": {
+                "834": [
+                    "PCM",
+                    "STA-15"
+                ]
+            },
+            "1": {
+                "566": [
+                    "PCM",
+                    "STA-15"
+                ],
+                "1562": [
+                    "TCD",
+                    "STA-XL"
+                ]
+            },
+            "687476088": {},
+            "393854592": {
+                "2364": [
+                    "PCM",
+                    "DMD",
+                    "LIG",
+                    "STA-XL"
+                ],
+                "256": [
+                    "SPO",
+                    "STA-XL"
+                ]
+            },
+            "103507000": {
+                "534": [
+                    "PCM",
+                    "STA-3"
+                ]
+            },
+            "21581612": {
+                "1120": [
+                    "SPO",
+                    "STA-XL"
+                ],
+                "2166": [
+                    "SPO",
+                    "STA-XL"
+                ]
+            },
+            "371758976": {
+                "1680": [
+                    "SPO",
+                    "FLA",
+                    "STA-XL"
+                ],
+                "1120": [
+                    "SPO",
+                    "FLA",
+                    "STA-XL"
+                ]
+            },
+            "371841776": {
+                "1680": [
+                    "SPO",
+                    "FLA",
+                    "STA-XL"
+                ]
+            },
+            "46687104": {
+                "1680": [
+                    "SPO",
+                    "STA-XL"
+                ]
+            },
+            "3227464": {
+                "256": [
+                    "SPO",
+                    "STA-15"
+                ],
+                "2166": [
+                    "SPO",
+                    "STA-15"
+                ],
+                "762": [
+                    "SPO",
+                    "STA-15"
+                ]
+            },
+            "269127064": {
+                "834": [
+                    "HYP",
+                    "STA-15"
+                ]
+            },
+            "787359648": {
+                "2166": [
+                    "HYP",
+                    "STA-XL"
+                ]
+            },
+            "787359649": {
+                "2364": [
+                    "HYP",
+                    "STA-XL"
+                ]
+            },
+            "472049168": {
+                "682": [
+                    "HYP",
+                    "STA-3"
+                ]
+            },
+            "1388026440": {
+                "1008": [
+                    "HYP",
+                    "FLU-1"
+                ]
+            },
+            "393854624": {
+                "2364": [
+                    "LCM",
+                    "TCD",
+                    "STA-XL"
+                ]
+            },
+            "134621556": {
+                "834": [
+                    "LCM",
+                    "TCD",
+                    "STA-15"
+                ]
+            },
+            "393855224": {
+                "2364": [
+                    "LCM",
+                    "STA-XL"
+                ]
+            },
+            "509550144": {
+                "3156": [
+                    "FLA",
+                    "STA-XL"
+                ]
+            },
+            "239224692": {
+                "699": [
+                    "RT",
+                    "STA-VG"
+                ]
+            }
+        }
+    }
+}
